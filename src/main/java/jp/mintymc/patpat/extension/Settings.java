@@ -9,7 +9,7 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
                 double distance, long cooldown, long duration, long frameMs, double height, int maxActive,
                 boolean localPreview, List<String> frames, String permission,
                 String renderer, String imageFile, double scale, double offsetX, double offsetZ, boolean imageLoop, String offsetSpace, double sittingOffsetY, boolean soundEnabled, String soundEvent, double soundVolume, double soundPitch, boolean standaloneMode, boolean squishEnabled, boolean handMotionEnabled, double handMotionDepth, long handMotionDuration,
-                boolean avoidHandOcclusion, double handFrontClearance, boolean swingHandEnabled,
+                boolean swingHandEnabled,
                 Set<String> ignoredEntityTypes, Set<UUID> ignoredPlayerUuids,
                 boolean cameraShakeEnabled, double cameraShakeIntensity) {
     static Settings load(Path file) throws IOException {
@@ -32,7 +32,6 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
                 p.getProperty("offset-space","view").trim().toLowerCase(Locale.ROOT),number(p,"sitting-offset-y",0.2,-2,2),flag(p,"sound-enabled",true),p.getProperty("sound-event","patpatbedrock.pat"),number(p,"sound-volume",1,0,4),number(p,"sound-pitch",1,.1,4),flag(p,"standalone-mode",true),flag(p,"squish-enabled",true),
                 flag(p,"hand-motion-enabled",true),number(p,"hand-motion-depth",0.425,0,2),
                 (long)number(p,"hand-motion-duration-ms",240,50,5000),
-                flag(p,"hand-avoid-occlusion",true),number(p,"hand-front-clearance",0.15,0,2),
                 flag(p,"swing-hand-enabled",true),entityTypes(p),playerUuids(p),
                 flag(p,"camera-shake-enabled",false),number(p,"camera-shake-intensity",0.06,0,0.3));
     }
