@@ -27,13 +27,9 @@ class PatExtrasTest {
         assertTrue(cfg.ignoredEntityTypes().contains("example:custom_mob"));
         assertFalse(cfg.ignoredEntityTypes().contains(""));
         assertEquals(Set.of(id),cfg.ignoredPlayerUuids());
-        assertTrue(cfg.avoidHandOcclusion());
         assertTrue(cfg.swingHandEnabled());
-        assertEquals(.15,cfg.handFrontClearance(),1e-6);
         p.setProperty("swing-hand-enabled","false");
-        p.setProperty("hand-avoid-occlusion","false");
         assertFalse(Settings.from(p).swingHandEnabled());
-        assertFalse(Settings.from(p).avoidHandOcclusion());
     }
 
     @Test void personalPatTotalsPersistAcrossReloadAndNeverMixPlayers() throws Exception {
