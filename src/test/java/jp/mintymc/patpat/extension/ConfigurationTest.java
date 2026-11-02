@@ -6,7 +6,7 @@ class ConfigurationTest {
     @Test void clampsInvalidSettingsAndPreservesValidGlyphs() {
         Properties p=new Properties();p.setProperty("duration-ms","-1");p.setProperty("max-distance","NaN");p.setProperty("frames",",,");
         Settings cfg=Settings.from(p);
-        assertEquals(200,cfg.duration());assertEquals(3,cfg.distance());assertEquals(4,cfg.frames().size());
+        assertEquals(0,cfg.duration());assertEquals(3,cfg.distance());assertEquals(4,cfg.frames().size());
         p.setProperty("frames","A,B");assertEquals(2,Settings.from(p).frames().size());
     }
     @Test void requiresExactRuntimeBuildAndCommit() {

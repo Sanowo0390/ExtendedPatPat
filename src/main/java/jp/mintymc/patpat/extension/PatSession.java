@@ -32,7 +32,7 @@ final class PatSession extends SessionAdapter {
     private long nextPat;
     PatSession(PatPatExtension owner,GeyserSession session) {
         this.owner=owner;this.session=session;this.downstream=session.getDownstream().getSession();
-        this.renderer=new HandRenderer(session,owner::settings);
+        this.renderer=new HandRenderer(session,owner::settings,owner::animation);
     }
     GeyserSession session(){return session;}
     boolean ready(){return ready;}

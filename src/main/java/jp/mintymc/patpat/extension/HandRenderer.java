@@ -13,9 +13,10 @@ import java.util.function.Supplier;
 final class HandRenderer {
     private final GeyserSession session;
     private final Supplier<Settings> settings;
+    private final Supplier<ImageAnimation> animation;
     private final Map<Integer,Hand> hands=new HashMap<>();
     private boolean ticking;
-    HandRenderer(GeyserSession session,Supplier<Settings> settings) { this.session=session;this.settings=settings; }
+    HandRenderer(GeyserSession session,Supplier<Settings> settings,Supplier<ImageAnimation> animation) { this.session=session;this.settings=settings;this.animation=animation; }
     int size() { return hands.size(); }
     private Entity find(int id) {
         return session.getPlayerEntity().javaId()==id ? session.getPlayerEntity() : session.getEntityCache().getEntityByJavaId(id);
@@ -28,9 +29,10 @@ final class HandRenderer {
         if(hands.size()>=cfg.maxActive()) return;
         long id=session.getEntityCache().nextEntityId();
         String name=text ? "PAT" : cfg.frames().getFirst();
-        AddEntityPacket packet=spawnPacket(id,anchor(entity),name);
+        boolean image=!text && cfg.renderer().equals("image") && animation.get()!=null;
+        AddEntityPacket packet=image?spawnImagePacket(id,anchor(entity),(float)cfg.scale(),0):spawnPacket(id,anchor(entity),name);
         session.sendUpstreamPacket(packet);
-        hands.put(javaId,new Hand(id,entity,System.nanoTime(),text,name));
+        hands.put(javaId,new Hand(id,entity,System.nanoTime(),text,name,image,cfg.scale()));
         if(!ticking) { ticking=true; schedule(); }
     }
     static AddEntityPacket spawnPacket(long id,Vector3f position,String name) {
@@ -49,8 +51,19 @@ final class HandRenderer {
         packet.getMetadata().put(EntityDataTypes.NAMETAG_ALWAYS_SHOW,(byte)1);
         return packet;
     }
+    static AddEntityPacket spawnImagePacket(long id,Vector3f position,float scale,int frame) {
+        AddEntityPacket packet=new AddEntityPacket();packet.setRuntimeEntityId(id);packet.setUniqueEntityId(id);
+        packet.setIdentifier(ImagePack.ENTITY);packet.setPosition(position);packet.setMotion(Vector3f.ZERO);packet.setRotation(Vector2f.ZERO);
+        packet.getMetadata().setFlag(EntityFlag.NO_AI,true);packet.getMetadata().setFlag(EntityFlag.SILENT,true);
+        packet.getMetadata().put(EntityDataTypes.SCALE,scale);packet.getMetadata().put(EntityDataTypes.VARIANT,frame);
+        packet.getMetadata().put(EntityDataTypes.WIDTH,0f);packet.getMetadata().put(EntityDataTypes.HEIGHT,0f);
+        return packet;
+    }
     private Vector3f anchor(Entity entity) {
-        return entity.position().add(0,entity.getBoundingBoxHeight()+(float)settings.get().height(),0);
+        return anchor(entity.position(),entity.getBoundingBoxHeight(),settings.get());
+    }
+    static Vector3f anchor(Vector3f feet,float height,Settings settings) {
+        return feet.add((float)settings.offsetX(),height+(float)settings.height(),(float)settings.offsetZ());
     }
     private void schedule() { session.scheduleInEventLoop(this::tick,50,TimeUnit.MILLISECONDS); }
     private void tick() {
@@ -58,11 +71,21 @@ final class HandRenderer {
         Settings cfg=settings.get(); long now=System.nanoTime();
         for(Iterator<Map.Entry<Integer,Hand>> it=hands.entrySet().iterator();it.hasNext();) {
             var entry=it.next(); Hand hand=entry.getValue(); long elapsed=(now-hand.started)/1_000_000;
-            if(elapsed>=cfg.duration() || find(entry.getKey())!=hand.entity || !hand.entity.isValid()
+            long duration=cfg.duration()>0?cfg.duration():(hand.image?animation.get().duration():800);
+            if(elapsed>=duration || find(entry.getKey())!=hand.entity || !hand.entity.isValid()
                     || hand.entity.getFlag(EntityFlag.INVISIBLE)) { remove(hand.id);it.remove();continue; }
             MoveEntityAbsolutePacket move=new MoveEntityAbsolutePacket();
             move.setRuntimeEntityId(hand.id); move.setPosition(anchor(hand.entity)); move.setRotation(Vector3f.ZERO);
             move.setTeleported(true); session.sendUpstreamPacket(move);
+            if(hand.image) {
+                int index=animation.get().frameAt(elapsed,cfg.imageLoop());
+                if(index!=hand.frame || cfg.scale()!=hand.scale) {
+                    SetEntityDataPacket update=new SetEntityDataPacket();update.setRuntimeEntityId(hand.id);
+                    update.getMetadata().put(EntityDataTypes.VARIANT,index);update.getMetadata().put(EntityDataTypes.SCALE,(float)cfg.scale());
+                    session.sendUpstreamPacket(update);hand.frame=index;hand.scale=cfg.scale();
+                }
+                continue;
+            }
             String frame=hand.text ? "PAT" : cfg.frames().get((int)(elapsed/cfg.frameMs()%cfg.frames().size()));
             if(!frame.equals(hand.name)) {
                 SetEntityDataPacket update=new SetEntityDataPacket(); update.setRuntimeEntityId(hand.id);
@@ -74,7 +97,7 @@ final class HandRenderer {
     void clear() { if(!session.isClosed()) hands.values().forEach(h->remove(h.id)); hands.clear(); }
     private void remove(long id) { RemoveEntityPacket packet=new RemoveEntityPacket();packet.setUniqueEntityId(id);session.sendUpstreamPacket(packet); }
     private static final class Hand {
-        final long id,started;final Entity entity;final boolean text;String name;
-        Hand(long id,Entity entity,long started,boolean text,String name) {this.id=id;this.entity=entity;this.started=started;this.text=text;this.name=name;}
+        final long id,started;final Entity entity;final boolean text,image;String name;int frame;double scale;
+        Hand(long id,Entity entity,long started,boolean text,String name,boolean image,double scale) {this.id=id;this.entity=entity;this.started=started;this.text=text;this.name=name;this.image=image;this.scale=scale;}
     }
 }

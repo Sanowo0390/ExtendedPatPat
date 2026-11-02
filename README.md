@@ -1,132 +1,166 @@
-# PatPatGeyserExtension 0.2.1
+# PatPatGeyserExtension 0.3.0
 
-**Geyserの`extensions/`へ入れる版です。Paper用PatPatGeyserAddonは不要です。**
+Geyserの`extensions/`へ入れるPatPat拡張です。統合版で撫でる操作と手の表示を追加し、Java版PatPat Modとも通信します。Paper用PatPatGeyserAddonは不要です。
 
-統合版のしゃがみ＋空の手でのインタラクトをPatPat Modと同じV2通信へ変換し、手のアニメーションは統合版クライアント内にだけ表示します。バックエンドで補助アーマースタンドを生成しません。
+**0.3.0から、PNG・GIFを貼った専用エンティティで表示します。サイズとX/Y/Z位置を調整でき、画像から統合版パックを自動生成します。既定の画像方式は絵文字フォントを上書きしません。**
 
-## 対応環境
+## 必要な環境
 
-- **Geyser 2.12.1-b1280 / commit `64bb3993b4beef6743af0ab76ee5dfc8e67a0d21`専用**。
-- Java 21以上。ユーザーのVelocity＋Geyser環境を対象に、配布済みVelocity版b1280の実際のクラスへコンパイルしています。
-- バックエンドは**PatPat Plugin 1.2.5以上**が必要です。PatPat本体は同梱していません。
-- Java版で従来の演出を見る人にはPatPatクライアントModが必要です。
-- 拡張単体ではFloodgate-Spigotの追加は不要です。既存のGeyser／Floodgate認証設定はそのまま利用します。
-- Geyserの公開APIだけでは操作・PatPat独自通信を扱いきれないため、セッション／パケットAPIも使います。**異なるGeyserビルドでは操作変換を停止し、起動ログへ理由を出します。** Geyserの自動更新でビルドが変わった場合は、そのビルドに合わせた拡張の再ビルドが必要です。
-- 試験版です。コンパイル／自動テスト済みですが、実際の統合版クライアントと接続した確認はまだ行っていません。詳細はVALIDATION.md。
+- **Geyser 2.12.1-b1280 / commit `64bb3993b4beef6743af0ab76ee5dfc8e67a0d21`専用**。内部セッション／パケットAPIを使うため、別ビルドでは操作変換を停止します。
+- Java 21以上。Velocity版b1280の実配布JARに対してビルドしています。
+- 撫でる操作を使うバックエンドに**PatPat Plugin 1.2.5以上**。
+- Java版で従来の演出を見るプレイヤーはPatPatクライアントModが必要です。
+- 既存のGeyser／Floodgate認証設定を利用します。拡張単体のためにFloodgate-Spigotを追加する必要はありません。
+- 試験版です。自動テストはVALIDATION.mdを参照。実クライアントでの新しい画像モデルの見え方は未検証です。
 
-## 0.2.0からの修正
+## 導入・更新
 
-Velocityで追加権限がないとコマンドや撫で操作を使えない問題を修正しました。古いJARを外して0.2.1へ置換し、Proxyを再起動してください。既存の設定ファイルとパックはそのまま使えます。
-
-## 導入
-
-1. 前回のPaper用`PatPatGeyserAddon-0.1.0.jar`を導入している場合は、バックエンドの`plugins/`から外します。**PatPat本体は残してください。** 両方を同時に動かすと演出や操作が重複する可能性があります。
-2. `PatPatGeyserExtension-0.2.1.jar`を、Velocity側の **`plugins/Geyser-Velocity/extensions/`** に置きます。Velocity直下の`plugins/`ではありません。
-3. 前回の`PatPatBedrock-0.1.0.mcpack`をGeyserの`packs/`へ入れていた場合は、そこから外して構いません。今回はJARからパックを展開して自動登録します。手動パックが同じUUIDで既に登録されている場合、二重登録は避けますが、古いパックが優先されます。
-4. Proxyを再起動します。初回に`extensions/patpatbedrock/`へ設定と`PatPatBedrock.mcpack`が生成されます。
-5. Geyserの`force-resource-packs: true`を推奨。統合版で入り直し、パックを受け取ってください。
-6. **PatPat本体の入ったSurvivalへ移動**し、次のコマンドで確認します。
+1. 古いPatPatGeyserExtensionのJARを外し、新しい`PatPatGeyserExtension-0.3.0.jar`を**`plugins/Geyser-Velocity/extensions/`**へ配置。
+2. Paper用PatPatGeyserAddonが残っていれば外します。**バックエンドのPatPat本体は残してください。**
+3. Proxyを再起動。`extensions/patpatbedrock/`に初期GIF、設定、新しいパックを自動生成します。旧設定には新しいキーを追加し、既存の値は保持します。
+4. 統合版で入り直して生成パックを受信。Geyserの`force-resource-packs: true`を推奨します。
+5. PatPat本体のあるSurvivalで次を実行します。
 
 ```text
 /patpatbedrock status
-/patpatbedrock test text
 /patpatbedrock test
 ```
 
-`backendHello=true`なら、現在接続中のバックエンドのPatPat本体から応答を受信できています。`test text`はパック不要の`PAT`文字、`test`は手アイコンです。見ているエンティティがGeyserに通知されていればその頭上へ、なければ自分の頭上へ表示します。自分の頭上は三人称視点で確認できます。
+`status`の`renderer=image`を確認してください。`backendHello=true`はPatPat本体から応答を受信できた状態です。`false`でも表示テストは可能ですが、実際の撫でる操作はできません。本体のないロビーではfalseで正常です。
 
-本体のないロビーでは`backendHello=false`でも正常です。テスト表示自体は利用できますが、実際の撫でる操作にはバックエンドのPatPatが必要です。バックエンド切替・リスポーン／ディメンション変更時には通信状態を再確認します。
+`/patpatbedrock test`は照準先の頭上へ、自分にだけ表示します。照準先がGeyserに通知されていなければ自分の頭上です。三人称視点で確認できます。`test text`は引き続きパック不要の文字表示テストです。
 
-## 操作
+旧版の`PatPatBedrock-0.1.0.mcpack`をGeyserの`packs/`へ手動配置していた場合、画像方式では不要なので外してください。旧glyphパックを残すとそのフォント上書きも残ります。
 
-- 空のメインハンドでしゃがみ、モブを「使う／インタラクト」します。
-- 攻撃タップは変換しません。端末の操作モードによっては長押し等が必要です。
-- **`/patpatbedrock pat`** でも、照準先としてGeyserに認識されている相手を撫でられます。コマンドではしゃがみ不要ですが、空の手・距離・権限は必要です。照準先が通知されない端末では、インタラクト操作を使用してください。
-- 既定の最大距離は3ブロック、クールダウンは600msです。メインハンド／インタラクト重複は共通のクールダウンで抑止します。
+## 位置・サイズを調整
 
-## Java版との連携
+編集するファイル:
 
-| 操作した人 | Java版＋PatPat Mod | 統合版 |
+```text
+plugins/Geyser-Velocity/extensions/patpatbedrock/config.properties
+```
+
+例（1.2ブロック幅へ拡大し、対象の頭上から0.2ブロック下へ）:
+
+```properties
+renderer=image
+image-scale=1.2
+offset-x=0.0
+offset-y=-0.2
+offset-z=0.0
+```
+
+- `image-scale`: 透明な正方形キャンバスの幅／高さをブロック単位で指定。既定0.8、範囲0.05〜8。画像に余白が多いほど、見える絵の部分は小さくなります。
+- `offset-y`: 対象の当たり判定の上端を基準とした画像中心の高さ。正で上、負で下。文字ネームタグの高さ補正は使いません。
+- `offset-x`／`offset-z`: ワールドのX／Z軸方向のずれ。対象が回転してもワールド軸は変わりません。
+- 非正方形の画像は縦横比を保ったまま中央へ収め、残りを透明にします。描画モデルはカメラを向く板です。
+- 旧`height-offset`は`offset-y`の初期値へ引き継ぎます。以後は`offset-y`を編集してください。
+
+変更後、Proxyコンソールで実行:
+
+```text
+patpatbedrock reload
+```
+
+ゲーム内では`/patpatbedrock reload`です。Proxy側の`patpatbedrock.admin`権限が必要です。位置・サイズ・表示時間は再接続せずに反映できます。
+
+## PNG・GIFへ差し替える
+
+1. 使用する画像を次のフォルダーへ置きます。
+
+```text
+plugins/Geyser-Velocity/extensions/patpatbedrock/images/
+```
+
+2. ファイル名を設定します。
+
+```properties
+image-file=images/custom.gif
+```
+
+PNGなら`image-file=images/custom.png`です。
+
+3. **Proxyを再起動し、統合版で再接続**してください。ファイル内容からパックを再生成し、変更に応じてキャッシュ用のパックversionも変更します。画像やファイル名、rendererの変更をreloadだけで配信することはできません。
+
+- PNG: 透過に対応した静止画。
+- GIF: 最大128フレーム。元のフレーム待ち時間、部分更新、残像を防ぐdisposal合成に対応。
+- GIFの更新精度は最大20fps。50ms未満の待ち時間は50msへ、0msは100msへ調整します。
+- 元のキャンバスは最大1024×1024、ファイルサイズは16MiBまで。各コマは縦横比を維持して128×128の透過PNGに変換します。
+- 不正／未対応画像の場合は起動ログへ理由を出し、通常の変換を停止します。
+- 初期の`images/hand.gif`は上書きしません。独自画像や既存の設定ファイルを保持します。
+
+表示時間と繰り返し:
+
+```properties
+# 0ならGIF全体を1周表示。PNGは800ms。
+duration-ms=0
+# duration-msを長くした場合、アニメーションを繰り返すか
+image-loop=true
+```
+
+例: `duration-ms=2000`と`image-loop=true`で2秒間繰り返します。`image-loop=false`なら最後のコマで停止し、表示時間の終了時に消えます。GIF内の繰返し回数指定は使用せず、この設定で管理します。旧設定の`duration-ms=800`は保持されるため、長いGIF全体を表示したい場合は0へ変更してください。
+
+生成パックは`extensions/patpatbedrock/generated/`に保存します。`auto-pack=false`なら自動配信を止め、生成されたパックを別の配信経路で利用できます。再起動時の削除・再生成は不要です。
+
+## 撫でる操作
+
+- 空のメインハンドでしゃがみ、モブを「使う／インタラクト」します。攻撃タップは変換しません。
+- `/patpatbedrock pat`も利用できます。Geyserが照準先として認識している対象が必要です。コマンドはしゃがみ不要です。
+- 最大距離は既定3ブロック。クールダウン600msで重複するインタラクトを抑止します。
+- `backendHello=false`なら、接続先のPatPat本体とまだ通信できていません。表示テストの成功と本体との通信成功は別々に確認してください。
+
+## 設定一覧
+
+| キー | 既定値 | 内容 |
 |---|---|---|
-| 統合版 | PatPat本体の通常パケットによる演出 | 操作者のローカル演出＋周囲は本体からの受信で表示 |
-| Java版＋PatPat Mod | 従来どおり | 本体からのV2パケットを受信して表示 |
-| Java版・Modなし | 撫でる操作は追加しません | ― |
+| enabled | true | 操作変換と通常の受信演出 |
+| renderer | image | `image`はPNG/GIFモデル、`glyph`は旧文字方式 |
+| image-file | images/hand.gif | 設定フォルダー内の画像への相対パス |
+| image-scale | 0.8 | 正方形キャンバスの幅・高さ（ブロック） |
+| offset-x / offset-y / offset-z | 0 / 0.05 / 0 | 当たり判定上端からの画像中心位置 |
+| duration-ms | 0 | 0で画像の1周分、それ以外は固定表示時間 |
+| image-loop | true | 固定表示時間中にGIFを繰り返す |
+| auto-pack | true | 表示用パックを自動登録 |
+| required-permission | 空欄 | 追加のProxy権限。既定は不要 |
+| require-sneaking | true | インタラクト時にしゃがみ必須 |
+| require-empty-hand | true | 空のメインハンド必須 |
+| allow-players | true | プレイヤーも撫でられる |
+| max-distance | 3.0 | 対象の当たり判定までの最大距離 |
+| cooldown-ms | 600 | 連打抑止 |
+| max-active-per-viewer | 32 | 統合版プレイヤー1人あたりの最大同時演出数 |
+| local-preview | true | 操作者の演出を先行表示 |
+| frames / frame-ms | 旧4文字 / 100 | glyph方式でのみ使用 |
 
-この版は公開APIを呼ぶ方式ではなく、PatPat Modのクライアント通信を実装する方式です。**PatPat本体の通常のパケット受信処理（リスト・権限・レート制限）を通ります。** `api: true`は拡張自体には必須ではありません。ただし他の制限アドオンが公開APIイベントを利用している場合は、本体側で有効にしておいてください。
+status／test／patは既定で追加のProxy権限不要です。制限する場合は`required-permission=patpatbedrock.use`等を設定し、**Velocity側**の権限プラグインで付与してください。バックエンドの権限では代用できません。reloadは`patpatbedrock.admin`、バックエンドのPatPat本体の制限は本体の設定に従います。
 
-### 操作者の演出について
+## 通信・制限について
 
-PatPat本体は、通常の撫でるパケットを操作者へ返しません。Java版Modと同様、操作者の手の演出はサーバーの受理を待たずに表示します。そのため、**PatPat側で拒否されても操作者自身には手が見える場合があります**。周囲のプレイヤーには、実際にサーバーから届いたパケットでのみ表示します。設定の`local-preview=false`で操作者の先行表示を無効にできます。
+この拡張はPatPat Modと同じV2通信を使い、本体の通常のリスト・権限・レート制限を通ります。Java版Modからの受信演出も統合版へ表示します。PatPat公開APIの直接呼出し方式ではなく、`api: true`は拡張単体には必須ではありません。
 
-通常のBukkit右クリックイベントへは変換されません。保護が必要な場合は、PatPat本体の権限／リスト設定、またはPatPatのイベントへ対応する制限アドオンで管理してください。通常のモブ右クリック保護と完全に同じ動作になるとは限りません。
+PatPat本体は通常のパケットを操作者へ返さないため、**操作者だけは本体の受理を待たずに先行表示**します。拒否されても自分には手が見える場合があります。周囲には本体から届いたパケットでのみ表示します。`local-preview=false`で先行表示を無効にできます。
 
-## 設定
+通常のBukkit右クリックイベントを作る方式ではありません。保護が必要な場合はPatPat本体の設定か、PatPatイベントへ対応する制限アドオンで管理してください。
 
-`plugins/Geyser-Velocity/extensions/patpatbedrock/config.properties`
-
-| 設定 | 既定値 | 内容 |
-|---|---|---|
-| `enabled` | true | 操作変換と通常の受信演出 |
-| `required-permission` | 空欄 | 追加のProxy権限。空欄なら不要 |
-| `auto-pack` | true | 同梱パックを自動配信。変更はProxy再起動が必要 |
-| `require-sneaking` | true | インタラクト操作にしゃがみ必須 |
-| `require-empty-hand` | true | 空のメインハンド必須 |
-| `allow-players` | true | プレイヤーも撫でられる |
-| `max-distance` | 3.0 | バウンディングボックスまでの最大距離 |
-| `cooldown-ms` | 600 | 連打抑止 |
-| `duration-ms` | 800 | 手の表示時間 |
-| `frame-ms` | 100 | フレーム間隔 |
-| `height-offset` | 0.15 | 対象の頭上からの高さ。実機で調整可能 |
-| `max-active-per-viewer` | 32 | プレイヤー1人あたりの同時演出数 |
-| `local-preview` | true | 操作者の先行演出 |
-| `frames` | U+E2A0～U+E2A3 | カンマ区切りの手の4フレーム |
-
-VelocityではGeyserの既定権限値が反映されません。0.2.1ではstatus／test／patを公開コマンドとして登録し、`required-permission`を設定した場合だけ実行時に権限を確認します。バックエンドのLuckPermsで付けた権限はProxy側の権限チェックには使われません。
-
-通常の設定は`/patpatbedrock reload`で反映できます。再読込時は演出を削除し、バックエンドの通信状態も再確認します。
-
-| 権限 | 設定する場所 | 内容 |
-|---|---|---|
-| `required-permission`で指定した権限 | Proxy/Geyser側 | 設定した場合のみ、操作とテストに必要。既定では追加権限不要 |
-| `patpatbedrock.admin` | Proxy/Geyser側 | reload。既定では明示的な付与が必要。コンソールからも実行可能 |
-| `patpat.pat`等 | バックエンド側 | PatPat本体の設定に従う権限 |
-
-## リソースパックの競合
-
-前回と同じ手パックを同梱しています。`font/glyph_E2.png`全体を置き換えるため、別の絵文字パックが同じページを使う場合は統合が必要です。U+E2A0～U+E2A3は、256×256画像の行10・列0～3（16×16セル）です。
-
-既存パックへ4セルを合成して配信する場合は、`auto-pack=false`にし、統合済みパックを既存の配信経路で配信してください。`frames`も必要に応じて変更できます。
-
-生成された`PatPatBedrock.mcpack`は起動時に上書きしません。独自編集を保持します。パック更新時はmanifestのversionを上げ、統合版を再接続してください。
-
-## 問題の切り分け
-
-- 起動ログに`PatPat extension ready for Geyser b1280`が出る → 対応ビルドとしてフックを有効にできています。
-- `Bridge disabled` → 対応外のGeyserビルドです。ビルド番号とcommitを確認。
-- `backendHello=false` → 接続先にPatPat本体がない、古い、またはProxyでPatPatの独自チャンネルが転送されていません。
-- `test text`も見えない → 位置、Geyser／統合版のゼロスケール名前表示を確認。
-- `test text`だけ見える → パック受信・glyph_E2競合・キャッシュを確認。
-- 自分には手が見えるのに他人へ伝わらない → 本体の権限、リスト、レート制限、Modバージョンを確認。自分の先行演出は受理確認ではありません。
-- `geyserdisplayentity`は不要です。ログにあった`JAVA_ENTITY_TYPES`のエラーが出る拡張とは別物で、今回の拡張はそのフィールドを参照しません。
+新しい画像モデル方式はGeyserのcustom entity登録APIを使います。`GeyserDisplayEntity`は不要です。旧版の`Registries.JAVA_ENTITY_TYPES`は参照しません。`renderer=glyph`へ戻す場合は旧パックのglyph_E2ページ競合に注意してください。
 
 ## ビルド
 
-JDK 21以上、Maven 3.9以上、Python 3.10以上で実行します。
+JDK 21以上、Maven 3.9以上、Python 3.10以上:
 
 ```sh
 python scripts/prepare_build.py
 mvn -B verify
 ```
 
-最初のスクリプトはGeyserのb1280配布JARを取得し、公開SHA-256と一致することを確認してローカルのコンパイル用リポジトリへ配置します。Geyser本体や依存ライブラリーを拡張JARへ埋め込みません。成果物は`target/PatPatGeyserExtension-0.2.1.jar`です。push／PR／手動実行用のGitHub Actionsも同梱しています。
+準備スクリプトは公式Geyser b1280配布JARを取得し、SHA-256を確認します。Geyser本体や外部ライブラリーは拡張JARへ埋め込みません。画像変換はJava標準ImageIOで行い、サーバーにPythonやPillowは不要です。GitHub Actionsでpush／PR／手動ビルドを実行できます。
 
-手パックの元画像とmanifestは`resource-pack/`、元のベクターアイコンは`art/hand.svg`です。再生成する場合はPillowをインストールし、`python scripts/build_pack.py`を実行して、生成された`dist/PatPatBedrock-0.1.0.mcpack`を`src/main/resources/PatPatBedrock.mcpack`へコピーしてからビルドしてください。拡張の版番号と同梱パックの版番号は独立しています。
+初期画像は`src/main/resources/default-hand.gif`、旧パックの画像生成元は`art/`、`resource-pack/`と`scripts/build_pack.py`です。
 
-## ライセンス・参照
+## 参照・ライセンス
 
-拡張と独自の手アイコン: MIT。PatPat本体のコードやJARは同梱せず、公開されているV2通信形式と接続します。
+拡張と独自の手アイコンはMIT。PatPat本体のコードやJARは同梱しません。
 
 - [Geyser Extensions](https://geysermc.org/wiki/geyser/extensions/)
-- [Geyser b1280のcommit](https://github.com/GeyserMC/Geyser/commit/64bb3993b4beef6743af0ab76ee5dfc8e67a0d21)
-- [PatPat Plugin](https://github.com/LopyMine/PatPat-Plugin)
-- PatPatプロトコル確認元: `8a5810960441fee6906447b074406247eda0c57c`のHelloPacketHandler、PatPacketV2、PatPacketHandler。
+- [Geyser Entity API](https://geysermc.org/wiki/geyser/custom-entities/)
+- [対象のGeyser commit](https://github.com/GeyserMC/Geyser/commit/64bb3993b4beef6743af0ab76ee5dfc8e67a0d21)
+- [PatPat Plugin](https://github.com/LopyMine/PatPat-Plugin) — 通信確認元 `8a5810960441fee6906447b074406247eda0c57c`

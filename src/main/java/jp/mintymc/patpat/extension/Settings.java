@@ -7,7 +7,8 @@ import java.util.*;
 
 record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyHand, boolean players,
                 double distance, long cooldown, long duration, long frameMs, double height, int maxActive,
-                boolean localPreview, List<String> frames, String permission) {
+                boolean localPreview, List<String> frames, String permission,
+                String renderer, String imageFile, double scale, double offsetX, double offsetZ, boolean imageLoop) {
     static Settings load(Path file) throws IOException {
         Properties p = new Properties();
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) { p.load(reader); }
@@ -20,9 +21,11 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
         return new Settings(flag(p,"enabled",true), flag(p,"auto-pack",true), flag(p,"require-sneaking",true),
                 flag(p,"require-empty-hand",true), flag(p,"allow-players",true),
                 number(p,"max-distance",3,1,6), (long)number(p,"cooldown-ms",600,50,60000),
-                (long)number(p,"duration-ms",800,200,5000), (long)number(p,"frame-ms",100,50,1000),
-                number(p,"height-offset",.15,-2,4), (int)number(p,"max-active-per-viewer",32,1,128),
-                flag(p,"local-preview",true), frames, p.getProperty("required-permission", "").trim());
+                (long)number(p,"duration-ms",0,0,60000), (long)number(p,"frame-ms",100,50,1000),
+                number(p,"offset-y",number(p,"height-offset",.05,-8,8),-8,8), (int)number(p,"max-active-per-viewer",32,1,128),
+                flag(p,"local-preview",true), frames, p.getProperty("required-permission", "").trim(),
+                p.getProperty("renderer","image").trim().toLowerCase(Locale.ROOT), p.getProperty("image-file","images/hand.gif").trim(),
+                number(p,"image-scale",.8,.05,8),number(p,"offset-x",0,-8,8),number(p,"offset-z",0,-8,8),flag(p,"image-loop",true));
     }
     boolean allows(org.geysermc.geyser.api.command.CommandSource source) {
         return permission.isBlank() || source.hasPermission(permission);
