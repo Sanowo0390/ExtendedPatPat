@@ -84,7 +84,15 @@ final class HandRenderer {
         if(!cfg.avoidHandOcclusion() || !cfg.offsetSpace().equals("view") || hitboxWidth<=0)return base;
         double tx=viewer.getX()-feet.getX(),tz=viewer.getZ()-feet.getZ();
         double length=Math.hypot(tx,tz);
-        if(length<1e-5) return base;
+        if(length<1e-5) {
+            // Looking almost straight down: move the image above the target's
+            // upper face instead of attempting an undefined horizontal offset.
+            double above=viewer.getY()+1.62-(feet.getY()+height);
+            if(above<=0)return base;
+            double lift=cfg.scale()*0.5+cfg.handFrontClearance()
+                    +(cfg.handMotionEnabled()?cfg.handMotionDepth():0);
+            return base.add(0,(float)Math.min(lift,Math.max(0,above-0.1)),0);
+        }
         tx/=length;tz/=length;
         // A square hitbox's front face is farther along a diagonal view ray.
         double faceDistance=(hitboxWidth*0.5)/Math.max(Math.abs(tx),Math.abs(tz));
