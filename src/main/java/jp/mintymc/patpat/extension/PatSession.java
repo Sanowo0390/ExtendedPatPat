@@ -80,7 +80,9 @@ final class PatSession extends SessionAdapter {
                         renderer.show(pat.target(),false);
                         // Backend broadcasts the target's Java ID to each viewer.
                         // Only the recipient's own session gets the camera effect.
-                        if(session.getPlayerEntity()!=null && pat.target()==session.getPlayerEntity().javaId())
+                        if(session.getPlayerEntity()!=null
+                                && pat.target()==session.getPlayerEntity().javaId()
+                                && pat.actor()!=session.getPlayerEntity().javaId())
                             receivePatFeedback();
                     });
                 } catch(IllegalArgumentException ignored) { /* Ignore malformed packets without log spam. */ }
