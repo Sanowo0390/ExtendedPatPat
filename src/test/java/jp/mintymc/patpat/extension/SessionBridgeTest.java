@@ -201,4 +201,13 @@ class SessionBridgeTest {
         verify(session).sendMessage(contains("使い方"));
     }
 
+    @Test void disabledPlayerIgnoresBackendPatAnimationsAndStandaloneRelays() {
+        setupAimedTarget();
+        when(owner.patEnabled(session)).thenReturn(false);
+        bridge.packetReceived(network,new ClientboundCustomPayloadPacket(
+                Key.key(PatProtocol.PAT_S2C),new byte[]{(byte)0xAC,2,1}));
+        bridge.showStandalone(300);
+        verify(session,never()).sendUpstreamPacket(any());
+    }
+
 }
