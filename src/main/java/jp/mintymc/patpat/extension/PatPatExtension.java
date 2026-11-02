@@ -153,10 +153,16 @@ public final class PatPatExtension implements Extension {
                 if(viewer.closed() || other.isClosed() || !settings.enabled()
                         || !Objects.equals(world,other.getWorldName())
                         || !Objects.equals(remote,other.remoteServer()))return;
-                Entity candidate=other.getEntityCache().getEntityByUuid(targetUuid);
+                // The recipient's own player is not always present in Geyser's
+                // ordinary entity UUID cache, so resolve it explicitly.
+                boolean recipientIsTarget=other.getPlayerEntity()!=null
+                        && targetUuid.equals(other.getPlayerEntity().uuid());
+                Entity candidate=recipientIsTarget?other.getPlayerEntity()
+                        :other.getEntityCache().getEntityByUuid(targetUuid);
                 if(candidate==null || !candidate.isValid() || !targetUuid.equals(candidate.uuid())
                         || candidate.position()==null || candidate.position().distanceSquared(at)>16)return;
                 viewer.showStandalone(candidate.javaId());
+                if(recipientIsTarget)viewer.receivePatFeedback();
             });
         });
     }
