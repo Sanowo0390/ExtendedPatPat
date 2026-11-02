@@ -70,39 +70,8 @@ final class HandRenderer {
     }
     private Vector3f anchor(Entity entity) {
         Settings cfg=settings.get();
-        return visibleAnchor(entity.position(),displayHeight(entity,cfg),entity.getBoundingBoxWidth(),
+        return anchor(entity.position(),displayHeight(entity,cfg),
                 session.getPlayerEntity().position(),session.getPlayerEntity().getYaw(),cfg);
-    }
-    /**
-     * Keep the hand quad outside the target hitbox rather than allowing half the
-     * sprite to clip into a wide mob. Positive view-space X stays the user's
-     * preferred distance, but grows as necessary for large hitboxes.
-     */
-    static Vector3f visibleAnchor(Vector3f feet,float height,float hitboxWidth,
-                                  Vector3f viewer,float viewerYaw,Settings cfg) {
-        Vector3f base=anchor(feet,height,viewer,viewerYaw,cfg);
-        if(!cfg.avoidHandOcclusion() || !cfg.offsetSpace().equals("view") || hitboxWidth<=0)return base;
-        double tx=viewer.getX()-feet.getX(),tz=viewer.getZ()-feet.getZ();
-        double length=Math.hypot(tx,tz);
-        if(length<1e-5) {
-            // Looking almost straight down: move the image above the target's
-            // upper face instead of attempting an undefined horizontal offset.
-            double above=viewer.getY()+1.62-(feet.getY()+height);
-            if(above<=0)return base;
-            double lift=cfg.scale()*0.5+cfg.handFrontClearance()
-                    +(cfg.handMotionEnabled()?cfg.handMotionDepth():0);
-            return base.add(0,(float)Math.min(lift,Math.max(0,above-0.1)),0);
-        }
-        tx/=length;tz/=length;
-        // A square hitbox's front face is farther along a diagonal view ray.
-        double faceDistance=(hitboxWidth*0.5)/Math.max(Math.abs(tx),Math.abs(tz));
-        // The image is one block square before multiplying its entity scale.
-        double quadHalfWidth=cfg.scale()*0.5;
-        double required=faceDistance+quadHalfWidth+cfg.handFrontClearance();
-        double additional=Math.max(0,required-cfg.offsetX());
-        // Do not move the sprite past the camera on very close encounters.
-        additional=Math.min(additional,Math.max(0,length-0.1-Math.max(0,cfg.offsetX())));
-        return base.add((float)(tx*additional),0,(float)(tz*additional));
     }
     /** Keep user-defined offsets fixed; the Pat movement is an additional Y-only displacement. */
     static Vector3f motionPosition(Vector3f base, long elapsedMs, boolean text, Settings cfg) {
@@ -137,7 +106,7 @@ final class HandRenderer {
         // Return to 50 ms updates afterward to avoid continuous extra packets.
         long now=System.nanoTime();
         boolean animating=settings.get().handMotionEnabled() && hands.values().stream()
-                .anyMatch(h->!h.text && (now-h.started)/1_000_000 < settings.get().handMotionDuration());
+                .anyMatch(h->!h.image && !h.text && (now-h.started)/1_000_000 < settings.get().handMotionDuration());
         session.scheduleInEventLoop(this::tick,animating?20:50,TimeUnit.MILLISECONDS);
     }
     private void tick() {
@@ -149,8 +118,12 @@ final class HandRenderer {
             if(elapsed>=duration || find(entry.getKey())!=hand.entity || !hand.entity.isValid()
                     || hand.entity.getFlag(EntityFlag.INVISIBLE)) { remove(hand.id);it.remove();continue; }
             MoveEntityAbsolutePacket move=new MoveEntityAbsolutePacket();
-            move.setRuntimeEntityId(hand.id); move.setPosition(motionPosition(anchor(hand.entity),elapsed,hand.text,cfg)); move.setRotation(Vector3f.ZERO);
-            move.setTeleported(!cfg.handMotionEnabled() || hand.text || elapsed>=cfg.handMotionDuration()); session.sendUpstreamPacket(move);
+            move.setRuntimeEntityId(hand.id);
+            // Image sprite motion is client-side to start in the SAME Bedrock frame
+            // as the target's Squish. Only glyph mode uses scheduled Y movement.
+            move.setPosition(hand.image ? anchor(hand.entity) : motionPosition(anchor(hand.entity),elapsed,hand.text,cfg));
+            move.setRotation(Vector3f.ZERO);
+            move.setTeleported(hand.image || !cfg.handMotionEnabled() || hand.text || elapsed>=cfg.handMotionDuration()); session.sendUpstreamPacket(move);
             if(hand.image) {
                 int index=animation.get().frameAt(elapsed,cfg.imageLoop());
                 if(index!=hand.frame || cfg.scale()!=hand.scale) {
