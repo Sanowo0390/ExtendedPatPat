@@ -96,7 +96,7 @@ final class PatSession extends SessionAdapter {
         if(entity==null || !(entity instanceof LivingEntity) || entity instanceof ArmorStandEntity
                 || !entity.isValid() || entity.javaId()==session.getPlayerEntity().javaId()
                 || entity.getFlag(EntityFlag.INVISIBLE) || session.getGameMode()==GameMode.SPECTATOR
-                || session.getPlayerEntity().getHealth()<=0 || !session.hasPermission("patpatbedrock.use")) return false;
+                || session.getPlayerEntity().getHealth()<=0 || !cfg.allows(session)) return false;
         if(!cfg.players() && entity instanceof PlayerEntity) return false;
         if(cfg.emptyHand() && !session.getPlayerInventory().getItemInHand().isEmpty()) return false;
         Vector3f eye=session.getPlayerEntity().position().add(0,session.isSneaking()?1.27f:1.62f,0);

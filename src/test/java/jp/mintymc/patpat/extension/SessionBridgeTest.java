@@ -69,7 +69,8 @@ class SessionBridgeTest {
         when(mob.position()).thenReturn(Vector3f.from(0,0,1));when(mob.getBoundingBoxWidth()).thenReturn(1f);when(mob.getBoundingBoxHeight()).thenReturn(1f);
         var player=mock(SessionPlayerEntity.class);when(session.getPlayerEntity()).thenReturn(player);
         when(player.javaId()).thenReturn(1);when(player.getHealth()).thenReturn(20f);when(player.position()).thenReturn(Vector3f.ZERO);
-        when(session.getGameMode()).thenReturn(GameMode.SURVIVAL);when(session.hasPermission("patpatbedrock.use")).thenReturn(true);
+        // Simulate a normal Velocity player with no extra permission nodes.
+        when(session.getGameMode()).thenReturn(GameMode.SURVIVAL);
         var a=new PacketSendingEvent(network,interact());var b=new PacketSendingEvent(network,interact());bridge.packetSending(a);bridge.packetSending(b);
         assertTrue(a.isCancelled());assertTrue(b.isCancelled());
         ArgumentCaptor<Packet> captor=ArgumentCaptor.forClass(Packet.class);verify(session,times(1)).sendDownstreamGamePacket(captor.capture());

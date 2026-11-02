@@ -24,7 +24,7 @@ public final class PatPatExtension implements Extension {
             Files.createDirectories(dataFolder());
             copyDefault("config.properties"); copyDefault("PatPatBedrock.mcpack");
             settings=Settings.load(dataFolder().resolve("config.properties"));
-        } catch(IOException e) { settings=new Settings(false,false,true,true,true,3,600,800,100,.15,32,true,List.of("PAT")); logger().error("Unable to load configuration; bridge disabled",e); }
+        } catch(IOException e) { settings=new Settings(false,false,true,true,true,3,600,800,100,.15,32,true,List.of("PAT"),""); logger().error("Unable to load configuration; bridge disabled",e); }
     }
     private void copyDefault(String name) throws IOException {
         Path destination=dataFolder().resolve(name);
@@ -41,7 +41,6 @@ public final class PatPatExtension implements Extension {
         } catch(Exception e) {logger().error("Unable to register hand pack; text test remains available",e);}
     }
     @Subscribe public void permissions(GeyserRegisterPermissionsEvent event) {
-        event.register("patpatbedrock.use",TriState.TRUE);
         event.register("patpatbedrock.admin",TriState.NOT_SET);
     }
     @Subscribe public void post(GeyserPostInitializeEvent event) {
@@ -76,8 +75,8 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.2.0 / compatible="+compatible+" / backendHello="+state.ready()+" / active="+state.active()));
-            else source.sendMessage("PatPatExtension 0.2.0 / compatible="+compatible+" / sessions="+sessions.size());
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.2.1 / compatible="+compatible+" / backendHello="+state.ready()+" / active="+state.active()+" / allowed="+settings.allows(source)));
+            else source.sendMessage("PatPatExtension 0.2.1 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
@@ -89,10 +88,13 @@ public final class PatPatExtension implements Extension {
     }
     private void register(GeyserDefineCommandsEvent event,String name,boolean player,CommandAction action) {
         event.register(Command.builder(this).name(name).source(CommandSource.class).description("PatPat Bedrock "+name)
-                .permission("patpatbedrock.use",TriState.TRUE).bedrockOnly(player).playerOnly(player)
+                // Velocity cannot apply Geyser's permission defaults. Keep public commands
+                // visible; check an explicitly configured node at execution time instead.
+                .permission("",TriState.TRUE).bedrockOnly(player).playerOnly(player)
                 .executor((source,cmd,args)->action.run(source,args)).build());
     }
     private void withSession(CommandSource source,java.util.function.Consumer<PatSession> action) {
+        if(!settings.allows(source)){source.sendMessage("この操作にはProxy側の権限 "+settings.permission()+" が必要です。");return;}
         PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
         if(state==null){source.sendMessage("このGeyserへ接続中の統合版プレイヤーから実行してください。対応ビルドも確認してください。");return;}
         state.session().executeInEventLoop(()->action.accept(state));

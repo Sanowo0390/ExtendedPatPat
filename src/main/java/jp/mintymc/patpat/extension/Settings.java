@@ -7,7 +7,7 @@ import java.util.*;
 
 record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyHand, boolean players,
                 double distance, long cooldown, long duration, long frameMs, double height, int maxActive,
-                boolean localPreview, List<String> frames) {
+                boolean localPreview, List<String> frames, String permission) {
     static Settings load(Path file) throws IOException {
         Properties p = new Properties();
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) { p.load(reader); }
@@ -22,7 +22,10 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
                 number(p,"max-distance",3,1,6), (long)number(p,"cooldown-ms",600,50,60000),
                 (long)number(p,"duration-ms",800,200,5000), (long)number(p,"frame-ms",100,50,1000),
                 number(p,"height-offset",.15,-2,4), (int)number(p,"max-active-per-viewer",32,1,128),
-                flag(p,"local-preview",true), frames);
+                flag(p,"local-preview",true), frames, p.getProperty("required-permission", "").trim());
+    }
+    boolean allows(org.geysermc.geyser.api.command.CommandSource source) {
+        return permission.isBlank() || source.hasPermission(permission);
     }
     private static boolean flag(Properties p,String key,boolean fallback) {
         return Boolean.parseBoolean(p.getProperty(key,Boolean.toString(fallback)));

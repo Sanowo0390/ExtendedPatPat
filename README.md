@@ -1,4 +1,4 @@
-# PatPatGeyserExtension 0.2.0
+# PatPatGeyserExtension 0.2.1
 
 **Geyserの`extensions/`へ入れる版です。Paper用PatPatGeyserAddonは不要です。**
 
@@ -14,10 +14,14 @@
 - Geyserの公開APIだけでは操作・PatPat独自通信を扱いきれないため、セッション／パケットAPIも使います。**異なるGeyserビルドでは操作変換を停止し、起動ログへ理由を出します。** Geyserの自動更新でビルドが変わった場合は、そのビルドに合わせた拡張の再ビルドが必要です。
 - 試験版です。コンパイル／自動テスト済みですが、実際の統合版クライアントと接続した確認はまだ行っていません。詳細はVALIDATION.md。
 
+## 0.2.0からの修正
+
+Velocityで追加権限がないとコマンドや撫で操作を使えない問題を修正しました。古いJARを外して0.2.1へ置換し、Proxyを再起動してください。既存の設定ファイルとパックはそのまま使えます。
+
 ## 導入
 
 1. 前回のPaper用`PatPatGeyserAddon-0.1.0.jar`を導入している場合は、バックエンドの`plugins/`から外します。**PatPat本体は残してください。** 両方を同時に動かすと演出や操作が重複する可能性があります。
-2. `PatPatGeyserExtension-0.2.0.jar`を、Velocity側の **`plugins/Geyser-Velocity/extensions/`** に置きます。Velocity直下の`plugins/`ではありません。
+2. `PatPatGeyserExtension-0.2.1.jar`を、Velocity側の **`plugins/Geyser-Velocity/extensions/`** に置きます。Velocity直下の`plugins/`ではありません。
 3. 前回の`PatPatBedrock-0.1.0.mcpack`をGeyserの`packs/`へ入れていた場合は、そこから外して構いません。今回はJARからパックを展開して自動登録します。手動パックが同じUUIDで既に登録されている場合、二重登録は避けますが、古いパックが優先されます。
 4. Proxyを再起動します。初回に`extensions/patpatbedrock/`へ設定と`PatPatBedrock.mcpack`が生成されます。
 5. Geyserの`force-resource-packs: true`を推奨。統合版で入り直し、パックを受け取ってください。
@@ -63,6 +67,7 @@ PatPat本体は、通常の撫でるパケットを操作者へ返しません�
 | 設定 | 既定値 | 内容 |
 |---|---|---|
 | `enabled` | true | 操作変換と通常の受信演出 |
+| `required-permission` | 空欄 | 追加のProxy権限。空欄なら不要 |
 | `auto-pack` | true | 同梱パックを自動配信。変更はProxy再起動が必要 |
 | `require-sneaking` | true | インタラクト操作にしゃがみ必須 |
 | `require-empty-hand` | true | 空のメインハンド必須 |
@@ -76,11 +81,13 @@ PatPat本体は、通常の撫でるパケットを操作者へ返しません�
 | `local-preview` | true | 操作者の先行演出 |
 | `frames` | U+E2A0～U+E2A3 | カンマ区切りの手の4フレーム |
 
+VelocityではGeyserの既定権限値が反映されません。0.2.1ではstatus／test／patを公開コマンドとして登録し、`required-permission`を設定した場合だけ実行時に権限を確認します。バックエンドのLuckPermsで付けた権限はProxy側の権限チェックには使われません。
+
 通常の設定は`/patpatbedrock reload`で反映できます。再読込時は演出を削除し、バックエンドの通信状態も再確認します。
 
 | 権限 | 設定する場所 | 内容 |
 |---|---|---|
-| `patpatbedrock.use` | Proxy/Geyser側 | 操作とテストコマンド。既定true |
+| `required-permission`で指定した権限 | Proxy/Geyser側 | 設定した場合のみ、操作とテストに必要。既定では追加権限不要 |
 | `patpatbedrock.admin` | Proxy/Geyser側 | reload。既定では明示的な付与が必要。コンソールからも実行可能 |
 | `patpat.pat`等 | バックエンド側 | PatPat本体の設定に従う権限 |
 
@@ -111,7 +118,7 @@ python scripts/prepare_build.py
 mvn -B verify
 ```
 
-最初のスクリプトはGeyserのb1280配布JARを取得し、公開SHA-256と一致することを確認してローカルのコンパイル用リポジトリへ配置します。Geyser本体や依存ライブラリーを拡張JARへ埋め込みません。成果物は`target/PatPatGeyserExtension-0.2.0.jar`です。push／PR／手動実行用のGitHub Actionsも同梱しています。
+最初のスクリプトはGeyserのb1280配布JARを取得し、公開SHA-256と一致することを確認してローカルのコンパイル用リポジトリへ配置します。Geyser本体や依存ライブラリーを拡張JARへ埋め込みません。成果物は`target/PatPatGeyserExtension-0.2.1.jar`です。push／PR／手動実行用のGitHub Actionsも同梱しています。
 
 手パックの元画像とmanifestは`resource-pack/`、元のベクターアイコンは`art/hand.svg`です。再生成する場合はPillowをインストールし、`python scripts/build_pack.py`を実行して、生成された`dist/PatPatBedrock-0.1.0.mcpack`を`src/main/resources/PatPatBedrock.mcpack`へコピーしてからビルドしてください。拡張の版番号と同梱パックの版番号は独立しています。
 
