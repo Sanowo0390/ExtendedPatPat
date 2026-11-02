@@ -73,6 +73,11 @@ final class HandRenderer {
         return anchor(entity.position(),displayHeight(entity,cfg),
                 session.getPlayerEntity().position(),session.getPlayerEntity().getYaw(),cfg);
     }
+    /** Keep user-defined offsets fixed; the Pat movement is an additional Y-only displacement. */
+    static Vector3f motionPosition(Vector3f base, long elapsedMs, boolean text, Settings cfg) {
+        if (text || !cfg.handMotionEnabled()) return base;
+        return base.add(0f,HandMotion.displacement(elapsedMs,cfg.handMotionDuration(),cfg.handMotionDepth()),0f);
+    }
     static float displayHeight(Entity entity,Settings cfg) {
         float height=entity.getBoundingBoxHeight();
         // Geyser keeps the standing collision height while a player is mounted/sitting.
@@ -96,7 +101,14 @@ final class HandRenderer {
         }
         return feet.add((float)x,height+(float)settings.height(),(float)z);
     }
-    private void schedule() { session.scheduleInEventLoop(this::tick,50,TimeUnit.MILLISECONDS); }
+    private void schedule() {
+        // Use 20 ms updates during the short press so the bob is visibly smooth.
+        // Return to 50 ms updates afterward to avoid continuous extra packets.
+        long now=System.nanoTime();
+        boolean animating=settings.get().handMotionEnabled() && hands.values().stream()
+                .anyMatch(h->!h.text && (now-h.started)/1_000_000 < settings.get().handMotionDuration());
+        session.scheduleInEventLoop(this::tick,animating?20:50,TimeUnit.MILLISECONDS);
+    }
     private void tick() {
         if(session.isClosed()) { hands.clear();ticking=false;return; }
         Settings cfg=settings.get(); long now=System.nanoTime();
@@ -106,7 +118,7 @@ final class HandRenderer {
             if(elapsed>=duration || find(entry.getKey())!=hand.entity || !hand.entity.isValid()
                     || hand.entity.getFlag(EntityFlag.INVISIBLE)) { remove(hand.id);it.remove();continue; }
             MoveEntityAbsolutePacket move=new MoveEntityAbsolutePacket();
-            move.setRuntimeEntityId(hand.id); move.setPosition(anchor(hand.entity)); move.setRotation(Vector3f.ZERO);
+            move.setRuntimeEntityId(hand.id); move.setPosition(motionPosition(anchor(hand.entity),elapsed,hand.text,cfg)); move.setRotation(Vector3f.ZERO);
             move.setTeleported(true); session.sendUpstreamPacket(move);
             if(hand.image) {
                 int index=animation.get().frameAt(elapsed,cfg.imageLoop());
