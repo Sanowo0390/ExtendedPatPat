@@ -1,6 +1,6 @@
 # PatPatGeyserExtension 🐾
 
-Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**向けのPatPat拡張機能です。しゃがみながら空のメインハンドでモブやプレイヤーを操作すると、対象の頭上に手のGIFアニメーションを表示し、効果音を再生します。さらに統合版側では対象のモデルが一瞬むにゅっと縮む「Squish」演出にも対応します。
+Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**向けのPatPat拡張機能です。しゃがみながら空のメインハンドでモブやプレイヤーを操作すると、対象の頭上に手のGIFアニメーションを表示し、**手が下がって戻るモーション**と効果音を再生します。さらに統合版側では対象のモデルが一瞬むにゅっと縮む「Squish」演出にも対応します。
 
 サーバー側のPatPatプラグインがなくても動作します。PatPat本体がある場合は本体との通信を優先し、Java版クライアントModとの演出共有にも対応します。
 
@@ -16,7 +16,7 @@ Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**�
 
 ## 導入
 
-1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.7.0.jar` を取得します。
+1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.8.0.jar` を取得します。
 2. JARをVelocityの `plugins/Geyser-Velocity/extensions/` に配置し、古い同拡張のJARを取り除きます。
 3. Velocityを再起動すると `extensions/patpatbedrock/` に設定・画像・音声ファイルとリソースパックが生成されます。
 4. 統合版プレイヤーで再接続し、配布されるリソースパックを適用します。必要に応じてGeyser側の `force-resource-packs: true` を使用してください。
@@ -69,6 +69,9 @@ max-active-per-viewer=32
 local-preview=true
 frames=\uE2A0,\uE2A1,\uE2A2,\uE2A3
 squish-enabled=true
+hand-motion-enabled=true
+hand-motion-depth=0.425
+hand-motion-duration-ms=240
 sound-enabled=true
 sound-event=patpatbedrock.pat
 sound-volume=1.0
@@ -78,6 +81,20 @@ sound-pitch=1.0
 **主要な設定**：`image-scale` は画像のサイズ、`offset-x` は見る人の方向への距離、`offset-y` は上下、`offset-z` は見る人から見て左右の位置調整です。`sitting-offset-y` は座っているプレイヤーに対する追加の高さ補正です。`cooldown-ms` は連打の最小間隔です。`standalone-mode=true` ならバックエンド本体がなくても統合版でPatできます。
 
 `/patpatbedrock reload` で位置・サイズ・表示時間などを再読み込みできます。**既存の設定ファイルは更新時に上書きしません。** 旧設定に `cooldown-ms=600` などが残っている場合は、必要に応じて手動で変更してください。
+
+## 手の上下アニメーション（PatPat Java版に準拠）
+
+PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240msかけて一度下がり、滑らかに元の位置へ戻ります**。Java版と同様、単純な等速移動ではなく、`1-(1-t)^2` で加速した進捗に `sin(π・進捗)` を適用した動きです。
+
+| 設定 | 既定値 | 内容 |
+|---|---:|---|
+| `hand-motion-enabled` | `true` | 手の上下移動をON/OFF |
+| `hand-motion-depth` | `0.425` | 手を下げる最大量（ブロック単位） |
+| `hand-motion-duration-ms` | `240` | 1回の上下移動にかける時間（ミリ秒） |
+
+通常の位置設定 `offset-x` / `offset-y` / `offset-z` は**基準位置**として維持され、上下移動はY方向にだけ加算されます。GIFやPNGのサイズ、各フレームの表示時間には影響しません。文字だけの `test text` は移動させません。
+
+この機能はGeyserから送る表示用エンティティの位置パケットを利用し、表示中の約240msは20ms間隔で位置更新します。**サーバープラグイン不要**で、設定の変更は `/patpatbedrock reload` で反映できます。画像素材・リソースパックを再生成する必要はありません。
 
 ## Squish（潰れる演出）
 
