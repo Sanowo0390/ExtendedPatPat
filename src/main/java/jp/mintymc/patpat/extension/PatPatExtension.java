@@ -54,6 +54,14 @@ public final class PatPatExtension implements Extension {
             statistics=new PatStatistics(dataFolder().resolve("pat-stats.properties"));
             copyDefault("config.properties"); copyDefault("PatPatBedrock.mcpack");
             upgradeConfig();
+            // Legacy config is reorganized once; user values and unknown keys stay.
+            // A verbatim backup is kept alongside config.properties.
+            try {
+                if(ConfigLayout.formatIfLegacy(dataFolder().resolve("config.properties")))
+                    logger().info("Formatted legacy config; backup saved as config.properties.backup-before-layout-v2");
+            }catch(IOException formattingError) {
+                logger().warning("Could not reorganize config; using existing values: "+formattingError.getMessage());
+            }
             settings=Settings.load(dataFolder().resolve("config.properties"));
             if(!Set.of("image","glyph").contains(settings.renderer()))throw new IOException("renderer must be image or glyph");
             copyDefaultImage();
