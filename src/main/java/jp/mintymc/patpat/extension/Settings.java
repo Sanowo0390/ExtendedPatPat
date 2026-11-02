@@ -8,7 +8,9 @@ import java.util.*;
 record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyHand, boolean players,
                 double distance, long cooldown, long duration, long frameMs, double height, int maxActive,
                 boolean localPreview, List<String> frames, String permission,
-                String renderer, String imageFile, double scale, double offsetX, double offsetZ, boolean imageLoop, String offsetSpace, double sittingOffsetY, boolean soundEnabled, String soundEvent, double soundVolume, double soundPitch, boolean standaloneMode, boolean squishEnabled, boolean handMotionEnabled, double handMotionDepth, long handMotionDuration) {
+                String renderer, String imageFile, double scale, double offsetX, double offsetZ, boolean imageLoop, String offsetSpace, double sittingOffsetY, boolean soundEnabled, String soundEvent, double soundVolume, double soundPitch, boolean standaloneMode, boolean squishEnabled, boolean handMotionEnabled, double handMotionDepth, long handMotionDuration,
+                boolean avoidHandOcclusion, double handFrontClearance, boolean swingHandEnabled,
+                Set<String> ignoredEntityTypes, Set<UUID> ignoredPlayerUuids) {
     static Settings load(Path file) throws IOException {
         Properties p = new Properties();
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) { p.load(reader); }
@@ -28,7 +30,26 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
                 number(p,"image-scale",0.5,.05,8),number(p,"offset-x",0.5,-8,8),number(p,"offset-z",0,-8,8),flag(p,"image-loop",true),
                 p.getProperty("offset-space","view").trim().toLowerCase(Locale.ROOT),number(p,"sitting-offset-y",0.2,-2,2),flag(p,"sound-enabled",true),p.getProperty("sound-event","patpatbedrock.pat"),number(p,"sound-volume",1,0,4),number(p,"sound-pitch",1,.1,4),flag(p,"standalone-mode",true),flag(p,"squish-enabled",true),
                 flag(p,"hand-motion-enabled",true),number(p,"hand-motion-depth",0.425,0,2),
-                (long)number(p,"hand-motion-duration-ms",240,50,5000));
+                (long)number(p,"hand-motion-duration-ms",240,50,5000),
+                flag(p,"hand-avoid-occlusion",true),number(p,"hand-front-clearance",0.15,0,2),
+                flag(p,"swing-hand-enabled",true),entityTypes(p),playerUuids(p));
+    }
+
+    private static Set<String> entityTypes(Properties p) {
+        Set<String> result=new HashSet<>();
+        for(String raw:p.getProperty("ignored-entity-types","").split(",")) {
+            String value=raw.trim().toLowerCase(Locale.ROOT);
+            if(value.matches("[a-z0-9_.-]+(:[a-z0-9_./-]+)?"))result.add(value.contains(":")?value:"minecraft:"+value);
+        }
+        return Set.copyOf(result);
+    }
+    private static Set<UUID> playerUuids(Properties p) {
+        Set<UUID> result=new HashSet<>();
+        for(String raw:p.getProperty("ignored-player-uuids","").split(",")) {
+            try {result.add(UUID.fromString(raw.trim()));}
+            catch(IllegalArgumentException ignored) {}
+        }
+        return Set.copyOf(result);
     }
     boolean allows(org.geysermc.geyser.api.command.CommandSource source) {
         return permission.isBlank() || source.hasPermission(permission);
