@@ -88,4 +88,12 @@ class ViewerFacingTest {
         assertEquals(expected,HandRenderer.visibleAnchor(Vector3f.ZERO,2,5,viewer,0,cfg));
     }
 
+    @Test void overheadCameraKeepsHandAboveCompressedMobTop() {
+        Settings cfg=Settings.from(new Properties());
+        Vector3f anchor=HandRenderer.visibleAnchor(Vector3f.ZERO,2,2,
+                Vector3f.from(0,5,0),0,cfg);
+        Vector3f pressed=HandRenderer.motionPosition(anchor,70,false,cfg);
+        assertTrue(pressed.getY()>2.25f,"Pat hand should not clip the mob's roof at maximum press");
+    }
+
 }
