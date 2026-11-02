@@ -42,6 +42,9 @@ final class ImagePack {
         // actor's body yaw so it cannot compound the camera's world yaw.
         put(entries,"animations/hand.json",Map.of("format_version","1.10.0","animations",Map.of("animation.patpatbedrock.billboard",Map.of(
                 "loop",true,"bones",Map.of("billboard",Map.of("rotation",List.of("query.camera_rotation(0)","query.camera_rotation(1) - query.body_y_rotation",0)))))));
+        // Bedrock one-shot squish animations share this resource pack with the hand sprite.
+        // No Behavior Pack or Java backend plugin is needed for the visuals.
+        put(entries,"animations/squish.json",SquishAnimations.resource());
         Map<String,byte[]> audio=new TreeMap<>();
         for(String sound:List.of("pat","pat1","pat2"))try(InputStream in=ImagePack.class.getResourceAsStream("/"+sound+".ogg")){if(in==null)throw new IOException("Missing sound");audio.put(sound,in.readAllBytes());}
         if(soundFolder!=null && Files.isDirectory(soundFolder))try(var files=Files.list(soundFolder)) {
