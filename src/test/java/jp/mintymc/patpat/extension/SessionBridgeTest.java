@@ -120,7 +120,7 @@ class SessionBridgeTest {
         verify(session,never()).sendDownstreamGamePacket(same(packet));
     }
     @Test void sneakRightClickAirWithoutHoveredEntityPreservesVanillaBehavior() {
-        hello();clearInvocations(session);
+        hello();clearInvocations(session);setupAimedTarget();
         when(session.isSneaking()).thenReturn(true);
         var packet=new ServerboundUseItemPacket(Hand.MAIN_HAND,0,0f,0f);
         var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
