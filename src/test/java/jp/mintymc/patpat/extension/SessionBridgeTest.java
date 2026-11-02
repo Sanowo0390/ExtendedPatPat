@@ -108,7 +108,8 @@ class SessionBridgeTest {
     @Test void sneakRightClickAirCanPatHoveredEntity() {
         hello();clearInvocations(session);setupAimedTarget();
         when(session.isSneaking()).thenReturn(true);
-        when(session.getMouseoverEntity()).thenReturn(cache.getEntityByJavaId(300));
+        var hovered=cache.getEntityByJavaId(300);
+        when(session.getMouseoverEntity()).thenReturn(hovered);
         var packet=new ServerboundUseItemPacket(Hand.MAIN_HAND,0,0f,0f);
         var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
         assertTrue(event.isCancelled());
