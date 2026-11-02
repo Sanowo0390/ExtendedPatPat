@@ -111,6 +111,11 @@ final class PatSession extends SessionAdapter {
                 || entity.getFlag(EntityFlag.INVISIBLE) || session.getGameMode()==GameMode.SPECTATOR
                 || session.getPlayerEntity().getHealth()<=0 || !cfg.allows(session)) return false;
         if(!cfg.players() && entity instanceof PlayerEntity) return false;
+        String entityType=entity.bedrockDefinition()!=null && entity.bedrockDefinition().identifier()!=null
+                ? entity.bedrockDefinition().identifier().toString() : "";
+        if(cfg.ignoredEntityTypes().contains(entityType))return false;
+        if(entity instanceof PlayerEntity && entity.uuid()!=null && cfg.ignoredPlayerUuids().contains(entity.uuid()))
+            return false;
         if(cfg.emptyHand() && !session.getPlayerInventory().getItemInHand().isEmpty()) return false;
         Vector3f eye=session.getPlayerEntity().position().add(0,session.isSneaking()?1.27f:1.62f,0);
         Vector3f pos=entity.position();double half=entity.getBoundingBoxWidth()/2d;
@@ -152,6 +157,10 @@ final class PatSession extends SessionAdapter {
         if((!ready && !owner.settings().standaloneMode()) || !owner.settings().enabled() || !owner.patEnabled(session) || !eligible(target)) return false;
         long now=System.nanoTime();if(now<nextPat)return true;
         nextPat=now+owner.settings().cooldown()*1_000_000L;
+        if(owner.settings().swingHandEnabled()) {
+            session.sendUpstreamPacket(PatSwing.packet(session.getPlayerEntity().geyserId()));
+            owner.relaySwing(this);
+        }
         if(ready) {
             // Preserve the backend protocol when PatPat is present.
             payload(PatProtocol.PAT_C2S,PatProtocol.pat(target.javaId()));
@@ -184,6 +193,11 @@ final class PatSession extends SessionAdapter {
         }
         renderer.show(target.javaId(),text);
         session.sendMessage("照準先への表示テスト（自分のみ）。backendHello="+ready);
+    }
+    void swingForViewer(long actorRuntimeId) {
+        if(!closed && !session.isClosed() && owner.settings().enabled()
+                && owner.settings().swingHandEnabled() && owner.patEnabled(session))
+            session.sendUpstreamPacket(PatSwing.packet(actorRuntimeId));
     }
     void showStandalone(int targetJavaId) {
         if(!closed && !session.isClosed() && owner.settings().enabled() && owner.patEnabled(session)) renderer.show(targetJavaId,false);
