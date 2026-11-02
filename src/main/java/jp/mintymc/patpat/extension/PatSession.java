@@ -162,6 +162,8 @@ final class PatSession extends SessionAdapter {
             session.sendUpstreamPacket(PatSwing.packet(session.getPlayerEntity().geyserId()));
             owner.relaySwing(this);
         }
+        if(owner.settings().cameraShakeEnabled())
+            session.sendUpstreamPacket(PatCamera.shake((float)owner.settings().cameraShakeIntensity()));
         if(ready) {
             // Preserve the backend protocol when PatPat is present.
             payload(PatProtocol.PAT_C2S,PatProtocol.pat(target.javaId()));
