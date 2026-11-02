@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PatPatExtension implements Extension {
     private volatile Settings settings=Settings.from(new Properties());
     private volatile PatPreferences preferences;
+    private volatile PatStatistics statistics;
     private final Map<GeyserSession,PatSession> sessions=new ConcurrentHashMap<>();
     private volatile boolean compatible;
     private ImageAnimation animation;
@@ -33,11 +34,24 @@ public final class PatPatExtension implements Extension {
         if(store==null)throw new IOException("Pat preferences have not been initialized");
         return store.setEnabled(session.getPlayerEntity().uuid(),enabled);
     }
+    long patCount(GeyserSession session) {
+        return statistics==null?0:statistics.total(session.getPlayerEntity().uuid());
+    }
+    void recordPat(GeyserSession session) {
+        if(statistics==null)return;
+        statistics.record(session.getPlayerEntity().uuid());
+        if(statistics.shouldFlush())flushStatistics();
+    }
+    private void flushStatistics() {
+        try {if(statistics!=null)statistics.flush();}
+        catch(IOException e){logger().warning("Unable to save Pat statistics: "+e.getMessage());}
+    }
     ImageAnimation animation() { return animation; }
     @Subscribe public void pre(GeyserPreInitializeEvent event) {
         try {
             Files.createDirectories(dataFolder());
             preferences=new PatPreferences(dataFolder().resolve("disabled-players.txt"));
+            statistics=new PatStatistics(dataFolder().resolve("pat-stats.properties"));
             copyDefault("config.properties"); copyDefault("PatPatBedrock.mcpack");
             upgradeConfig();
             settings=Settings.load(dataFolder().resolve("config.properties"));
@@ -60,7 +74,7 @@ public final class PatPatExtension implements Extension {
         try(var reader=Files.newBufferedReader(file,java.nio.charset.StandardCharsets.UTF_8)){old.load(reader);}
         Map<String,String> added=new LinkedHashMap<>();
         added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","0.5");added.put("image-loop","true");added.put("offset-space","view");
-        added.put("offset-x","0.5");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","0.2");added.put("standalone-mode","true");added.put("squish-enabled","true");added.put("hand-motion-enabled","true");added.put("hand-motion-depth","0.425");added.put("hand-motion-duration-ms","240");
+        added.put("offset-x","0.5");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","0.2");added.put("standalone-mode","true");added.put("squish-enabled","true");added.put("hand-motion-enabled","true");added.put("hand-motion-depth","0.425");added.put("hand-motion-duration-ms","240");added.put("hand-avoid-occlusion","true");added.put("hand-front-clearance","0.15");added.put("swing-hand-enabled","true");added.put("ignored-entity-types","");added.put("ignored-player-uuids","");
         StringBuilder append=new StringBuilder();
         added.forEach((key,value)->{if(!old.containsKey(key))append.append(key).append('=').append(value).append('\n');});
         if(!append.isEmpty())Files.writeString(file,"\n# Added image options: offset-space=view means X toward viewer, Y up, Z right.\n"+append,
@@ -169,7 +183,7 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void quit(SessionDisconnectEvent event) {
         if(event.connection() instanceof GeyserSession s) { PatSession state=sessions.remove(s);if(state!=null)state.close(); }
     }
-    @Subscribe public void shutdown(GeyserShutdownEvent event) { sessions.values().forEach(PatSession::close);sessions.clear(); }
+    @Subscribe public void shutdown(GeyserShutdownEvent event) { flushStatistics();sessions.values().forEach(PatSession::close);sessions.clear(); }
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
@@ -180,6 +194,7 @@ public final class PatPatExtension implements Extension {
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
         // Always allow users to disable effects even without the optional use permission.
         register(event,"toggle",true,(source,args)->withSession(source,s->s.toggle(args),false));
+        register(event,"stats",true,(source,args)->withSession(source,s->s.stats(),false));
         event.register(Command.builder(this).name("reload").source(CommandSource.class).description("Reload PatPat extension config")
                 .permission("patpatbedrock.admin",TriState.NOT_SET).executor((source,cmd,args)->{
                     try {
