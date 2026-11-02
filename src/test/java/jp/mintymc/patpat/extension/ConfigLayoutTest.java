@@ -51,8 +51,11 @@ class ConfigLayoutTest {
         assertTrue(values.containsKey("hand-motion-enabled"));
         assertTrue(values.containsKey("camera-shake-enabled"));
         assertTrue(values.containsKey("camera-shake-intensity"));
+        assertEquals("images/hand.png",values.getProperty("image-file"));
+        assertEquals("5",values.getProperty("image-sprite-columns"));
+        assertEquals("50",values.getProperty("image-sprite-frame-ms"));
         assertTrue(values.containsKey("auto-pack"));
         assertTrue(values.containsKey("required-permission"));
-        assertEquals(36,values.size(),"New config should contain every documented setting");
+        assertEquals(38,values.size(),"New config should contain every documented setting");
     }
 }
