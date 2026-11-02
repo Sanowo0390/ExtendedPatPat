@@ -1,6 +1,6 @@
 # PatPatGeyserExtension 🐾
 
-Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**向けのPatPat拡張機能です。しゃがみながら空のメインハンドでモブやプレイヤーを操作すると、対象の頭上に手のGIFアニメーションを表示し、効果音を再生します。
+Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**向けのPatPat拡張機能です。しゃがみながら空のメインハンドでモブやプレイヤーを操作すると、対象の頭上に手のGIFアニメーションを表示し、効果音を再生します。さらに統合版側では対象のモデルが一瞬むにゅっと縮む「Squish」演出にも対応します。
 
 サーバー側のPatPatプラグインがなくても動作します。PatPat本体がある場合は本体との通信を優先し、Java版クライアントModとの演出共有にも対応します。
 
@@ -16,7 +16,7 @@ Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**�
 
 ## 導入
 
-1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.6.0.jar` を取得します。
+1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.7.0.jar` を取得します。
 2. JARをVelocityの `plugins/Geyser-Velocity/extensions/` に配置し、古い同拡張のJARを取り除きます。
 3. Velocityを再起動すると `extensions/patpatbedrock/` に設定・画像・音声ファイルとリソースパックが生成されます。
 4. 統合版プレイヤーで再接続し、配布されるリソースパックを適用します。必要に応じてGeyser側の `force-resource-packs: true` を使用してください。
@@ -68,6 +68,7 @@ sitting-offset-y=0.2
 max-active-per-viewer=32
 local-preview=true
 frames=\uE2A0,\uE2A1,\uE2A2,\uE2A3
+squish-enabled=true
 sound-enabled=true
 sound-event=patpatbedrock.pat
 sound-volume=1.0
@@ -77,6 +78,17 @@ sound-pitch=1.0
 **主要な設定**：`image-scale` は画像のサイズ、`offset-x` は見る人の方向への距離、`offset-y` は上下、`offset-z` は見る人から見て左右の位置調整です。`sitting-offset-y` は座っているプレイヤーに対する追加の高さ補正です。`cooldown-ms` は連打の最小間隔です。`standalone-mode=true` ならバックエンド本体がなくても統合版でPatできます。
 
 `/patpatbedrock reload` で位置・サイズ・表示時間などを再読み込みできます。**既存の設定ファイルは更新時に上書きしません。** 旧設定に `cooldown-ms=600` などが残っている場合は、必要に応じて手動で変更してください。
+
+## Squish（潰れる演出）
+
+`squish-enabled=true`（既定）でPat時に約0.3秒間、対象のモデルを縦に縮めてから元に戻すBedrockアニメーションを再生します。GeyserからBedrockへ直接アニメーションパケットを送るため、バックエンドのPatPatプラグインは不要です。
+
+- **統合版プレイヤーの画面だけ**に適用します。Java版には影響しません。
+- 標準的なモブの主要なボーンに合わせた演出を使用します。独自モデルや一部のモブは、ボーン名が一致せず変化しない場合があります。
+- 既存のPat用リソースパックにアニメーション定義を含めています。**v0.7.0への更新後はProxy再起動と統合版の再接続が必要**です。
+- `squish-enabled=false` で無効化できます。このON/OFF設定は `/patpatbedrock reload` で反映できます。
+- サーバー側のエンティティのサイズ・当たり判定は変更しません。あくまでクライアント側の見た目の演出です。
+- 実機の描画結果は端末・Minecraftバージョン・他のリソースパックによって変わる可能性があります。
 
 ## 画像・GIF・効果音の変更
 
