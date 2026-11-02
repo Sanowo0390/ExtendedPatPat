@@ -86,6 +86,8 @@ class ImageSupportTest {
         assertEquals(-.25,extension.settings().height());assertEquals(1400,extension.settings().duration());
         assertTrue(Files.isRegularFile(directory.resolve("images/hand.gif")));
         assertTrue(Files.readString(directory.resolve("config.properties")).contains("offset-y=-0.25"));
+        assertTrue(Files.readString(directory.resolve("config.properties")).contains("image-scale=0.5"));
+        assertTrue(Files.readString(directory.resolve("config.properties")).contains("offset-x=0.5"));
         try(var files=Files.list(directory.resolve("generated"))){assertTrue(files.anyMatch(p->p.getFileName().toString().endsWith(".mcpack")));}
     }
 }
