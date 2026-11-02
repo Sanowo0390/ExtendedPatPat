@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class SquishAnimationsTest {
     @Test void selectsPrimaryBonesForCommonMobTypes() {
         assertEquals("animation.patpatbedrock.squish.root",
-                SquishAnimations.animationFor("minecraft:player").replace(".generic",".root"));
+                SquishAnimations.animationFor("minecraft:player"));
         assertEquals(SquishAnimations.PREFIX+"body",SquishAnimations.animationFor("minecraft:wolf"));
         assertEquals(SquishAnimations.PREFIX+"body",SquishAnimations.animationFor("minecraft:cat"));
         assertEquals(SquishAnimations.PREFIX+"root",SquishAnimations.animationFor("minecraft:pig"));
