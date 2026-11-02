@@ -22,6 +22,14 @@ record ImageAnimation(List<BufferedImage> frames,List<Integer> delays) {
         return delays.size()-1;
     }
     static ImageAnimation load(Path path) throws IOException {
+        return load(path,1,50);
+    }
+    /**
+     * PNG sprite sheets are supported without turning the original into a GIF.
+     * When the dimensions are exactly N square tiles side-by-side, split left
+     * to right; ordinary PNGs and animated GIFs retain their original behavior.
+     */
+    static ImageAnimation load(Path path,int spriteColumns,int spriteFrameMs) throws IOException {
         if(!Files.isRegularFile(path) || Files.size(path)>16*1024*1024)throw new IOException("Image must exist and be at most 16 MiB: "+path.getFileName());
         try(ImageInputStream input=ImageIO.createImageInputStream(path.toFile())) {
             if(input==null)throw new IOException("Unable to open image");
@@ -36,6 +44,17 @@ record ImageAnimation(List<BufferedImage> frames,List<Integer> delays) {
                 Node screen=child(stream,"LogicalScreenDescriptor");
                 if(screen!=null){width=attrInt(screen,"logicalScreenWidth",width);height=attrInt(screen,"logicalScreenHeight",height);}
                 if(width<1||height<1||width>1024||height>1024)throw new IOException("Image canvas must be 1..1024 pixels per axis");
+                if(format.equalsIgnoreCase("png") && spriteColumns>1 && spriteColumns<=MAX_FRAMES
+                        && width==height*spriteColumns) {
+                    BufferedImage sheet=reader.read(0);
+                    List<BufferedImage> tileFrames=new ArrayList<>(spriteColumns);
+                    List<Integer> tileDelays=new ArrayList<>(spriteColumns);
+                    for(int tile=0;tile<spriteColumns;tile++) {
+                        tileFrames.add(fit(sheet.getSubimage(tile*height,0,height,height)));
+                        tileDelays.add(Math.clamp(spriteFrameMs,50,10000));
+                    }
+                    return new ImageAnimation(tileFrames,tileDelays);
+                }
                 BufferedImage canvas=new BufferedImage(width,height,BufferedImage.TYPE_INT_ARGB);
                 List<BufferedImage> frames=new ArrayList<>();List<Integer> delays=new ArrayList<>();
                 for(int i=0;i<count;i++) {
