@@ -40,7 +40,9 @@ class SquishAnimationsTest {
         Entity target=mock(Entity.class);
         BedrockEntityDefinition definition=mock(BedrockEntityDefinition.class);
         when(target.bedrockDefinition()).thenReturn(definition);
-        when(definition.identifier()).thenReturn(Identifier.of("minecraft:wolf"));
+        Identifier identifier=mock(Identifier.class);
+        when(identifier.toString()).thenReturn("minecraft:wolf");
+        when(definition.identifier()).thenReturn(identifier);
         when(target.geyserId()).thenReturn(123L);
         var packet=SquishAnimations.packet(target);
         assertEquals(SquishAnimations.PREFIX+"body",packet.getAnimation());
