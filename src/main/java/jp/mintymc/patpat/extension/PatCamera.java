@@ -42,6 +42,9 @@ final class PatCamera {
     }
 
     boolean play(float depth) {
+        // Rapid repeated Pats must not trap the recipient in the temporary
+        // free-camera mode. Ignore overlapping starts until this bob completes.
+        if(active)return false;
         if(depth <= 0f || session.isClosed() || session.getPlayerEntity()==null
                 || session.getPlayerEntity().position()==null
                 || session.getGameMode()==GameMode.SPECTATOR
