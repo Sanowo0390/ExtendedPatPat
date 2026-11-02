@@ -115,4 +115,41 @@ class ImageSupportTest {
         assertTrue(Files.readString(directory.resolve("config.properties")).contains("offset-x=0.5"));
         try(var files=Files.list(directory.resolve("generated"))){assertTrue(files.anyMatch(p->p.getFileName().toString().endsWith(".mcpack")));}
     }
+    @Test void oldBundledGifMigratesToNewPngWhileKeepingOtherOptions() throws Exception {
+        Files.writeString(directory.resolve("config.properties"),
+                "image-file=images/hand.gif\\nimage-scale=0.75\\n");
+        Path images=directory.resolve("images");
+        Files.createDirectories(images);
+        try(var in=getClass().getResourceAsStream("/default-hand.gif")) {
+            assertNotNull(in);
+            Files.copy(in,images.resolve("hand.gif"));
+        }
+        PatPatExtension extension=mock(PatPatExtension.class,CALLS_REAL_METHODS);
+        doReturn(directory).when(extension).dataFolder();
+        doReturn(mock(org.geysermc.geyser.api.extension.ExtensionLogger.class)).when(extension).logger();
+        extension.pre(null);
+        assertEquals("images/hand.png",extension.settings().imageFile());
+        assertEquals(.75,extension.settings().scale(),1e-6);
+        assertEquals(5,extension.animation().frames().size());
+        assertTrue(Files.isRegularFile(images.resolve("hand.gif")),"Preserve old image on disk");
+        assertTrue(Files.isRegularFile(images.resolve("hand.png")));
+    }
+
+    @Test void customGifAtOldDefaultPathIsNotReplaced() throws Exception {
+        Files.writeString(directory.resolve("config.properties"),
+                "image-file=images/hand.gif\\n");
+        Path images=directory.resolve("images");
+        Files.createDirectories(images);
+        try(var in=getClass().getResourceAsStream("/disposal.gif")) {
+            assertNotNull(in);
+            Files.copy(in,images.resolve("hand.gif"));
+        }
+        PatPatExtension extension=mock(PatPatExtension.class,CALLS_REAL_METHODS);
+        doReturn(directory).when(extension).dataFolder();
+        doReturn(mock(org.geysermc.geyser.api.extension.ExtensionLogger.class)).when(extension).logger();
+        extension.pre(null);
+        assertEquals("images/hand.gif",extension.settings().imageFile());
+        assertEquals(3,extension.animation().frames().size());
+    }
+
 }
