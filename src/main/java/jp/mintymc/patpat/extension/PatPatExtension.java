@@ -118,7 +118,7 @@ public final class PatPatExtension implements Extension {
         if(targetUuid==null)return; // Actor has already received its own preview.
         GeyserSession actor=sender.session();
         var world=actor.getWorldName();
-        var remote=actor.getRemoteServer();
+        var remote=actor.remoteServer();
         var at=target.position();
         if(world==null || remote==null || at==null)return;
         sessions.values().forEach(viewer->{
@@ -127,7 +127,7 @@ public final class PatPatExtension implements Extension {
             other.executeInEventLoop(()->{
                 if(viewer.closed() || other.isClosed() || !settings.enabled()
                         || !Objects.equals(world,other.getWorldName())
-                        || !Objects.equals(remote,other.getRemoteServer()))return;
+                        || !Objects.equals(remote,other.remoteServer()))return;
                 Entity candidate=other.getEntityCache().getEntityByUuid(targetUuid);
                 if(candidate==null || !candidate.isValid() || !targetUuid.equals(candidate.uuid())
                         || candidate.position()==null || candidate.position().distanceSquared(at)>16)return;
