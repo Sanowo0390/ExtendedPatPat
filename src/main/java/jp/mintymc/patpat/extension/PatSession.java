@@ -157,6 +157,7 @@ final class PatSession extends SessionAdapter {
         if((!ready && !owner.settings().standaloneMode()) || !owner.settings().enabled() || !owner.patEnabled(session) || !eligible(target)) return false;
         long now=System.nanoTime();if(now<nextPat)return true;
         nextPat=now+owner.settings().cooldown()*1_000_000L;
+        owner.recordPat(session);
         if(owner.settings().swingHandEnabled()) {
             session.sendUpstreamPacket(PatSwing.packet(session.getPlayerEntity().geyserId()));
             owner.relaySwing(this);
@@ -201,6 +202,9 @@ final class PatSession extends SessionAdapter {
     }
     void showStandalone(int targetJavaId) {
         if(!closed && !session.isClosed() && owner.settings().enabled() && owner.patEnabled(session)) renderer.show(targetJavaId,false);
+    }
+    void stats() {
+        session.sendMessage("あなたのPat回数: "+owner.patCount(session)+" 回（この拡張で受け付けた操作）");
     }
     void toggle(String[] args) {
         boolean next;
