@@ -70,8 +70,31 @@ final class HandRenderer {
     }
     private Vector3f anchor(Entity entity) {
         Settings cfg=settings.get();
-        return anchor(entity.position(),displayHeight(entity,cfg),
+        return visibleAnchor(entity.position(),displayHeight(entity,cfg),entity.getBoundingBoxWidth(),
                 session.getPlayerEntity().position(),session.getPlayerEntity().getYaw(),cfg);
+    }
+    /**
+     * Keep the hand quad outside the target hitbox rather than allowing half the
+     * sprite to clip into a wide mob. Positive view-space X stays the user's
+     * preferred distance, but grows as necessary for large hitboxes.
+     */
+    static Vector3f visibleAnchor(Vector3f feet,float height,float hitboxWidth,
+                                  Vector3f viewer,float viewerYaw,Settings cfg) {
+        Vector3f base=anchor(feet,height,viewer,viewerYaw,cfg);
+        if(!cfg.avoidHandOcclusion() || !cfg.offsetSpace().equals("view") || hitboxWidth<=0)return base;
+        double tx=viewer.getX()-feet.getX(),tz=viewer.getZ()-feet.getZ();
+        double length=Math.hypot(tx,tz);
+        if(length<1e-5) return base;
+        tx/=length;tz/=length;
+        // A square hitbox's front face is farther along a diagonal view ray.
+        double faceDistance=(hitboxWidth*0.5)/Math.max(Math.abs(tx),Math.abs(tz));
+        // The image is one block square before multiplying its entity scale.
+        double quadHalfWidth=cfg.scale()*0.5;
+        double required=faceDistance+quadHalfWidth+cfg.handFrontClearance();
+        double additional=Math.max(0,required-cfg.offsetX());
+        // Do not move the sprite past the camera on very close encounters.
+        additional=Math.min(additional,Math.max(0,length-0.1-Math.max(0,cfg.offsetX())));
+        return base.add((float)(tx*additional),0,(float)(tz*additional));
     }
     /** Keep user-defined offsets fixed; the Pat movement is an additional Y-only displacement. */
     static Vector3f motionPosition(Vector3f base, long elapsedMs, boolean text, Settings cfg) {
