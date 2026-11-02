@@ -8,7 +8,7 @@ import java.util.*;
 record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyHand, boolean players,
                 double distance, long cooldown, long duration, long frameMs, double height, int maxActive,
                 boolean localPreview, List<String> frames, String permission,
-                String renderer, String imageFile, double scale, double offsetX, double offsetZ, boolean imageLoop, String offsetSpace, double sittingOffsetY, boolean soundEnabled, String soundEvent, double soundVolume, double soundPitch, boolean standaloneMode, boolean squishEnabled, boolean handMotionEnabled, double handMotionDepth, long handMotionDuration,
+                String renderer, String imageFile, int spriteColumns, int spriteFrameMs, double scale, double offsetX, double offsetZ, boolean imageLoop, String offsetSpace, double sittingOffsetY, boolean soundEnabled, String soundEvent, double soundVolume, double soundPitch, boolean standaloneMode, boolean squishEnabled, boolean handMotionEnabled, double handMotionDepth, long handMotionDuration,
                 boolean swingHandEnabled,
                 Set<String> ignoredEntityTypes, Set<UUID> ignoredPlayerUuids,
                 boolean cameraShakeEnabled, double cameraShakeIntensity) {
@@ -27,7 +27,8 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
                 (long)number(p,"duration-ms",0,0,60000), (long)number(p,"frame-ms",100,50,1000),
                 number(p,"offset-y",number(p,"height-offset",0,-8,8),-8,8), (int)number(p,"max-active-per-viewer",32,1,128),
                 flag(p,"local-preview",true), frames, p.getProperty("required-permission", "").trim(),
-                p.getProperty("renderer","image").trim().toLowerCase(Locale.ROOT), p.getProperty("image-file","images/hand.gif").trim(),
+                p.getProperty("renderer","image").trim().toLowerCase(Locale.ROOT), p.getProperty("image-file","images/hand.png").trim(),
+                (int)number(p,"image-sprite-columns",5,1,128),(int)number(p,"image-sprite-frame-ms",50,50,10000),
                 number(p,"image-scale",0.5,.05,8),number(p,"offset-x",0.5,-8,8),number(p,"offset-z",0,-8,8),flag(p,"image-loop",true),
                 p.getProperty("offset-space","view").trim().toLowerCase(Locale.ROOT),number(p,"sitting-offset-y",0.2,-2,2),flag(p,"sound-enabled",true),p.getProperty("sound-event","patpatbedrock.pat"),number(p,"sound-volume",1,0,4),number(p,"sound-pitch",1,.1,4),flag(p,"standalone-mode",true),flag(p,"squish-enabled",true),
                 flag(p,"hand-motion-enabled",true),number(p,"hand-motion-depth",0.425,0,2),
