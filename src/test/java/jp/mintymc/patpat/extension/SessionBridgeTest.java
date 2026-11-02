@@ -210,4 +210,35 @@ class SessionBridgeTest {
         verify(session,never()).sendUpstreamPacket(any());
     }
 
+    @Test void successfulPatTriggersVanillaSwingAndRecordsStats() {
+        setupAimedTarget();
+        var event=new PacketSendingEvent(network,interact());
+        bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session).sendUpstreamPacket(argThat(p ->
+                p instanceof org.cloudburstmc.protocol.bedrock.packet.AnimatePacket swing
+                && swing.getAction()==org.cloudburstmc.protocol.bedrock.packet.AnimatePacket.Action.SWING_ARM));
+        verify(owner).recordPat(session);
+    }
+
+    @Test void ignoredMobTypePreservesVanillaInteractionWithoutPatOrDamage() {
+        setupAimedTarget();
+        var mob=cache.getEntityByJavaId(300);
+        var type=mock(org.geysermc.geyser.entity.BedrockEntityDefinition.class);
+        var id=mock(org.geysermc.geyser.api.util.Identifier.class);
+        when(id.toString()).thenReturn("minecraft:cow");
+        when(type.identifier()).thenReturn(id);
+        when(mob.bedrockDefinition()).thenReturn(type);
+        Properties props=new Properties();
+        props.setProperty("require-empty-hand","false");
+        props.setProperty("ignored-entity-types","cow");
+        when(owner.settings()).thenReturn(Settings.from(props));
+        var packet=interact();
+        var event=new PacketSendingEvent(network,packet);
+        bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session).sendDownstreamGamePacket(same(packet));
+        verify(owner,never()).recordPat(any());
+    }
+
 }
