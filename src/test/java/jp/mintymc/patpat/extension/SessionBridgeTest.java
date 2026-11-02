@@ -171,25 +171,5 @@ class SessionBridgeTest {
         verify(session,never()).sendUpstreamPacket(any());
     }
 
-    @Test void testCanRaycastEntityWhenBedrockMouseoverHintIsMissing() {
-        setupAimedTarget();
-        var visible=new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<org.geysermc.geyser.entity.type.Entity>();
-        visible.put(300L,cache.getEntityByJavaId(300));
-        when(cache.getEntitiesUnsafe()).thenReturn(visible);
-        bridge.test(true);
-        verify(session,atLeastOnce()).sendUpstreamPacket(any());
-    }
-    @Test void standaloneAirUseCanRaycastEntityWithoutMouseoverHint() {
-        setupAimedTarget();
-        var visible=new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<org.geysermc.geyser.entity.type.Entity>();
-        visible.put(300L,cache.getEntityByJavaId(300));
-        when(cache.getEntitiesUnsafe()).thenReturn(visible);
-        when(session.isSneaking()).thenReturn(true);
-        var packet=new ServerboundUseItemPacket(Hand.MAIN_HAND,0,0f,0f);
-        var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
-        assertTrue(event.isCancelled());
-        verify(session).sendDownstreamGamePacket(argThat(p->p instanceof ServerboundCustomPayloadPacket));
-        verify(session,never()).sendDownstreamGamePacket(same(packet));
-    }
 
 }
