@@ -1,3 +1,27 @@
+追加OGGは`extensions/patpatbedrock/sounds/`へ置けます（半角小文字・数字・_・-のファイル名）。そのフォルダーの音がランダム候補になります。固定再生は例:`sound-event=patpatbedrock.sound.pat1`。変更後はProxy再起動と再接続が必要です。
+
+# PatPatGeyserExtension 0.4.0 の追加機能
+
+添付のpatpat.gifと3つのOGGを既定素材として同梱。新規設定は位置X/Y/Z=0、サイズ1.0です。既存の設定とimages/hand.gifは上書きしません。素材を更新する場合はimages/hand.gifを添付GIFへ置き換えてください。
+
+`/patpatbedrock reload`は設定（位置、サイズ、音量、ピッチ、有効無効）を再読込します。ゲーム内ではProxy側patpatbedrock.admin権限が必要、Proxyコンソールでは`patpatbedrock reload`です。画像・音素材のパック更新にはProxy再起動と統合版の再接続が必要です。
+
+```properties
+image-scale=1.0
+offset-space=view
+offset-x=0.0
+offset-y=0.0
+offset-z=0.0
+sound-enabled=true
+sound-event=patpatbedrock.pat
+sound-volume=1.0
+sound-pitch=1.0
+```
+
+patpatbedrock.patは同梱3音からBedrockがランダム選択します。sound-eventには他のBedrockサウンド識別子も指定可能です。表示テストでも音を再生し、test textでは鳴らしません。
+
+---
+
 # PatPatGeyserExtension 0.3.1
 
 Geyserの`extensions/`へ入れるPatPat拡張です。統合版で撫でる操作と手の表示を追加し、Java版PatPat Modとも通信します。Paper用PatPatGeyserAddonは不要です。

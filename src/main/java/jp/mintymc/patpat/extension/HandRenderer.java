@@ -32,6 +32,10 @@ final class HandRenderer {
         boolean image=!text && cfg.renderer().equals("image") && animation.get()!=null;
         AddEntityPacket packet=image?spawnImagePacket(id,anchor(entity),(float)cfg.scale(),0):spawnPacket(id,anchor(entity),name);
         session.sendUpstreamPacket(packet);
+        if(!text && cfg.soundEnabled()) {
+            PlaySoundPacket sound=new PlaySoundPacket();sound.setSound(cfg.soundEvent());
+            sound.setPosition(anchor(entity));sound.setVolume((float)cfg.soundVolume());sound.setPitch((float)cfg.soundPitch());session.sendUpstreamPacket(sound);
+        }
         hands.put(javaId,new Hand(id,entity,System.nanoTime(),text,name,image,cfg.scale()));
         if(!ticking) { ticking=true; schedule(); }
     }

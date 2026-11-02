@@ -49,6 +49,8 @@ class ImageSupportTest {
         try(ZipFile zip=new ZipFile(first.toFile())) {
             assertFalse(zip.stream().anyMatch(e->e.getName().startsWith("font/")));
             assertNotNull(zip.getEntry("textures/patpatbedrock/f2.png"));
+            assertNotNull(zip.getEntry("sounds/sound_definitions.json"));
+            for(String sound:List.of("pat","pat1","pat2"))assertNotNull(zip.getEntry("sounds/patpatbedrock/"+sound+".ogg"));
             String json=new String(zip.getInputStream(zip.getEntry("render_controllers/hand.json")).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
             JsonArray frames=JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("render_controllers")
                     .getAsJsonObject("controller.render.patpatbedrock.hand").getAsJsonObject("arrays").getAsJsonObject("textures").getAsJsonArray("Array.frames");
@@ -58,7 +60,7 @@ class ImageSupportTest {
         assertNotEquals(first,changed);
     }
     @Test void bundledDefaultGifIsDecodable() throws Exception {
-        ImageAnimation a=ImageAnimation.load(fixture("default-hand.gif"));assertEquals(4,a.frames().size());
+        ImageAnimation a=ImageAnimation.load(fixture("default-hand.gif"));assertEquals(5,a.frames().size());
     }
     @Test void imageScaleIsIndependentOfPositionAndHasNoNameplateOffset() {
         Properties p=new Properties();p.setProperty("offset-x","0.2");p.setProperty("offset-y","-0.4");p.setProperty("offset-z","-0.3");p.setProperty("image-scale","1.5");
@@ -80,7 +82,7 @@ class ImageSupportTest {
         doReturn(directory).when(extension).dataFolder();
         doReturn(mock(org.geysermc.geyser.api.extension.ExtensionLogger.class)).when(extension).logger();
         extension.pre(null);
-        assertNotNull(extension.animation());assertEquals(4,extension.animation().frames().size());
+        assertNotNull(extension.animation());assertEquals(5,extension.animation().frames().size());
         assertEquals(-.25,extension.settings().height());assertEquals(1400,extension.settings().duration());
         assertTrue(Files.isRegularFile(directory.resolve("images/hand.gif")));
         assertTrue(Files.readString(directory.resolve("config.properties")).contains("offset-y=-0.25"));

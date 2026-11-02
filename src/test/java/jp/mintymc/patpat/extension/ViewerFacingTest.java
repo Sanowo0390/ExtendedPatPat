@@ -51,7 +51,7 @@ class ViewerFacingTest {
             assertEquals("query.camera_rotation(1) - query.body_y_rotation",rotation.get(1).getAsString());
             assertEquals(0,rotation.get(2).getAsInt());
             var manifest=JsonParser.parseString(new String(zip.getInputStream(zip.getEntry("manifest.json")).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
-            assertEquals(4,manifest.getAsJsonObject("header").getAsJsonArray("version").get(0).getAsInt(),"Force update of cached 0.3.0 billboard");
+            assertEquals(5,manifest.getAsJsonObject("header").getAsJsonArray("version").get(0).getAsInt(),"Force update of cached 0.3.0 billboard");
         }
     }
 }

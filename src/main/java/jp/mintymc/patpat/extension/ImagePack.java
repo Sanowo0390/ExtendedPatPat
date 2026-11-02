@@ -14,7 +14,8 @@ final class ImagePack {
     static final UUID PACK_UUID=UUID.fromString("37261fb1-530a-4bd3-a9a8-c2e32bd88d88");
     private static final Gson JSON=new GsonBuilder().disableHtmlEscaping().create();
     private ImagePack(){}
-    static Path build(Path directory,ImageAnimation animation) throws IOException {
+    static Path build(Path directory,ImageAnimation animation) throws IOException { return build(directory,animation,null); }
+    static Path build(Path directory,ImageAnimation animation,Path soundFolder) throws IOException {
         SortedMap<String,byte[]> entries=new TreeMap<>();
         Map<String,String> textures=new LinkedHashMap<>();List<String> array=new ArrayList<>();
         for(int i=0;i<animation.frames().size();i++) {
@@ -41,6 +42,19 @@ final class ImagePack {
         // actor's body yaw so it cannot compound the camera's world yaw.
         put(entries,"animations/hand.json",Map.of("format_version","1.10.0","animations",Map.of("animation.patpatbedrock.billboard",Map.of(
                 "loop",true,"bones",Map.of("billboard",Map.of("rotation",List.of("query.camera_rotation(0)","query.camera_rotation(1) - query.body_y_rotation",0)))))));
+        Map<String,byte[]> audio=new TreeMap<>();
+        for(String sound:List.of("pat","pat1","pat2"))try(InputStream in=ImagePack.class.getResourceAsStream("/"+sound+".ogg")){if(in==null)throw new IOException("Missing sound");audio.put(sound,in.readAllBytes());}
+        if(soundFolder!=null && Files.isDirectory(soundFolder))try(var files=Files.list(soundFolder)) {
+            List<Path> custom=files.filter(p->p.getFileName().toString().matches("[a-z0-9_-]+\\.ogg")).sorted().limit(64).toList();
+            if(!custom.isEmpty()){audio.clear();for(Path p:custom){if(Files.size(p)>8*1024*1024)throw new IOException("Sound too large");String name=p.getFileName().toString();audio.put(name.substring(0,name.length()-4),Files.readAllBytes(p));}}
+        }
+        Map<String,Object> definitions=new TreeMap<>();List<String> choices=new ArrayList<>();
+        for(var sound:audio.entrySet()){
+            String path="sounds/patpatbedrock/"+sound.getKey();entries.put(path+".ogg",sound.getValue());choices.add(path);
+            definitions.put("patpatbedrock.sound."+sound.getKey(),Map.of("category","neutral","sounds",List.of(path)));
+        }
+        definitions.put("patpatbedrock.pat",Map.of("category","neutral","sounds",choices));
+        put(entries,"sounds/sound_definitions.json",Map.of("format_version","1.14.0","sound_definitions",definitions));
         byte[] digest;
         try {
             MessageDigest hash=MessageDigest.getInstance("SHA-256");
@@ -49,7 +63,7 @@ final class ImagePack {
             entries.forEach((name,data)->{hash.update(name.getBytes(java.nio.charset.StandardCharsets.UTF_8));hash.update(data);});digest=hash.digest();
         }catch(NoSuchAlgorithmException e){throw new IOException(e);}
         String token=HexFormat.of().formatHex(digest).substring(0,16);
-        List<Integer> version=List.of(4,((digest[0]&255)<<8)|(digest[1]&255),((digest[2]&255)<<8)|(digest[3]&255));
+        List<Integer> version=List.of(5,((digest[0]&255)<<8)|(digest[1]&255),((digest[2]&255)<<8)|(digest[3]&255));
         put(entries,"manifest.json",Map.of("format_version",2,"header",Map.of("name","PatPat Custom Image","description","Generated PNG/GIF hand display "+token,
                 "uuid",PACK_UUID.toString(),"version",version,"min_engine_version",List.of(1,21,0)),
                 "modules",List.of(Map.of("type","resources","uuid","68c0308c-d05b-4c21-b449-3f93d3aacdd6","version",version))));

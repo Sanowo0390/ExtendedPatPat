@@ -31,12 +31,14 @@ public final class PatPatExtension implements Extension {
             settings=Settings.load(dataFolder().resolve("config.properties"));
             if(!Set.of("image","glyph").contains(settings.renderer()))throw new IOException("renderer must be image or glyph");
             copyDefaultImage();
+            Path sounds=dataFolder().resolve("sounds");Files.createDirectories(sounds);
+            for(String name:List.of("pat","pat1","pat2"))if(!Files.exists(sounds.resolve(name+".ogg")))try(InputStream in=getClass().getResourceAsStream("/"+name+".ogg")){if(in!=null)Files.copy(in,sounds.resolve(name+".ogg"));}
             if(settings.renderer().equals("image")) {
                 Path folder=dataFolder().toAbsolutePath().normalize();
                 Path source=folder.resolve(settings.imageFile()).normalize();
                 if(!source.startsWith(folder))throw new IOException("image-file must be inside the extension folder");
                 animation=ImageAnimation.load(source);
-                generatedPack=ImagePack.build(folder.resolve("generated"),animation);
+                generatedPack=ImagePack.build(folder.resolve("generated"),animation,folder.resolve("sounds"));
                 logger().info("Image ready: "+settings.imageFile()+", "+animation.frames().size()+" frames, "+animation.duration()+" ms. Generated pack: "+generatedPack.getFileName());
             }
         } catch(IOException e) { Properties disabled=new Properties();disabled.setProperty("enabled","false");settings=Settings.from(disabled);animation=null;generatedPack=null;logger().error("Unable to load configuration/image; bridge disabled",e); }
@@ -45,8 +47,8 @@ public final class PatPatExtension implements Extension {
         Path file=dataFolder().resolve("config.properties");Properties old=new Properties();
         try(var reader=Files.newBufferedReader(file,java.nio.charset.StandardCharsets.UTF_8)){old.load(reader);}
         Map<String,String> added=new LinkedHashMap<>();
-        added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","0.8");added.put("image-loop","true");added.put("offset-space","view");
-        added.put("offset-x","0.0");added.put("offset-y",old.getProperty("height-offset","0.05"));added.put("offset-z","0.0");
+        added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","1.0");added.put("image-loop","true");added.put("offset-space","view");
+        added.put("offset-x","0.0");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");
         StringBuilder append=new StringBuilder();
         added.forEach((key,value)->{if(!old.containsKey(key))append.append(key).append('=').append(value).append('\n');});
         if(!append.isEmpty())Files.writeString(file,"\n# Added image options: offset-space=view means X toward viewer, Y up, Z right.\n"+append,
@@ -112,8 +114,8 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.3.1 / compatible="+compatible+" / backendHello="+state.ready()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
-            else source.sendMessage("PatPatExtension 0.3.1 / compatible="+compatible+" / sessions="+sessions.size());
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.4.0 / compatible="+compatible+" / backendHello="+state.ready()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            else source.sendMessage("PatPatExtension 0.4.0 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
