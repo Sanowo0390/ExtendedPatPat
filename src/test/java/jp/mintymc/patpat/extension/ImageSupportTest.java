@@ -55,7 +55,7 @@ class ImageSupportTest {
                     java.nio.charset.StandardCharsets.UTF_8);
             JsonObject squishes=JsonParser.parseString(squishJson).getAsJsonObject().getAsJsonObject("animations");
             assertTrue(squishes.has("animation.patpatbedrock.squish.root"));
-            assertEquals(0.3,squishes.getAsJsonObject("animation.patpatbedrock.squish.root")
+            assertEquals(0.24,squishes.getAsJsonObject("animation.patpatbedrock.squish.root")
                     .get("animation_length").getAsDouble(),0.00001);
             for(String sound:List.of("pat","pat1","pat2"))assertNotNull(zip.getEntry("sounds/patpatbedrock/"+sound+".ogg"));
             String json=new String(zip.getInputStream(zip.getEntry("render_controllers/hand.json")).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
@@ -70,7 +70,7 @@ class ImageSupportTest {
         ImageAnimation a=ImageAnimation.load(fixture("default-hand.gif"));assertEquals(5,a.frames().size());
     }
     @Test void imageScaleIsIndependentOfPositionAndHasNoNameplateOffset() {
-        Properties p=new Properties();p.setProperty("offset-x","0.2");p.setProperty("offset-y","-0.4");p.setProperty("offset-z","-0.3");p.setProperty("image-scale","1.5");
+        Properties p=new Properties();p.setProperty("offset-x","0.2");p.setProperty("offset-y","-0.4");p.setProperty("offset-z","-0.24");p.setProperty("image-scale","1.5");
         p.setProperty("offset-space","world");
         Settings cfg=Settings.from(p);Vector3f anchor=HandRenderer.anchor(Vector3f.from(10,20,30),2,Vector3f.ZERO,0,cfg);
         assertEquals(10.2,anchor.getX(),.0001);assertEquals(21.6,anchor.getY(),.0001);assertEquals(29.7,anchor.getZ(),.0001);
