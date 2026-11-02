@@ -1,0 +1,6 @@
+id: patpatbedrock
+name: PatPatGeyserExtension
+main: jp.mintymc.patpat.extension.PatPatExtension
+api: 2.12.1
+version: 0.2.0
+authors: [Sanowo0390]
