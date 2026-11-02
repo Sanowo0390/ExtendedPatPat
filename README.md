@@ -1,6 +1,6 @@
 # PatPatGeyserExtension 🐾
 
-Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**向けのPatPat拡張機能です。しゃがみながら空のメインハンドでモブやプレイヤーを操作すると、対象の頭上に手のGIFアニメーションを表示し、**手が下がって戻るモーション**と効果音を再生します。さらに統合版側では対象のモデルが一瞬むにゅっと縮む「Squish」演出にも対応します。
+Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**向けのPatPat拡張機能です。しゃがみながら空のメインハンドでモブやプレイヤーを操作すると、対象の頭上に手のPNGスプライトシート／GIFアニメーションを表示し、**手が下がって戻るモーション**と効果音を再生します。さらに統合版側では対象のモデルが一瞬むにゅっと縮む「Squish」演出にも対応します。
 
 サーバー側のPatPatプラグインがなくても動作します。PatPat本体がある場合は本体との通信を優先し、Java版クライアントModとの演出共有にも対応します。
 
@@ -16,7 +16,7 @@ Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**�
 
 ## 導入
 
-1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.10.0.jar` を取得します。
+1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.11.0.jar` を取得します。
 2. JARをVelocityの `plugins/Geyser-Velocity/extensions/` に配置し、古い同拡張のJARを取り除きます。
 3. Velocityを再起動すると `extensions/patpatbedrock/` に設定・画像・音声ファイルとリソースパックが生成されます。
 4. 統合版プレイヤーで再接続し、配布されるリソースパックを適用します。必要に応じてGeyser側の `force-resource-packs: true` を使用してください。
@@ -63,7 +63,9 @@ cooldown-ms=100
 duration-ms=0
 frame-ms=100
 renderer=image
-image-file=images/hand.gif
+image-file=images/hand.png
+image-sprite-columns=5
+image-sprite-frame-ms=50
 image-scale=0.5
 image-loop=true
 offset-x=0.5
@@ -87,6 +89,24 @@ sound-pitch=1.0
 **主要な設定**：`image-scale` は画像のサイズ、`offset-x` は見る人の方向への距離、`offset-y` は上下、`offset-z` は見る人から見て左右の位置調整です。`sitting-offset-y` は座っているプレイヤーに対する追加の高さ補正です。`cooldown-ms` は連打の最小間隔です。`standalone-mode=true` ならバックエンド本体がなくても統合版でPatできます。
 
 `/patpatbedrock reload` で位置・サイズ・表示時間などを再読み込みできます。**既存の設定ファイルは更新時に上書きしません。** 旧設定に `cooldown-ms=600` などが残っている場合は、必要に応じて手動で変更してください。
+
+## デフォルトの手画像（v0.11.0）
+
+送っていただいた **560×112px の5コマ横並び透過PNG** をデフォルト画像に変更しました。GIFへ変換せず、そのまま `images/hand.png` として配置し、112×112pxずつ左から右へ切り出してアニメーションします。
+
+```properties
+image-file=images/hand.png
+image-sprite-columns=5
+image-sprite-frame-ms=50
+```
+
+5コマ×50ms＝約250msで1サイクル（従来の手の上下運動240msとほぼ同じ）です。画像自体はPNGですが静止画像ではなく、スプライトシートのコマ送りで手の開閉を表現します。
+
+- PNGが `幅 = 高さ × image-sprite-columns` に一致する場合だけ分割します。普通の正方形PNGは従来どおり静止画です。
+- **GIFは従来どおり直接読み込めます。** カスタムGIFを使う場合、スプライト設定は無視されます。
+- 以前のデフォルト `images/hand.gif` が**未変更の同梱ファイル**だった場合のみ、自動で新しいPNGを使用します。既に差し替えたカスタムGIFは維持します。
+- デフォルト画像ファイルは既存の `images/hand.png` を上書きしません。
+- 画像やコマ数・コマ速度を変更した場合はVelocityを再起動し、統合版で再接続してください（リソースパックが再生成されます）。
 
 ## 手の表示位置と腕振り
 
@@ -160,7 +180,7 @@ PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240ms
 
 ## 画像・GIF・効果音の変更
 
-- `extensions/patpatbedrock/images/` にPNGまたはGIFを配置し、`image-file=images/ファイル名.gif` を設定します（GIFは最大128フレーム、画像サイズ最大16MiB）。
+- `extensions/patpatbedrock/images/` にPNGまたはGIFを配置し、`image-file=images/ファイル名.png` などを設定します（GIFは最大128フレーム、画像サイズ最大16MiB）。
 - `extensions/patpatbedrock/sounds/` 内の小文字英数字・`_`・`-` の名前のOGGファイルを効果音候補として使います。既定で `pat.ogg`、`pat1.ogg`、`pat2.ogg` をランダム再生します。
 - 固定音にしたい場合は例として `sound-event=patpatbedrock.sound.pat1` と指定できます。`sound-enabled=false` で音を無効化できます。
 - **画像・GIF・音声そのものを変更した場合はVelocity再起動と統合版プレイヤーの再接続が必要**です。位置・サイズや音量などの設定変更だけなら `reload` で反映できます。
