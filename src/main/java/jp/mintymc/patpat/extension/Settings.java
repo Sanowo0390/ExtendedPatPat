@@ -26,7 +26,7 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
                 flag(p,"local-preview",true), frames, p.getProperty("required-permission", "").trim(),
                 p.getProperty("renderer","image").trim().toLowerCase(Locale.ROOT), p.getProperty("image-file","images/hand.gif").trim(),
                 number(p,"image-scale",1.0,.05,8),number(p,"offset-x",0,-8,8),number(p,"offset-z",0,-8,8),flag(p,"image-loop",true),
-                p.getProperty("offset-space","view").trim().toLowerCase(Locale.ROOT),number(p,"sitting-offset-y",-0.6,-2,2),flag(p,"sound-enabled",true),p.getProperty("sound-event","patpatbedrock.pat"),number(p,"sound-volume",1,0,4),number(p,"sound-pitch",1,.1,4),flag(p,"standalone-mode",true));
+                p.getProperty("offset-space","view").trim().toLowerCase(Locale.ROOT),number(p,"sitting-offset-y",0.2,-2,2),flag(p,"sound-enabled",true),p.getProperty("sound-event","patpatbedrock.pat"),number(p,"sound-volume",1,0,4),number(p,"sound-pitch",1,.1,4),flag(p,"standalone-mode",true));
     }
     boolean allows(org.geysermc.geyser.api.command.CommandSource source) {
         return permission.isBlank() || source.hasPermission(permission);
