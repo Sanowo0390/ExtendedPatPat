@@ -54,46 +54,22 @@ class ViewerFacingTest {
             assertEquals(5,manifest.getAsJsonObject("header").getAsJsonArray("version").get(0).getAsInt(),"Force update of cached 0.3.0 billboard");
         }
     }
-    @Test void autoFrontPlacementKeepsSpriteOutsideWideHitboxesAcrossViewAngles() {
+    @Test void legacyAutomaticFrontOptionsDoNotDisplaceHand() {
+        // Older users may still have these values in config.properties.
+        // They are intentionally ignored after reverting automatic placement.
         Properties p=new Properties();
         p.setProperty("offset-x","0.5");
-        p.setProperty("image-scale","0.5");
-        p.setProperty("hand-front-clearance","0.15");
+        p.setProperty("offset-y","0.2");
+        p.setProperty("hand-avoid-occlusion","true");
+        p.setProperty("hand-front-clearance","1.5");
         Settings cfg=Settings.from(p);
-        Vector3f feet=Vector3f.ZERO;
-        float width=2.4f;
-        for(int degrees=0;degrees<360;degrees+=15) {
+        for(int degrees=0;degrees<360;degrees+=30) {
             double angle=Math.toRadians(degrees);
             Vector3f viewer=Vector3f.from((float)(12*Math.cos(angle)),2,(float)(12*Math.sin(angle)));
-            Vector3f hand=HandRenderer.visibleAnchor(feet,2,width,viewer,0,cfg);
-            double dx=hand.getX(),dz=hand.getZ();
-            double viewX=Math.cos(angle),viewZ=Math.sin(angle);
-            double faceDistance=(width/2)/Math.max(Math.abs(viewX),Math.abs(viewZ));
-            double depth=dx*viewX+dz*viewZ;
-            assertTrue(depth>=faceDistance+.5*.5+.15-0.002,
-                    "The entire half-width of the billboard must be outside hitbox; angle "+degrees);
+            Vector3f hand=HandRenderer.anchor(Vector3f.ZERO,2,viewer,0,cfg);
+            assertEquals(.5*Math.cos(angle),hand.getX(),1e-6,"No automatic depth compensation");
+            assertEquals(.5*Math.sin(angle),hand.getZ(),1e-6);
+            assertEquals(2.2,hand.getY(),1e-6);
         }
     }
-    @Test void disablingFrontPlacementOrUsingWorldOffsetsPreservesCoordinates() {
-        Properties p=new Properties();
-        p.setProperty("hand-avoid-occlusion","false");
-        Settings cfg=Settings.from(p);
-        Vector3f viewer=Vector3f.from(10,3,0);
-        Vector3f expected=HandRenderer.anchor(Vector3f.ZERO,2,viewer,0,cfg);
-        assertEquals(expected,HandRenderer.visibleAnchor(Vector3f.ZERO,2,5,viewer,0,cfg));
-        p.setProperty("hand-avoid-occlusion","true");
-        p.setProperty("offset-space","world");
-        cfg=Settings.from(p);
-        expected=HandRenderer.anchor(Vector3f.ZERO,2,viewer,0,cfg);
-        assertEquals(expected,HandRenderer.visibleAnchor(Vector3f.ZERO,2,5,viewer,0,cfg));
-    }
-
-    @Test void overheadCameraKeepsHandAboveCompressedMobTop() {
-        Settings cfg=Settings.from(new Properties());
-        Vector3f anchor=HandRenderer.visibleAnchor(Vector3f.ZERO,2,2,
-                Vector3f.from(0,5,0),0,cfg);
-        Vector3f pressed=HandRenderer.motionPosition(anchor,70,false,cfg);
-        assertTrue(pressed.getY()>2.25f,"Pat hand should not clip the mob's roof at maximum press");
-    }
-
 }
