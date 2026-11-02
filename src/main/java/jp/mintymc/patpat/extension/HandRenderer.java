@@ -33,6 +33,9 @@ final class HandRenderer {
         boolean image=!text && cfg.renderer().equals("image") && animation.get()!=null;
         AddEntityPacket packet=image?spawnImagePacket(id,anchor(entity),(float)cfg.scale(),0):spawnPacket(id,anchor(entity),name);
         session.sendUpstreamPacket(packet);
+        // Only real Pat effects animate the target; text-only diagnostics must be
+        // non-invasive. AnimateEntityPacket is clientbound, so it alters no server pose.
+        if(image && cfg.squishEnabled()) session.sendUpstreamPacket(SquishAnimations.packet(entity));
         if(!text && cfg.soundEnabled()) {
             PlaySoundPacket sound=new PlaySoundPacket();sound.setSound(cfg.soundEvent());
             // Sound is sent separately to each viewer: use the listener position to prevent distance attenuation.
