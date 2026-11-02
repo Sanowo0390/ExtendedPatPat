@@ -10,7 +10,8 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
                 boolean localPreview, List<String> frames, String permission,
                 String renderer, String imageFile, double scale, double offsetX, double offsetZ, boolean imageLoop, String offsetSpace, double sittingOffsetY, boolean soundEnabled, String soundEvent, double soundVolume, double soundPitch, boolean standaloneMode, boolean squishEnabled, boolean handMotionEnabled, double handMotionDepth, long handMotionDuration,
                 boolean avoidHandOcclusion, double handFrontClearance, boolean swingHandEnabled,
-                Set<String> ignoredEntityTypes, Set<UUID> ignoredPlayerUuids) {
+                Set<String> ignoredEntityTypes, Set<UUID> ignoredPlayerUuids,
+                boolean cameraShakeEnabled, double cameraShakeIntensity) {
     static Settings load(Path file) throws IOException {
         Properties p = new Properties();
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) { p.load(reader); }
@@ -32,7 +33,8 @@ record Settings(boolean enabled, boolean autoPack, boolean sneak, boolean emptyH
                 flag(p,"hand-motion-enabled",true),number(p,"hand-motion-depth",0.425,0,2),
                 (long)number(p,"hand-motion-duration-ms",240,50,5000),
                 flag(p,"hand-avoid-occlusion",true),number(p,"hand-front-clearance",0.15,0,2),
-                flag(p,"swing-hand-enabled",true),entityTypes(p),playerUuids(p));
+                flag(p,"swing-hand-enabled",true),entityTypes(p),playerUuids(p),
+                flag(p,"camera-shake-enabled",false),number(p,"camera-shake-intensity",0.06,0,0.3));
     }
 
     private static Set<String> entityTypes(Properties p) {
