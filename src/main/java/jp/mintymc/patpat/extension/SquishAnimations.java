@@ -58,15 +58,16 @@ final class SquishAnimations {
                 // Generic fallback: try two common root bone conventions.
                 bones=Map.of(ROOT,squeeze(), "bb_main",squeeze());
             }else bones=Map.of(bone,squeeze());
-            animations.put(PREFIX+bone,Map.of("animation_length",0.3,"loop",false,"bones",bones));
+            animations.put(PREFIX+bone,Map.of("animation_length",0.24,"loop",false,"bones",bones));
         }
         return Map.of("format_version","1.8.0","animations",animations);
     }
 
     private static Map<String,Object> squeeze() {
-        // The bend rises and returns to zero at 0.3 seconds. Values are
+        // Align 240ms PatPat eased-sine curve with the floating hand movement. Values are
         // intentionally mild to avoid clipping mounted/complex mob models.
-        String wave="math.sin(math.min(query.anim_time / 0.3, 1.0) * 180.0)";
+        String t="math.min(query.anim_time / 0.24, 1.0)";
+        String wave="math.sin((1.0 - math.pow(1.0 - "+t+", 2.0)) * 180.0)";
         return Map.of("scale",List.of(
                 "1.0 + 0.04 * "+wave,
                 "1.0 - 0.26 * "+wave,
