@@ -25,4 +25,13 @@ class ConfigurationTest {
         assertFalse(Settings.from(fresh).standaloneMode());
     }
 
+    @Test void newDefaultPatVisualsAndCooldownMatchPublicConfig() {
+        Settings cfg=Settings.from(new Properties());
+        assertEquals(100,cfg.cooldown());
+        assertEquals(0.5,cfg.scale(),1e-6);
+        assertEquals(0.5,cfg.offsetX(),1e-6);
+        assertEquals(0.2,cfg.sittingOffsetY(),1e-6);
+        assertTrue(cfg.standaloneMode());
+    }
+
 }
