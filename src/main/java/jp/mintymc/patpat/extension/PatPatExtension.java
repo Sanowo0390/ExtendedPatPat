@@ -48,7 +48,7 @@ public final class PatPatExtension implements Extension {
         try(var reader=Files.newBufferedReader(file,java.nio.charset.StandardCharsets.UTF_8)){old.load(reader);}
         Map<String,String> added=new LinkedHashMap<>();
         added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","1.0");added.put("image-loop","true");added.put("offset-space","view");
-        added.put("offset-x","0.0");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");
+        added.put("offset-x","0.0");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","-0.6");
         StringBuilder append=new StringBuilder();
         added.forEach((key,value)->{if(!old.containsKey(key))append.append(key).append('=').append(value).append('\n');});
         if(!append.isEmpty())Files.writeString(file,"\n# Added image options: offset-space=view means X toward viewer, Y up, Z right.\n"+append,
