@@ -52,4 +52,18 @@ class PatExtrasTest {
         reloaded.flush();
         assertEquals(3,new PatStatistics(path).total(a));
     }
+    @Test void optionalCameraShakeUsesLowIntensityAndShortDuration() {
+        Properties props=new Properties();
+        assertFalse(Settings.from(props).cameraShakeEnabled(),"Avoid involuntary camera motion by default");
+        props.setProperty("camera-shake-enabled","true");
+        props.setProperty("camera-shake-intensity","0.07");
+        Settings cfg=Settings.from(props);
+        assertTrue(cfg.cameraShakeEnabled());
+        var packet=PatCamera.shake((float)cfg.cameraShakeIntensity());
+        assertEquals(.07f,packet.getIntensity(),1e-6f);
+        assertEquals(.14f,packet.getDuration(),1e-6f);
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.CameraShakeAction.ADD,packet.getShakeAction());
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.CameraShakeType.POSITIONAL,packet.getShakeType());
+    }
+
 }
