@@ -56,6 +56,8 @@ allow-players=true
 ignored-entity-types=
 ignored-player-uuids=
 swing-hand-enabled=true
+camera-shake-enabled=false
+camera-shake-intensity=0.06
 max-distance=3.0
 cooldown-ms=100
 duration-ms=0
@@ -96,6 +98,7 @@ sound-pitch=1.0
 - `hand-avoid-occlusion=false`：自動補正をOFFにして従来どおりの手動オフセットを使用
 - `offset-space=world`：ワールド基準の位置指定では自動補正しません
 - `swing-hand-enabled=true`：Pat成功時に**左クリックと同じ腕振りアニメーション**を本人と同じGeyser上の統合版プレイヤーに再生。攻撃・ダメージは発生しません
+- `camera-shake-enabled=false`：元Modにあるカメラの軽い揺れを任意で有効にできます。`camera-shake-intensity=0.06` は揺れの強さです（0〜0.3）。酔いやすさを考慮して既定ではOFFです
 
 なお、当たり判定と実際の3Dモデル形状が違うモブ、視点が非常に近い場合、異なるリソースパックを使う場合は完全に重なりを防げないことがあります。
 
@@ -124,7 +127,7 @@ PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240ms
 
 通常の位置設定 `offset-x` / `offset-y` / `offset-z` は**基準位置**として維持され、上下移動はY方向にだけ加算されます。GIFやPNGのサイズ、各フレームの表示時間には影響しません。文字だけの `test text` は移動させません。
 
-この機能はGeyserから送る表示用エンティティの位置パケットを利用し、表示中の約240msは20ms間隔で位置更新します。Squishも**標準設定では同じ240msと同じイージングカーブ**で再生します。**サーバープラグイン不要**で、設定の変更は `/patpatbedrock reload` で反映できます。画像素材・リソースパックを再生成する必要はありません。
+この機能はGeyserから送る表示用エンティティの位置パケットを利用し、表示中の約240msは20ms間隔で位置更新します。Squishも**標準設定では同じ240msと同じイージングカーブ**で再生します。 カスタムの `hand-motion-duration-ms` を使う場合、Squish側は標準の240msのままなので完全には同期しません。**サーバープラグイン不要**で、設定の変更は `/patpatbedrock reload` で反映できます。画像素材・リソースパックを再生成する必要はありません。
 
 ## Squish（潰れる演出）
 
