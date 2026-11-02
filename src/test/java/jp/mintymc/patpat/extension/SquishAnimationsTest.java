@@ -32,7 +32,7 @@ class SquishAnimationsTest {
         var animations=json.getAsJsonObject("animations");
         var root=animations.getAsJsonObject(SquishAnimations.PREFIX+"root");
         assertFalse(root.get("loop").getAsBoolean());
-        assertEquals(0.3,root.get("animation_length").getAsDouble(),1e-9);
+        assertEquals(0.24,root.get("animation_length").getAsDouble(),1e-9);
         var scale=root.getAsJsonObject("bones").getAsJsonObject("root").getAsJsonArray("scale");
         assertTrue(scale.get(1).getAsString().contains("query.anim_time"));
     }
