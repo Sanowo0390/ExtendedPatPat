@@ -14,8 +14,13 @@ final class ImagePack {
     static final UUID PACK_UUID=UUID.fromString("37261fb1-530a-4bd3-a9a8-c2e32bd88d88");
     private static final Gson JSON=new GsonBuilder().disableHtmlEscaping().create();
     private ImagePack(){}
-    static Path build(Path directory,ImageAnimation animation) throws IOException { return build(directory,animation,null); }
+    static Path build(Path directory,ImageAnimation animation) throws IOException {
+        return build(directory,animation,null,Settings.from(new Properties()));
+    }
     static Path build(Path directory,ImageAnimation animation,Path soundFolder) throws IOException {
+        return build(directory,animation,soundFolder,Settings.from(new Properties()));
+    }
+    static Path build(Path directory,ImageAnimation animation,Path soundFolder,Settings settings) throws IOException {
         SortedMap<String,byte[]> entries=new TreeMap<>();
         Map<String,String> textures=new LinkedHashMap<>();List<String> array=new ArrayList<>();
         for(int i=0;i<animation.frames().size();i++) {
@@ -26,7 +31,10 @@ final class ImagePack {
         put(entries,"entity/hand.entity.json",Map.of("format_version","1.10.0","minecraft:client_entity",Map.of("description",Map.of(
                 "identifier",ENTITY,"materials",Map.of("default","entity_alphatest"),"textures",textures,
                 "geometry",Map.of("default","geometry.patpatbedrock.hand"),
-                "animations",Map.of("billboard","animation.patpatbedrock.billboard"),"scripts",Map.of("animate",List.of("billboard")),
+                "animations",settings.handMotionEnabled()
+                    ? Map.of("billboard","animation.patpatbedrock.billboard","stroke","animation.patpatbedrock.hand_stroke")
+                    : Map.of("billboard","animation.patpatbedrock.billboard"),
+                "scripts",Map.of("animate",settings.handMotionEnabled()?List.of("billboard","stroke"):List.of("billboard")),
                 "render_controllers",List.of("controller.render.patpatbedrock.hand")))));
         put(entries,"render_controllers/hand.json",Map.of("format_version","1.8.0","render_controllers",Map.of("controller.render.patpatbedrock.hand",Map.of(
                 "arrays",Map.of("textures",Map.of("Array.frames",array)),"geometry","Geometry.default",
@@ -40,8 +48,24 @@ final class ImagePack {
                         "south",Map.of("uv",List.of(128,0),"uv_size",List.of(-128,128)))))))))));
         // Official Bedrock sprite billboard: camera angles are positive; cancel the
         // actor's body yaw so it cannot compound the camera's world yaw.
-        put(entries,"animations/hand.json",Map.of("format_version","1.10.0","animations",Map.of("animation.patpatbedrock.billboard",Map.of(
-                "loop",true,"bones",Map.of("billboard",Map.of("rotation",List.of("query.camera_rotation(0)","query.camera_rotation(1) - query.body_y_rotation",0)))))));
+        Map<String,Object> handAnimations=new LinkedHashMap<>();
+        handAnimations.put("animation.patpatbedrock.billboard",Map.of(
+                "loop",true,"bones",Map.of("billboard",Map.of("rotation",List.of(
+                        "query.camera_rotation(0)","query.camera_rotation(1) - query.body_y_rotation",0)))));
+        if(settings.handMotionEnabled()) {
+            // Move the image locally on Bedrock, not by delayed 20ms movement packets.
+            // Bone positions are in model units (16 per Minecraft block) and are
+            // scaled by the displayed entity's image-scale.
+            double length=settings.handMotionDuration()/1000.0;
+            double amplitude=16*settings.handMotionDepth()/settings.scale();
+            String progress="(1.0 - math.pow(1.0 - math.min(query.anim_time / "+
+                    Double.toString(length)+", 1.0), 2.0))";
+            String y=Double.toString(-amplitude)+" * math.sin("+progress+" * 180.0)";
+            handAnimations.put("animation.patpatbedrock.hand_stroke",Map.of(
+                    "loop",false,"animation_length",length,
+                    "bones",Map.of("billboard",Map.of("position",List.of(0,y,0)))));
+        }
+        put(entries,"animations/hand.json",Map.of("format_version","1.10.0","animations",handAnimations));
         // Bedrock one-shot squish animations share this resource pack with the hand sprite.
         // No Behavior Pack or Java backend plugin is needed for the visuals.
         put(entries,"animations/squish.json",SquishAnimations.resource());
@@ -62,7 +86,7 @@ final class ImagePack {
         try {
             MessageDigest hash=MessageDigest.getInstance("SHA-256");
             // Schema version and GIF timing are part of the identity, as well as texture bytes.
-            hash.update(("image-pack-v2-billboard:"+animation.delays()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            hash.update(("image-pack-v3-synchronized-hand-motion:"+animation.delays()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
             entries.forEach((name,data)->{hash.update(name.getBytes(java.nio.charset.StandardCharsets.UTF_8));hash.update(data);});digest=hash.digest();
         }catch(NoSuchAlgorithmException e){throw new IOException(e);}
         String token=HexFormat.of().formatHex(digest).substring(0,16);
