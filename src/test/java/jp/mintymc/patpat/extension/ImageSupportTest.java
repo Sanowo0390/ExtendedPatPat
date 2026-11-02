@@ -50,6 +50,13 @@ class ImageSupportTest {
             assertFalse(zip.stream().anyMatch(e->e.getName().startsWith("font/")));
             assertNotNull(zip.getEntry("textures/patpatbedrock/f2.png"));
             assertNotNull(zip.getEntry("sounds/sound_definitions.json"));
+            assertNotNull(zip.getEntry("animations/squish.json"));
+            String squishJson=new String(zip.getInputStream(zip.getEntry("animations/squish.json")).readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            JsonObject squishes=JsonParser.parseString(squishJson).getAsJsonObject().getAsJsonObject("animations");
+            assertTrue(squishes.has("animation.patpatbedrock.squish.root"));
+            assertEquals(0.3,squishes.getAsJsonObject("animation.patpatbedrock.squish.root")
+                    .get("animation_length").getAsDouble(),0.00001);
             for(String sound:List.of("pat","pat1","pat2"))assertNotNull(zip.getEntry("sounds/patpatbedrock/"+sound+".ogg"));
             String json=new String(zip.getInputStream(zip.getEntry("render_controllers/hand.json")).readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
             JsonArray frames=JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("render_controllers")
