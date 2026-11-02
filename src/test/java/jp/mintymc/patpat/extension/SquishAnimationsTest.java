@@ -1,6 +1,10 @@
 package jp.mintymc.patpat.extension;
 
 import com.google.gson.JsonParser;
+import org.geysermc.geyser.entity.BedrockEntityDefinition;
+import org.geysermc.geyser.entity.type.Entity;
+import org.geysermc.geyser.api.util.Identifier;
+import static org.mockito.Mockito.*;
 import org.junit.jupiter.api.Test;
 import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,4 +36,18 @@ class SquishAnimationsTest {
         var scale=root.getAsJsonObject("bones").getAsJsonObject("root").getAsJsonArray("scale");
         assertTrue(scale.get(1).getAsString().contains("query.anim_time"));
     }
+    @Test void createsOneShotPacketForTheTargetRuntimeId() {
+        Entity target=mock(Entity.class);
+        BedrockEntityDefinition definition=mock(BedrockEntityDefinition.class);
+        when(target.bedrockDefinition()).thenReturn(definition);
+        when(definition.identifier()).thenReturn(Identifier.of("minecraft:wolf"));
+        when(target.geyserId()).thenReturn(123L);
+        var packet=SquishAnimations.packet(target);
+        assertEquals(SquishAnimations.PREFIX+"body",packet.getAnimation());
+        assertEquals("__runtime_controller",packet.getController());
+        assertEquals("query.any_animation_finished",packet.getStopExpression());
+        assertEquals(1,packet.getRuntimeEntityIds().size());
+        assertEquals(123L,packet.getRuntimeEntityIds().get(0));
+    }
+
 }
