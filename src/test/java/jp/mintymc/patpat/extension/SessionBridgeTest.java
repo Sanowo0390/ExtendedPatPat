@@ -14,6 +14,7 @@ import org.geysermc.mcprotocollib.protocol.data.game.entity.player.*;
 import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ClientboundCustomPayloadPacket;
 import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.ServerboundCustomPayloadPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundInteractPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundUseItemPacket;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import java.util.*;
@@ -66,7 +67,7 @@ class SessionBridgeTest {
         hello();clearInvocations(session);
         var mob=mock(LivingEntity.class);when(cache.getEntityByJavaId(300)).thenReturn(mob);
         when(mob.isValid()).thenReturn(true);when(mob.javaId()).thenReturn(300);
-        when(mob.position()).thenReturn(Vector3f.from(0,0,1));when(mob.getBoundingBoxWidth()).thenReturn(1f);when(mob.getBoundingBoxHeight()).thenReturn(1f);
+        when(mob.position()).thenReturn(Vector3f.from(0,0,1));when(mob.getBoundingBoxWidth()).thenReturn(1f);when(mob.getBoundingBoxHeight()).thenReturn(2f);
         var player=mock(SessionPlayerEntity.class);when(session.getPlayerEntity()).thenReturn(player);
         when(player.javaId()).thenReturn(1);when(player.getHealth()).thenReturn(20f);when(player.position()).thenReturn(Vector3f.ZERO);
         // Simulate a normal Velocity player with no extra permission nodes.
@@ -76,4 +77,52 @@ class SessionBridgeTest {
         ArgumentCaptor<Packet> captor=ArgumentCaptor.forClass(Packet.class);verify(session,times(1)).sendDownstreamGamePacket(captor.capture());
         var payload=(ServerboundCustomPayloadPacket)captor.getValue();assertEquals(PatProtocol.PAT_C2S,payload.getChannel().asString());assertArrayEquals(new byte[]{(byte)0xAC,2},payload.getData());
     }
+    private void setupAimedTarget() {
+        var mob=mock(LivingEntity.class);when(cache.getEntityByJavaId(300)).thenReturn(mob);
+        when(mob.isValid()).thenReturn(true);when(mob.javaId()).thenReturn(300);
+        when(mob.position()).thenReturn(Vector3f.from(0,0,1));
+        when(mob.getBoundingBoxWidth()).thenReturn(1f);when(mob.getBoundingBoxHeight()).thenReturn(2f);
+        var player=mock(SessionPlayerEntity.class);when(session.getPlayerEntity()).thenReturn(player);
+        when(player.javaId()).thenReturn(1);when(player.getHealth()).thenReturn(20f);when(player.position()).thenReturn(Vector3f.ZERO);
+        when(session.getGameMode()).thenReturn(GameMode.SURVIVAL);
+    }
+    @Test void offTargetEntityUseIsNotConvertedIntoPat() {
+        hello();clearInvocations(session);setupAimedTarget();
+        when(session.getPlayerEntity().getYaw()).thenReturn(90f);
+        var packet=interact();var event=new PacketSendingEvent(network,packet);
+        bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session).sendDownstreamGamePacket(same(packet)); // vanilla action still proceeds
+        verify(session,never()).sendDownstreamGamePacket(argThat(p -> p instanceof ServerboundCustomPayloadPacket));
+    }
+    @Test void sneakingSessionStateAllowsStaleInteractSneakFlag() {
+        hello();clearInvocations(session);setupAimedTarget();
+        when(session.isSneaking()).thenReturn(true);
+        var packet=new ServerboundInteractPacket(300,Hand.MAIN_HAND,Vector3d.ZERO,false);
+        var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session).sendDownstreamGamePacket(argThat(p -> p instanceof ServerboundCustomPayloadPacket));
+        verify(session,never()).sendDownstreamGamePacket(same(packet));
+    }
+
+    @Test void sneakRightClickAirCanPatHoveredEntity() {
+        hello();clearInvocations(session);setupAimedTarget();
+        when(session.isSneaking()).thenReturn(true);
+        var hovered=cache.getEntityByJavaId(300);
+        when(session.getMouseoverEntity()).thenReturn(hovered);
+        var packet=new ServerboundUseItemPacket(Hand.MAIN_HAND,0,0f,0f);
+        var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session).sendDownstreamGamePacket(argThat(p -> p instanceof ServerboundCustomPayloadPacket));
+        verify(session,never()).sendDownstreamGamePacket(same(packet));
+    }
+    @Test void sneakRightClickAirWithoutHoveredEntityKeepsVanillaBehavior() {
+        hello();clearInvocations(session);
+        when(session.isSneaking()).thenReturn(true);
+        var packet=new ServerboundUseItemPacket(Hand.MAIN_HAND,0,0f,0f);
+        var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
+        assertFalse(event.isCancelled());
+        verify(session,never()).sendDownstreamGamePacket(any());
+    }
+
 }

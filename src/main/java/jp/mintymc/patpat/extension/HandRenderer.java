@@ -4,6 +4,7 @@ import org.cloudburstmc.math.vector.*;
 import org.cloudburstmc.protocol.bedrock.data.entity.*;
 import org.cloudburstmc.protocol.bedrock.packet.*;
 import org.geysermc.geyser.entity.type.Entity;
+import org.geysermc.geyser.entity.type.player.PlayerEntity;
 import org.geysermc.geyser.session.GeyserSession;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +35,8 @@ final class HandRenderer {
         session.sendUpstreamPacket(packet);
         if(!text && cfg.soundEnabled()) {
             PlaySoundPacket sound=new PlaySoundPacket();sound.setSound(cfg.soundEvent());
-            sound.setPosition(anchor(entity));sound.setVolume((float)cfg.soundVolume());sound.setPitch((float)cfg.soundPitch());session.sendUpstreamPacket(sound);
+            // Sound is sent separately to each viewer: use the listener position to prevent distance attenuation.
+            sound.setPosition(session.getPlayerEntity().position());sound.setVolume((float)cfg.soundVolume());sound.setPitch((float)cfg.soundPitch());session.sendUpstreamPacket(sound);
         }
         hands.put(javaId,new Hand(id,entity,System.nanoTime(),text,name,image,cfg.scale()));
         if(!ticking) { ticking=true; schedule(); }
@@ -64,7 +66,16 @@ final class HandRenderer {
         return packet;
     }
     private Vector3f anchor(Entity entity) {
-        return anchor(entity.position(),entity.getBoundingBoxHeight(),session.getPlayerEntity().position(),session.getPlayerEntity().getYaw(),settings.get());
+        Settings cfg=settings.get();
+        return anchor(entity.position(),displayHeight(entity,cfg),
+                session.getPlayerEntity().position(),session.getPlayerEntity().getYaw(),cfg);
+    }
+    static float displayHeight(Entity entity,Settings cfg) {
+        float height=entity.getBoundingBoxHeight();
+        // Geyser keeps the standing collision height while a player is mounted/sitting.
+        if(entity instanceof PlayerEntity && (entity.getFlag(EntityFlag.RIDING) || entity.getFlag(EntityFlag.SITTING)))
+            height+=(float)cfg.sittingOffsetY();
+        return height;
     }
     static Vector3f anchor(Vector3f feet,float height,Vector3f viewer,float viewerYaw,Settings settings) {
         double x=settings.offsetX(),z=settings.offsetZ();

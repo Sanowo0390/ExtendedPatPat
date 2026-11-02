@@ -17,6 +17,7 @@ import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.Serverbound
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundLoginPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundRespawnPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundInteractPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundUseItemPacket;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -77,17 +78,27 @@ final class PatSession extends SessionAdapter {
         }
     }
     @Override public void packetSending(PacketSendingEvent event) {
-        if(bypass.remove(event.getPacket()) || closed || event.isCancelled() || !ready || !owner.settings().enabled()) return;
-        if(!(event.getPacket() instanceof ServerboundInteractPacket interact)
-                || interact.getHand()!=Hand.MAIN_HAND || (owner.settings().sneak() && !interact.isSneaking())) return;
+        Packet packet=event.getPacket();
+        if(bypass.remove(packet) || closed || event.isCancelled() || !ready || !owner.settings().enabled()) return;
+        if(packet instanceof ServerboundInteractPacket interact) {
+            if(interact.getHand()!=Hand.MAIN_HAND
+                    || (owner.settings().sneak() && !interact.isSneaking() && !session.isSneaking())) return;
+        } else if(packet instanceof ServerboundUseItemPacket use) {
+            // Bedrock can send "use item in air" instead of "interact entity" for a
+            // crouched right-click on a player with no native Bedrock interaction.
+            // Only reinterpret it while crouching AND a specific entity is hovered.
+            if(use.getHand()!=Hand.MAIN_HAND || !session.isSneaking() || session.getMouseoverEntity()==null) return;
+        } else return;
         event.setCancelled(true);
         session.executeInEventLoop(()->{
             if(closed || session.isClosed()) return;
-            Entity target=session.getEntityCache().getEntityByJavaId(interact.getEntityId());
+            Entity target=packet instanceof ServerboundInteractPacket interact
+                    ? session.getEntityCache().getEntityByJavaId(interact.getEntityId())
+                    : session.getMouseoverEntity();
             if(!attempt(target)) {
-                // Invalid pat gesture keeps its original vanilla interaction intact.
-                // Bypass only this exact packet instance, not other extensions or all subsequent packets.
-                bypass.add(interact);session.sendDownstreamGamePacket(interact);
+                // Preserve vanilla behavior when the aim, permissions, or range are invalid.
+                // Bypass only this packet instance, not unrelated plugins or later clicks.
+                bypass.add(packet);session.sendDownstreamGamePacket(packet);
             }
         });
     }
@@ -104,7 +115,11 @@ final class PatSession extends SessionAdapter {
         double dx=axis(eye.getX(),pos.getX()-half,pos.getX()+half);
         double dy=axis(eye.getY(),pos.getY(),pos.getY()+entity.getBoundingBoxHeight());
         double dz=axis(eye.getZ(),pos.getZ()-half,pos.getZ()+half);
-        return dx*dx+dy*dy+dz*dz<=cfg.distance()*cfg.distance();
+        if (dx*dx+dy*dy+dz*dz>cfg.distance()*cfg.distance()) return false;
+        // An entity use packet can reach a nearby hitbox while the crosshair is elsewhere.
+        // Validate current look direction, not just the interaction entity ID and range.
+        return AimCheck.hits(eye,session.getPlayerEntity().getYaw(),session.getPlayerEntity().getPitch(),
+                pos,entity.getBoundingBoxWidth(),entity.getBoundingBoxHeight(),cfg.distance()+0.1);
     }
     static double axis(double n,double min,double max){return Math.max(0,Math.max(min-n,n-max));}
     /** true also covers cooldown suppression, to consume duplicate Interact/InteractAt packets. */
