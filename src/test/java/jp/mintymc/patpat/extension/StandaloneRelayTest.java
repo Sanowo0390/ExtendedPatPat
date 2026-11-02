@@ -86,4 +86,48 @@ class StandaloneRelayTest {
         extension.relayStandalone(actor,target);
         verify(recipient,never()).showStandalone(anyInt());
     }
+    @Test void receivingBedrockPlayerGetsCameraFeedbackButPatterDoesNot() throws Exception {
+        var extension=new PatPatExtension();
+        UUID targetUuid=UUID.randomUUID();
+        Key world=Key.key("minecraft:overworld");
+        RemoteServer remote=mock(RemoteServer.class);
+        GeyserSession source=session(world,remote),recipient=session(world,remote),observer=session(world,remote);
+        PatSession initiatorState=mock(PatSession.class),recipientState=mock(PatSession.class),observerState=mock(PatSession.class);
+        when(initiatorState.session()).thenReturn(source);
+        when(recipientState.session()).thenReturn(recipient);
+        when(observerState.session()).thenReturn(observer);
+        sessions(extension).put(source,initiatorState);
+        sessions(extension).put(recipient,recipientState);
+        sessions(extension).put(observer,observerState);
+
+        Entity target=mock(Entity.class);
+        Vector3f at=Vector3f.from(2,70,3);
+        when(target.uuid()).thenReturn(targetUuid);
+        when(target.position()).thenReturn(at);
+
+        org.geysermc.geyser.entity.type.player.SessionPlayerEntity self=
+                mock(org.geysermc.geyser.entity.type.player.SessionPlayerEntity.class);
+        when(self.uuid()).thenReturn(targetUuid);
+        when(self.position()).thenReturn(at);
+        when(self.javaId()).thenReturn(29);
+        when(self.isValid()).thenReturn(true);
+        when(recipient.getPlayerEntity()).thenReturn(self);
+
+        var observerCache=mock(EntityCache.class);
+        when(observer.getEntityCache()).thenReturn(observerCache);
+        Entity visible=mock(Entity.class);
+        when(observerCache.getEntityByUuid(targetUuid)).thenReturn(visible);
+        when(visible.uuid()).thenReturn(targetUuid);
+        when(visible.isValid()).thenReturn(true);
+        when(visible.position()).thenReturn(at);
+        when(visible.javaId()).thenReturn(29);
+
+        extension.relayStandalone(initiatorState,target);
+        verify(recipientState).showStandalone(29);
+        verify(recipientState).receivePatFeedback();
+        verify(observerState).showStandalone(29);
+        verify(observerState,never()).receivePatFeedback();
+        verify(initiatorState,never()).receivePatFeedback();
+    }
+
 }
