@@ -23,4 +23,12 @@ class AimCheckTest {
         assertTrue(AimCheck.hits(Vector3f.from(0,1,0),0,0,Vector3f.from(0,0,0),1,2,3));
         assertTrue(AimCheck.hits(EYE,0,45,Vector3f.from(0,-2,2),1,2,3));
     }
+    @Test void returnsClosestRayIntersectionAndInfinityOutsideAim() {
+        double near=AimCheck.intersectionDistance(EYE,0,0,Vector3f.from(0,0,1.2f),0.6,1.8,3);
+        double far=AimCheck.intersectionDistance(EYE,0,0,Vector3f.from(0,0,2.5f),0.6,1.8,3);
+        assertTrue(near<far);
+        assertEquals(Double.POSITIVE_INFINITY,
+                AimCheck.intersectionDistance(EYE,90,0,TARGET,0.6,1.8,3));
+    }
+
 }
