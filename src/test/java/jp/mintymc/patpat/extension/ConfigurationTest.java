@@ -15,4 +15,14 @@ class ConfigurationTest {
         assertFalse(PatPatExtension.compatible("1281",sha));
         assertFalse(PatPatExtension.compatible("1280","different"));
     }
+    @Test void standaloneAndSeatedOffsetDefaultsAreAppliedWithoutOverridingCustomValues() {
+        Properties fresh=new Properties();
+        assertTrue(Settings.from(fresh).standaloneMode());
+        assertEquals(0.2,Settings.from(fresh).sittingOffsetY(),1e-6);
+        fresh.setProperty("sitting-offset-y","-0.6");
+        fresh.setProperty("standalone-mode","false");
+        assertEquals(-0.6,Settings.from(fresh).sittingOffsetY(),1e-6);
+        assertFalse(Settings.from(fresh).standaloneMode());
+    }
+
 }
