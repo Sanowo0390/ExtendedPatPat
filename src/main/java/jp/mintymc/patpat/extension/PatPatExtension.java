@@ -146,6 +146,26 @@ public final class PatPatExtension implements Extension {
             });
         });
     }
+    /** Mirror the harmless hand swing to other Bedrock viewers in the same world. */
+    void relaySwing(PatSession sender) {
+        GeyserSession actor=sender.session();
+        if(actor.getPlayerEntity()==null || actor.getPlayerEntity().uuid()==null)return;
+        UUID actorUuid=actor.getPlayerEntity().uuid();
+        var world=actor.getWorldName();
+        var remote=actor.remoteServer();
+        if(world==null || remote==null)return;
+        sessions.values().forEach(viewer->{
+            if(viewer==sender)return;
+            GeyserSession other=viewer.session();
+            other.executeInEventLoop(()->{
+                if(viewer.closed() || other.isClosed() || !settings.enabled()
+                        || !Objects.equals(world,other.getWorldName())
+                        || !Objects.equals(remote,other.remoteServer()))return;
+                Entity otherActor=other.getEntityCache().getEntityByUuid(actorUuid);
+                if(otherActor!=null && otherActor.isValid())viewer.swingForViewer(otherActor.geyserId());
+            });
+        });
+    }
     @Subscribe public void quit(SessionDisconnectEvent event) {
         if(event.connection() instanceof GeyserSession s) { PatSession state=sessions.remove(s);if(state!=null)state.close(); }
     }
