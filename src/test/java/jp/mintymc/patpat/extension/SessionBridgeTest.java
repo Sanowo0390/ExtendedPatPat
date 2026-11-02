@@ -45,9 +45,12 @@ class SessionBridgeTest {
         var payload=(ServerboundCustomPayloadPacket)captor.getValue();
         assertEquals(PatProtocol.HELLO_C2S,payload.getChannel().asString());assertArrayEquals(new byte[]{1,2,0},payload.getData());
     }
-    @Test void doesNotChangeVanillaInteractionWithoutBackendHello() {
-        PacketSendingEvent event=new PacketSendingEvent(network,interact());bridge.packetSending(event);assertFalse(event.isCancelled());
-        verify(session,never()).sendDownstreamGamePacket(any());
+    @Test void rejectsInvalidStandaloneInteractionAndResendsVanillaPacket() {
+        var packet=interact();
+        PacketSendingEvent event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session).sendDownstreamGamePacket(same(packet));
+        verify(session,never()).sendUpstreamPacket(any());
     }
     @Test void invalidTargetIsResentOnceWithoutRecursion() {
         hello();clearInvocations(session);
@@ -116,13 +119,57 @@ class SessionBridgeTest {
         verify(session).sendDownstreamGamePacket(argThat(p -> p instanceof ServerboundCustomPayloadPacket));
         verify(session,never()).sendDownstreamGamePacket(same(packet));
     }
-    @Test void sneakRightClickAirWithoutHoveredEntityKeepsVanillaBehavior() {
-        hello();clearInvocations(session);
+    @Test void sneakRightClickAirWithoutHoveredEntityPreservesVanillaBehavior() {
+        hello();clearInvocations(session);setupAimedTarget();
         when(session.isSneaking()).thenReturn(true);
         var packet=new ServerboundUseItemPacket(Hand.MAIN_HAND,0,0f,0f);
         var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session).sendDownstreamGamePacket(same(packet));
+        verify(session,never()).sendDownstreamGamePacket(argThat(p->p instanceof ServerboundCustomPayloadPacket));
+    }
+
+    @Test void testCommandDoesNotFallBackToSelfWhenNothingIsAimed() {
+        setupAimedTarget();
+        bridge.test(false);
+        verify(session,never()).sendUpstreamPacket(any());
+        verify(session).sendMessage(contains("照準"));
+    }
+    @Test void testCommandRejectsStaleHoverWhenLookDirectionChanged() {
+        setupAimedTarget();
+        var hovered=cache.getEntityByJavaId(300);
+        when(session.getMouseoverEntity()).thenReturn(hovered);
+        when(session.getPlayerEntity().getYaw()).thenReturn(90f);
+        bridge.test(false);
+        verify(session,never()).sendUpstreamPacket(any());
+    }
+    @Test void testCommandAcceptsAimedTargetWithoutBackend() {
+        setupAimedTarget();
+        var hovered=cache.getEntityByJavaId(300);
+        when(session.getMouseoverEntity()).thenReturn(hovered);
+        bridge.test(true);
+        verify(session,atLeastOnce()).sendUpstreamPacket(any());
+        verify(session).sendMessage(contains("表示テスト"));
+    }
+    @Test void standalonePatWorksWithoutBackendHello() {
+        setupAimedTarget();
+        var original=interact();var event=new PacketSendingEvent(network,original);
+        bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session,never()).sendDownstreamGamePacket(any());
+        verify(session,atLeastOnce()).sendUpstreamPacket(any());
+    }
+    @Test void standaloneCanBeDisabledToRestoreOldBackendRequirement() {
+        PatPatExtension disabledOwner=mock(PatPatExtension.class);
+        Properties p=new Properties();p.setProperty("standalone-mode","false");
+        when(disabledOwner.settings()).thenReturn(Settings.from(p));
+        PatSession disabled=new PatSession(disabledOwner,session);
+        var event=new PacketSendingEvent(network,interact());
+        disabled.packetSending(event);
         assertFalse(event.isCancelled());
         verify(session,never()).sendDownstreamGamePacket(any());
+        verify(session,never()).sendUpstreamPacket(any());
     }
+
 
 }

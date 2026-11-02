@@ -10,6 +10,7 @@ import org.geysermc.geyser.api.entity.custom.CustomEntityDefinition;
 import org.geysermc.geyser.api.pack.*;
 import org.geysermc.geyser.api.util.TriState;
 import org.geysermc.geyser.session.GeyserSession;
+import org.geysermc.geyser.entity.type.Entity;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -48,7 +49,7 @@ public final class PatPatExtension implements Extension {
         try(var reader=Files.newBufferedReader(file,java.nio.charset.StandardCharsets.UTF_8)){old.load(reader);}
         Map<String,String> added=new LinkedHashMap<>();
         added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","1.0");added.put("image-loop","true");added.put("offset-space","view");
-        added.put("offset-x","0.0");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","-0.6");
+        added.put("offset-x","0.0");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","0.2");added.put("standalone-mode","true");
         StringBuilder append=new StringBuilder();
         added.forEach((key,value)->{if(!old.containsKey(key))append.append(key).append('=').append(value).append('\n');});
         if(!append.isEmpty())Files.writeString(file,"\n# Added image options: offset-space=view means X toward viewer, Y up, Z right.\n"+append,
@@ -93,7 +94,7 @@ public final class PatPatExtension implements Extension {
             compatible=compatible(build,commit);
         } catch(ReflectiveOperationException | LinkageError e) {compatible=false;}
         if(!compatible) { logger().error("This build targets Geyser 2.12.1-b1280 (64bb399). Running "+running+". Bridge disabled to avoid incompatible packet hooks.");return; }
-        logger().info("PatPat extension ready for Geyser b1280. Paper addon is NOT needed. Backend PatPat Plugin 1.2.5+ is required.");
+        logger().info("PatPat extension ready for Geyser b1280. Paper addon is NOT needed. Backend PatPat Plugin 1.2.5+ is optional; standalone Bedrock fallback is available.");
         geyserApi().onlineConnections().forEach(c->{ if(c instanceof GeyserSession s) attach(s); });
     }
     static boolean compatible(String build,String commit) {
@@ -107,6 +108,33 @@ public final class PatPatExtension implements Extension {
         session.getDownstream().getSession().addListener(state);
         session.executeInEventLoop(state::beginHandshake);
     }
+    /**
+     * Optional backend-free Pat. Each viewer owns a distinct Geyser entity cache,
+     * so resolve the target by UUID on that viewer's event loop. Never broadcast by
+     * Java entity ID: IDs may be reused on another Velocity backend.
+     */
+    void relayStandalone(PatSession sender,Entity target) {
+        UUID targetUuid=target.uuid();
+        if(targetUuid==null)return; // Actor has already received its own preview.
+        GeyserSession actor=sender.session();
+        var world=actor.getWorldName();
+        var remote=actor.remoteServer();
+        var at=target.position();
+        if(world==null || remote==null || at==null)return;
+        sessions.values().forEach(viewer->{
+            if(viewer==sender)return;
+            GeyserSession other=viewer.session();
+            other.executeInEventLoop(()->{
+                if(viewer.closed() || other.isClosed() || !settings.enabled()
+                        || !Objects.equals(world,other.getWorldName())
+                        || !Objects.equals(remote,other.remoteServer()))return;
+                Entity candidate=other.getEntityCache().getEntityByUuid(targetUuid);
+                if(candidate==null || !candidate.isValid() || !targetUuid.equals(candidate.uuid())
+                        || candidate.position()==null || candidate.position().distanceSquared(at)>16)return;
+                viewer.showStandalone(candidate.javaId());
+            });
+        });
+    }
     @Subscribe public void quit(SessionDisconnectEvent event) {
         if(event.connection() instanceof GeyserSession s) { PatSession state=sessions.remove(s);if(state!=null)state.close(); }
     }
@@ -114,8 +142,8 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.4.1 / compatible="+compatible+" / backendHello="+state.ready()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
-            else source.sendMessage("PatPatExtension 0.4.1 / compatible="+compatible+" / sessions="+sessions.size());
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.5.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            else source.sendMessage("PatPatExtension 0.5.0 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
@@ -125,7 +153,7 @@ public final class PatPatExtension implements Extension {
                         Settings loaded=Settings.load(dataFolder().resolve("config.properties"));
                         if(!loaded.renderer().equals(settings.renderer()) || !loaded.imageFile().equals(settings.imageFile()))throw new IOException("renderer / image-file の変更はProxy再起動が必要です。");
                         settings=loaded;sessions.values().forEach(s->s.session().executeInEventLoop(s::beginHandshake));
-                        source.sendMessage("位置・サイズ・表示時間を再読み込みしました。画像やGIFの変更はProxy再起動後、統合版へ再接続してください。");
+                        source.sendMessage("位置・サイズ・表示時間・standalone-modeを再読み込みしました。画像やGIFの変更はProxy再起動後、統合版へ再接続してください。");
                     }
                     catch(IOException e){source.sendMessage("再読み込み失敗: "+e.getMessage());}
                 }).build());

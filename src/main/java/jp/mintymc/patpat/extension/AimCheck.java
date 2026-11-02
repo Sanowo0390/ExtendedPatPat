@@ -8,7 +8,12 @@ final class AimCheck {
 
     static boolean hits(Vector3f eye, float yaw, float pitch, Vector3f feet,
                         double width, double height, double reach) {
-        if (eye == null || feet == null || !(width > 0) || !(height > 0) || !(reach > 0)) return false;
+        return Double.isFinite(intersectionDistance(eye,yaw,pitch,feet,width,height,reach));
+    }
+    /** Nearest ray entry distance, or infinity when the target is outside the crosshair. */
+    static double intersectionDistance(Vector3f eye, float yaw, float pitch, Vector3f feet,
+                                       double width, double height, double reach) {
+        if (eye == null || feet == null || !(width > 0) || !(height > 0) || !(reach > 0)) return Double.POSITIVE_INFINITY;
         double y = Math.toRadians(yaw), p = Math.toRadians(pitch);
         double cos = Math.cos(p);
         double[] from = {eye.getX(), eye.getY(), eye.getZ()};
@@ -19,14 +24,14 @@ final class AimCheck {
         double near = 0, far = reach;
         for (int i = 0; i < 3; i++) {
             if (Math.abs(dir[i]) < 1e-8) {
-                if (from[i] < min[i] || from[i] > max[i]) return false;
+                if (from[i] < min[i] || from[i] > max[i]) return Double.POSITIVE_INFINITY;
             } else {
                 double a = (min[i] - from[i]) / dir[i], b = (max[i] - from[i]) / dir[i];
                 near = Math.max(near, Math.min(a, b));
                 far = Math.min(far, Math.max(a, b));
-                if (near > far) return false;
+                if (near > far) return Double.POSITIVE_INFINITY;
             }
         }
-        return true;
+        return near;
     }
 }

@@ -37,6 +37,7 @@ final class PatSession extends SessionAdapter {
     }
     GeyserSession session(){return session;}
     boolean ready(){return ready;}
+    boolean closed(){return closed;}
     int active(){return renderer.size();}
     void beginHandshake() {
         ready=false;nextPat=0;generation++;renderer.clear();
@@ -79,7 +80,8 @@ final class PatSession extends SessionAdapter {
     }
     @Override public void packetSending(PacketSendingEvent event) {
         Packet packet=event.getPacket();
-        if(bypass.remove(packet) || closed || event.isCancelled() || !ready || !owner.settings().enabled()) return;
+        if(bypass.remove(packet) || closed || event.isCancelled() || !owner.settings().enabled()
+                || (!ready && !owner.settings().standaloneMode())) return;
         if(packet instanceof ServerboundInteractPacket interact) {
             if(interact.getHand()!=Hand.MAIN_HAND
                     || (owner.settings().sneak() && !interact.isSneaking() && !session.isSneaking())) return;
@@ -87,14 +89,14 @@ final class PatSession extends SessionAdapter {
             // Bedrock can send "use item in air" instead of "interact entity" for a
             // crouched right-click on a player with no native Bedrock interaction.
             // Only reinterpret it while crouching AND a specific entity is hovered.
-            if(use.getHand()!=Hand.MAIN_HAND || !session.isSneaking() || session.getMouseoverEntity()==null) return;
+            if(use.getHand()!=Hand.MAIN_HAND || !session.isSneaking()) return;
         } else return;
         event.setCancelled(true);
         session.executeInEventLoop(()->{
             if(closed || session.isClosed()) return;
             Entity target=packet instanceof ServerboundInteractPacket interact
                     ? session.getEntityCache().getEntityByJavaId(interact.getEntityId())
-                    : session.getMouseoverEntity();
+                    : findAimedTarget();
             if(!attempt(target)) {
                 // Preserve vanilla behavior when the aim, permissions, or range are invalid.
                 // Bypass only this packet instance, not unrelated plugins or later clicks.
@@ -122,25 +124,67 @@ final class PatSession extends SessionAdapter {
                 pos,entity.getBoundingBoxWidth(),entity.getBoundingBoxHeight(),cfg.distance()+0.1);
     }
     static double axis(double n,double min,double max){return Math.max(0,Math.max(min-n,n-max));}
+    /** Use Geyser's hover hint when valid, but raycast cached entities if it is absent/stale.
+     * This helps desktop Bedrock controls that do not send mouseover notifications.
+     */
+    private Entity findAimedTarget() {
+        Entity hovered=session.getMouseoverEntity();
+        if(eligible(hovered)) return hovered;
+        Vector3f eye=session.getPlayerEntity().position().add(0,session.isSneaking()?1.27f:1.62f,0);
+        double reach=owner.settings().distance()+0.1;
+        Entity best=null;
+        double bestDistance=Double.POSITIVE_INFINITY;
+        var tracked=session.getEntityCache().getEntitiesUnsafe();
+        if(tracked==null)return null;
+        for(Entity candidate:tracked.values()) {
+            if(candidate==null || !(candidate instanceof LivingEntity) || !candidate.isValid())continue;
+            double hit=AimCheck.intersectionDistance(eye,session.getPlayerEntity().getYaw(),
+                    session.getPlayerEntity().getPitch(),candidate.position(),
+                    candidate.getBoundingBoxWidth(),candidate.getBoundingBoxHeight(),reach);
+            if(hit<bestDistance && eligible(candidate)) {
+                best=candidate;bestDistance=hit;
+            }
+        }
+        return best;
+    }
     /** true also covers cooldown suppression, to consume duplicate Interact/InteractAt packets. */
     private boolean attempt(Entity target) {
-        if(!ready || !owner.settings().enabled() || !eligible(target)) return false;
+        if((!ready && !owner.settings().standaloneMode()) || !owner.settings().enabled() || !eligible(target)) return false;
         long now=System.nanoTime();if(now<nextPat)return true;
         nextPat=now+owner.settings().cooldown()*1_000_000L;
-        payload(PatProtocol.PAT_C2S,PatProtocol.pat(target.javaId()));
-        if(owner.settings().localPreview()) renderer.show(target.javaId(),false);
+        if(ready) {
+            // Preserve the backend protocol when PatPat is present.
+            payload(PatProtocol.PAT_C2S,PatProtocol.pat(target.javaId()));
+            if(owner.settings().localPreview()) renderer.show(target.javaId(),false);
+        } else {
+            // Backend-free mode: render locally, and relay only to Bedrock clients
+            // whose entity cache independently contains the same entity UUID.
+            renderer.show(target.javaId(),false);
+            owner.relayStandalone(this,target);
+        }
         return true;
     }
     void commandPat() {
-        if(!ready){session.sendMessage("PatPat本体の応答がありません。バックエンドにPatPat Plugin 1.2.5+があるか確認してください。");return;}
-        Entity target=session.getMouseoverEntity();
+        if(!ready && !owner.settings().standaloneMode()){
+            session.sendMessage("PatPat本体の応答がなく、standalone-mode=falseです。");
+            return;
+        }
+        Entity target=findAimedTarget();
         if(!attempt(target))session.sendMessage("撫でられる対象がいません。対象に照準を合わせ、空の手と距離を確認してください。");
     }
     void test(boolean text) {
-        Entity target=session.getMouseoverEntity();
-        if(target==null || !target.isValid())target=session.getPlayerEntity();
+        Entity target=findAimedTarget();
+        // Test uses the same crosshair/distance/entity checks as a real Pat.
+        // In particular, never silently fall back to the player's own head.
+        if(!eligible(target)) {
+            session.sendMessage("表示できません。撫でられる対象に照準を合わせ、距離と空の手を確認してください。");
+            return;
+        }
         renderer.show(target.javaId(),text);
-        session.sendMessage("表示テスト（自分のみ）。対象がなければ自分の頭上です。backendHello="+ready);
+        session.sendMessage("照準先への表示テスト（自分のみ）。backendHello="+ready);
+    }
+    void showStandalone(int targetJavaId) {
+        if(!closed && !session.isClosed() && owner.settings().enabled()) renderer.show(targetJavaId,false);
     }
     void clear(){renderer.clear();}
     void close() {

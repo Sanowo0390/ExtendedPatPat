@@ -1,3 +1,17 @@
+# PatPatGeyserExtension 0.5.0 — backend-free Bedrock Pat + safe test
+
+**新機能 / 修正**
+
+- バックエンドにPatPat Pluginがなくても、Geyser Extension単体で統合版プレイヤーがPatできます（`standalone-mode=true`）。操作した本人に演出を表示し、同じGeyser Extensionが管理している統合版プレイヤーにも対象のUUID・ワールド・位置を確認して表示します。**Java版にはこの単体モードの演出を送信しません。**
+- バックエンドにPatPat Plugin 1.2.5+があるときは従来どおりPatPatの通信方式を優先し、Java版Modとの共有を維持します。
+- `/patpatbedrock test` / `test text` は、照準先に有効な対象がない場合は表示しません。**従来の自分の頭上へのフォールバックを廃止**しました。視線、距離、空の手などのチェックを通常のPatと共通化しました。
+- 座り姿勢の表示補正は新規導入時の既定を `sitting-offset-y=0.2` に変更。既存設定は自動上書きしません。以前の `-0.6` を使っている場合は手動で変更し、`patpatbedrock reload` で反映します。
+- `standalone-mode=false` にすると、バックエンド本体がない場合のPat変換を無効にできます。
+
+**制限:** この方式での表示共有は同じGeyserプロセスに接続した統合版プレイヤー間に限ります。別のGeyserインスタンスやJava版プレイヤーには、サーバー側通信または追加実装が必要です。Geyserの対応ビルドは従来どおり **2.12.1-b1280** です。統合版の実機操作は別途検証してください。
+
+---
+
 # PatPatGeyserExtension 0.4.1 — Issues #1–#4
 
 - #1: Patの対象が近くにいるだけでは発動しないよう、現在の視線（yaw/pitch）と対象の当たり判定をレイ判定で照合します。視線外の通常の右クリックは元のパケットをバックエンドに渡します。
@@ -49,7 +63,7 @@ Geyserの`extensions/`へ入れるPatPat拡張です。統合版で撫でる操�
 
 - **Geyser 2.12.1-b1280 / commit `64bb3993b4beef6743af0ab76ee5dfc8e67a0d21`専用**。内部セッション／パケットAPIを使うため、別ビルドでは操作変換を停止します。
 - Java 21以上。Velocity版b1280の実配布JARに対してビルドしています。
-- 撫でる操作を使うバックエンドに**PatPat Plugin 1.2.5以上**。
+- バックエンドの**PatPat Plugin 1.2.5以上は任意**（Java版Modと演出を共有するときは必要）。
 - Java版で従来の演出を見るプレイヤーはPatPatクライアントModが必要です。
 - 既存のGeyser／Floodgate認証設定を利用します。拡張単体のためにFloodgate-Spigotを追加する必要はありません。
 - 試験版です。自動テストはVALIDATION.mdを参照。実クライアントでの新しい画像モデルの見え方は未検証です。
@@ -57,7 +71,7 @@ Geyserの`extensions/`へ入れるPatPat拡張です。統合版で撫でる操�
 ## 導入・更新
 
 1. 古いPatPatGeyserExtensionのJARを外し、新しい`PatPatGeyserExtension-0.3.1.jar`を**`plugins/Geyser-Velocity/extensions/`**へ配置。
-2. Paper用PatPatGeyserAddonが残っていれば外します。**バックエンドのPatPat本体は残してください。**
+2. Paper用PatPatGeyserAddonが残っていれば外します。**バックエンドのPatPat本体は任意**です。導入済みなら残すことでJava版Modとの相互通信を維持できます。
 3. Proxyを再起動。`extensions/patpatbedrock/`に初期GIF、設定、新しいパックを自動生成します。旧設定には新しいキーを追加し、既存の値は保持します。
 4. 統合版で入り直して生成パックを受信。Geyserの`force-resource-packs: true`を推奨します。
 5. PatPat本体のあるSurvivalで次を実行します。
@@ -67,9 +81,9 @@ Geyserの`extensions/`へ入れるPatPat拡張です。統合版で撫でる操�
 /patpatbedrock test
 ```
 
-`status`の`renderer=image`を確認してください。`backendHello=true`はPatPat本体から応答を受信できた状態です。`false`でも表示テストは可能ですが、実際の撫でる操作はできません。本体のないロビーではfalseで正常です。
+`status`の`renderer=image`を確認してください。`backendHello=true`はPatPat本体から応答を受信できた状態です。`false`でも`standalone-mode=true`なら統合版プレイヤーへの撫でる操作は可能です。本体のないロビーではfalseで正常です。
 
-`/patpatbedrock test`は照準先の頭上へ、自分にだけ表示します。照準先がGeyserに通知されていなければ自分の頭上です。三人称視点で確認できます。`test text`は引き続きパック不要の文字表示テストです。
+`/patpatbedrock test`は視線・距離・空の手などの判定を通った照準先の頭上へ、自分にだけ表示します。照準先がない場合は何も表示しません。`test text`も同じ照準チェックを行うパック不要の文字表示テストです。
 
 旧版の`PatPatBedrock-0.1.0.mcpack`をGeyserの`packs/`へ手動配置していた場合、画像方式では不要なので外してください。旧glyphパックを残すとそのフォント上書きも残ります。
 
@@ -168,6 +182,7 @@ image-loop=true
 | auto-pack | true | 表示用パックを自動登録 |
 | required-permission | 空欄 | 追加のProxy権限。既定は不要 |
 | require-sneaking | true | インタラクト時にしゃがみ必須 |
+| standalone-mode | true | バックエンド本体がないとき、統合版だけで撫でる |
 | require-empty-hand | true | 空のメインハンド必須 |
 | allow-players | true | プレイヤーも撫でられる |
 | max-distance | 3.0 | 対象の当たり判定までの最大距離 |
@@ -180,7 +195,7 @@ status／test／patは既定で追加のProxy権限不要です。制限する�
 
 ## 通信・制限について
 
-この拡張はPatPat Modと同じV2通信を使い、本体の通常のリスト・権限・レート制限を通ります。Java版Modからの受信演出も統合版へ表示します。PatPat公開APIの直接呼出し方式ではなく、`api: true`は拡張単体には必須ではありません。
+PatPat本体が応答するときはPatPat Modと同じV2通信を使い、本体の通常のリスト・権限・レート制限を通ります。Java版Modからの受信演出も統合版へ表示します。バックエンドなしの単体動作では本体側の権限・制限は適用されません。PatPat公開APIの直接呼出し方式ではなく、`api: true`は拡張単体には必須ではありません。
 
 PatPat本体は通常のパケットを操作者へ返さないため、**操作者だけは本体の受理を待たずに先行表示**します。拒否されても自分には手が見える場合があります。周囲には本体から届いたパケットでのみ表示します。`local-preview=false`で先行表示を無効にできます。
 
