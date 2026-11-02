@@ -20,7 +20,7 @@ final class SquishAnimations {
 
     private static Map<String,String> types() {
         Map<String,String> result=new HashMap<>();
-        group(result,ROOT,"allay axolotl camel camel_husk copper_golem cow creaking fox frog happy_ghast pig sheep sniffer warden snow_golem");
+        group(result,ROOT,"player allay axolotl camel camel_husk copper_golem cow creaking fox frog happy_ghast pig sheep sniffer warden snow_golem");
         group(result,BODY,"bat bee cat chicken cod creeper dolphin drowned enderman ghast glow_squid hoglin horse husk iron_golem magma_cube mooshroom ocelot panda parrot phantom piglin piglin_brute pillager polar_bear rabbit ravager salmon silverfish squid stray strider turtle vex villager villager_v2 vindicator wandering_trader witch wither_skeleton wolf zombie zombie_horse zombie_villager zombie_villager_v2");
         group(result,WAIST,"bogged skeleton");
         group(result,HEAD,"blaze elder_guardian guardian");
