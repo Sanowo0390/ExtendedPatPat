@@ -14,6 +14,7 @@ import org.geysermc.mcprotocollib.protocol.data.game.entity.player.*;
 import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ClientboundCustomPayloadPacket;
 import org.geysermc.mcprotocollib.protocol.packet.common.serverbound.ServerboundCustomPayloadPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundInteractPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundUseItemPacket;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import java.util.*;
@@ -102,6 +103,25 @@ class SessionBridgeTest {
         assertTrue(event.isCancelled());
         verify(session).sendDownstreamGamePacket(argThat(p -> p instanceof ServerboundCustomPayloadPacket));
         verify(session,never()).sendDownstreamGamePacket(same(packet));
+    }
+
+    @Test void sneakRightClickAirCanPatHoveredEntity() {
+        hello();clearInvocations(session);setupAimedTarget();
+        when(session.isSneaking()).thenReturn(true);
+        when(session.getMouseoverEntity()).thenReturn(cache.getEntityByJavaId(300));
+        var packet=new ServerboundUseItemPacket(Hand.MAIN_HAND,0,0f,0f);
+        var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
+        assertTrue(event.isCancelled());
+        verify(session).sendDownstreamGamePacket(argThat(p -> p instanceof ServerboundCustomPayloadPacket));
+        verify(session,never()).sendDownstreamGamePacket(same(packet));
+    }
+    @Test void sneakRightClickAirWithoutHoveredEntityKeepsVanillaBehavior() {
+        hello();clearInvocations(session);
+        when(session.isSneaking()).thenReturn(true);
+        var packet=new ServerboundUseItemPacket(Hand.MAIN_HAND,0,0f,0f);
+        var event=new PacketSendingEvent(network,packet);bridge.packetSending(event);
+        assertFalse(event.isCancelled());
+        verify(session,never()).sendDownstreamGamePacket(any());
     }
 
 }
