@@ -16,7 +16,7 @@ Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**�
 
 ## 導入
 
-1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.9.1.jar` を取得します。
+1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.10.0.jar` を取得します。
 2. JARをVelocityの `plugins/Geyser-Velocity/extensions/` に配置し、古い同拡張のJARを取り除きます。
 3. Velocityを再起動すると `extensions/patpatbedrock/` に設定・画像・音声ファイルとリソースパックが生成されます。
 4. 統合版プレイヤーで再接続し、配布されるリソースパックを適用します。必要に応じてGeyser側の `force-resource-packs: true` を使用してください。
@@ -93,7 +93,30 @@ sound-pitch=1.0
 手の座標は `offset-x` / `offset-y` / `offset-z` の設定に従います。v0.9.0で導入した**モブの当たり判定に合わせて手を手前に動かす自動補正は撤回しました**。旧設定の `hand-avoid-occlusion` / `hand-front-clearance` がファイルに残っていても無視されます。
 
 - `swing-hand-enabled=true`：Pat成功時に左クリックと同じ腕振りアニメーションを再生（攻撃・ダメージなし）
-- `camera-shake-enabled=false`：任意の短いカメラ振動（既定OFF）
+- `camera-shake-enabled=false`：**他の人から撫でられた統合版プレイヤー本人だけ**に軽い上下視点モーションを適用（既定OFF）。撫でた側・周囲の観客・モブには適用しません
+
+## 撫でられた時の上下カメラモーション
+
+Bedrock標準のランダムなスクリーンシェイクは使用しません。代わりに、撫でられたプレイヤー本人の**カメラ位置だけ**を約240msかけて軽く下げて戻す動きにしました（X/Z方向の揺れやプレイヤーの座標変更はありません）。
+
+```properties
+# 自分が撫でられたときだけ
+camera-shake-enabled=true
+# 最大上下幅（ブロック）
+camera-shake-intensity=0.06
+```
+
+- **他の人から撫でられたときだけ**再生。自分からPatした場合は再生しません。
+- バックエンドPatPat連携時と `standalone-mode=true` の両方に対応。自分がJava版でログインしている場合はこのGeyser拡張のカメラ演出対象外です。
+- 標準の `CameraShakePacket` では軸指定ができないため、一時的にBedrockのフリーカメラを使い、最後に必ず通常の視点へ戻します。**他のカメラ制御がGeyser上で有効な場合や観戦中は適用しません。**
+- 一時的なカメラ切り替えのため、シネマティック系の他プラグインと競合する場合があります。動作に問題がある場合は `camera-shake-enabled=false` にしてください。
+- カメラ演出は既定でOFFです。変更後、`/patpatbedrock reload` で反映できます。
+
+## Configのレイアウト
+
+`config.properties` を**日本語の説明付き・9カテゴリー構成**へ変更しました。全36項目を用途別に並べ、単位と再起動が必要な設定を明示しています。
+
+v0.9.1以前の設定ファイルは、初回起動時に**設定値と独自キーを保持**したまま新しい配置に整形します。変更前のファイルは `config.properties.backup-before-layout-v2` に原文のまま保存します（旧ファイル中の独自コメントは新レイアウトに移動しないので、必要ならバックアップを参照してください）。その後は自動で書き換えません。
 
 ## 除外リストとPat回数
 
