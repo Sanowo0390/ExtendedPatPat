@@ -53,6 +53,6 @@ class ConfigLayoutTest {
         assertTrue(values.containsKey("camera-shake-intensity"));
         assertTrue(values.containsKey("auto-pack"));
         assertTrue(values.containsKey("required-permission"));
-        assertEquals(31,values.size(),"New config should contain every documented setting");
+        assertEquals(36,values.size(),"New config should contain every documented setting");
     }
 }
