@@ -142,7 +142,7 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.5.0 / compatible="+compatible+" / backendHello="+state.ready()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.5.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
             else source.sendMessage("PatPatExtension 0.5.0 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
@@ -153,7 +153,7 @@ public final class PatPatExtension implements Extension {
                         Settings loaded=Settings.load(dataFolder().resolve("config.properties"));
                         if(!loaded.renderer().equals(settings.renderer()) || !loaded.imageFile().equals(settings.imageFile()))throw new IOException("renderer / image-file の変更はProxy再起動が必要です。");
                         settings=loaded;sessions.values().forEach(s->s.session().executeInEventLoop(s::beginHandshake));
-                        source.sendMessage("位置・サイズ・表示時間を再読み込みしました。画像やGIFの変更はProxy再起動後、統合版へ再接続してください。");
+                        source.sendMessage("位置・サイズ・表示時間・standalone-modeを再読み込みしました。画像やGIFの変更はProxy再起動後、統合版へ再接続してください。");
                     }
                     catch(IOException e){source.sendMessage("再読み込み失敗: "+e.getMessage());}
                 }).build());
