@@ -60,10 +60,23 @@ final class HandRenderer {
         return packet;
     }
     private Vector3f anchor(Entity entity) {
-        return anchor(entity.position(),entity.getBoundingBoxHeight(),settings.get());
+        return anchor(entity.position(),entity.getBoundingBoxHeight(),session.getPlayerEntity().position(),session.getPlayerEntity().getYaw(),settings.get());
     }
-    static Vector3f anchor(Vector3f feet,float height,Settings settings) {
-        return feet.add((float)settings.offsetX(),height+(float)settings.height(),(float)settings.offsetZ());
+    static Vector3f anchor(Vector3f feet,float height,Vector3f viewer,float viewerYaw,Settings settings) {
+        double x=settings.offsetX(),z=settings.offsetZ();
+        if(!settings.offsetSpace().equals("world")) {
+            double tx=viewer.getX()-feet.getX(),tz=viewer.getZ()-feet.getZ();
+            double length=Math.hypot(tx,tz);
+            if(length>1e-6){tx/=length;tz/=length;}
+            else {
+                // Self tests / directly overhead: use the opposite of the camera's
+                // horizontal look direction so offsets stay finite and predictable.
+                double yaw=Math.toRadians(viewerYaw);tx=Math.sin(yaw);tz=-Math.cos(yaw);
+            }
+            // X = toward this viewer. Z = this viewer's right. Y stays world-up.
+            double dx=tx*x+tz*z,dz=tz*x-tx*z;x=dx;z=dz;
+        }
+        return feet.add((float)x,height+(float)settings.height(),(float)z);
     }
     private void schedule() { session.scheduleInEventLoop(this::tick,50,TimeUnit.MILLISECONDS); }
     private void tick() {

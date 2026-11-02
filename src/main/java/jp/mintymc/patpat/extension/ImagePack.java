@@ -37,17 +37,19 @@ final class ImagePack {
                         "origin",List.of(-8,-8,-.01),"size",List.of(16,16,.02),"uv",Map.of(
                         "north",Map.of("uv",List.of(0,0),"uv_size",List.of(128,128)),
                         "south",Map.of("uv",List.of(128,0),"uv_size",List.of(-128,128)))))))))));
-        put(entries,"animations/hand.json",Map.of("format_version","1.8.0","animations",Map.of("animation.patpatbedrock.billboard",Map.of(
-                "loop",true,"bones",Map.of("billboard",Map.of("rotation",List.of("-query.camera_rotation(0)","-query.camera_rotation(1)",0)))))));
+        // Official Bedrock sprite billboard: camera angles are positive; cancel the
+        // actor's body yaw so it cannot compound the camera's world yaw.
+        put(entries,"animations/hand.json",Map.of("format_version","1.10.0","animations",Map.of("animation.patpatbedrock.billboard",Map.of(
+                "loop",true,"bones",Map.of("billboard",Map.of("rotation",List.of("query.camera_rotation(0)","query.camera_rotation(1) - query.body_y_rotation",0)))))));
         byte[] digest;
         try {
             MessageDigest hash=MessageDigest.getInstance("SHA-256");
             // Schema version and GIF timing are part of the identity, as well as texture bytes.
-            hash.update(("image-pack-v1:"+animation.delays()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            hash.update(("image-pack-v2-billboard:"+animation.delays()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
             entries.forEach((name,data)->{hash.update(name.getBytes(java.nio.charset.StandardCharsets.UTF_8));hash.update(data);});digest=hash.digest();
         }catch(NoSuchAlgorithmException e){throw new IOException(e);}
         String token=HexFormat.of().formatHex(digest).substring(0,16);
-        List<Integer> version=List.of(3,((digest[0]&255)<<8)|(digest[1]&255),((digest[2]&255)<<8)|(digest[3]&255));
+        List<Integer> version=List.of(4,((digest[0]&255)<<8)|(digest[1]&255),((digest[2]&255)<<8)|(digest[3]&255));
         put(entries,"manifest.json",Map.of("format_version",2,"header",Map.of("name","PatPat Custom Image","description","Generated PNG/GIF hand display "+token,
                 "uuid",PACK_UUID.toString(),"version",version,"min_engine_version",List.of(1,21,0)),
                 "modules",List.of(Map.of("type","resources","uuid","68c0308c-d05b-4c21-b449-3f93d3aacdd6","version",version))));

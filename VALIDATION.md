@@ -1,11 +1,19 @@
-# 検証結果 — 0.3.0 / 2026-11-02
+# 検証結果 — 0.3.1 / 2026-11-02
 
 ## 実行済み
 
 - Geyser-Velocity **2.12.1-b1280**の実配布JARでコンパイル。
 - 依存JARのSHA-256: `fb936077d44a4f765e0905119e1fa841b8c8c01148290711410367f0a38e3edb`。公式APIと一致。
 - JDK 21.0.13、Maven 3.9.9、`mvn verify`成功。
-- **JUnit 23件成功、失敗0・エラー0。**
+- **JUnit 28件成功、失敗0・エラー0。**
+
+### 0.3.1の回帰: 5件
+
+- 24方向から見てXプラスが必ず見る人側へ水平に移動し、高さが変わらないこと。
+- Zプラスが見る人の右へ移動すること。
+- 自分の頭上／水平位置一致ではyawへフォールバックし、NaNを出さないこと。
+- 反対側の2人には、それぞれの側へ画像の位置をずらすこと。
+- 生成パックが公式のカメラ回転式（正のcamera rotationとbody yaw相殺）を含み、旧パックより新しいmajor version 4を持つこと。
 
 ### 0.3.0の画像機能: 8件
 
@@ -52,3 +60,5 @@
 - Geyserのcustom entity登録APIで表示識別子を登録し、Bedrock側のvariantでフレームのテクスチャを選択します。
 - PNG/GIFはJava標準ImageIOで読み込みます。拡張JARへGeyser本体や外部ライブラリーを埋め込みません。
 - 画像更新ごとに新しいファイル名とmanifest versionを生成します。パックのJSONキー順を正規化し、同じ素材が起動のたびに別のハッシュになることを避けています。
+
+ビルボード式の一次資料: https://learn.microsoft.com/en-us/minecraft/creator/documents/custom_projectiles?view=minecraft-bedrock-stable （2D雪玉のカメラ正面表示の例）。この回帰テストはパックの式と座標計算を検証し、実機の描画そのものは検証していません。

@@ -1,8 +1,14 @@
-# PatPatGeyserExtension 0.3.0
+# PatPatGeyserExtension 0.3.1
 
 Geyserの`extensions/`へ入れるPatPat拡張です。統合版で撫でる操作と手の表示を追加し、Java版PatPat Modとも通信します。Paper用PatPatGeyserAddonは不要です。
 
 **0.3.0から、PNG・GIFを貼った専用エンティティで表示します。サイズとX/Y/Z位置を調整でき、画像から統合版パックを自動生成します。既定の画像方式は絵文字フォントを上書きしません。**
+
+## 0.3.1の修正
+
+画像のカメラ回転の符号を修正し、エンティティのbody yawを相殺する公式のビルボード式へ変更しました。見る方向によって板が斜めになり薄く見える問題を修正する変更です。
+
+位置は既定で見る人を基準にします。**Xプラスで対象の中心から自分側へ、Yプラスで上へ、Zプラスで自分から見て右へ**移動します。複数の統合版プレイヤーが見る場合、それぞれの視点に合わせて計算します。生成パックも更新するため、JAR置換後はProxy再起動と統合版の再接続が必要です。
 
 ## 必要な環境
 
@@ -15,7 +21,7 @@ Geyserの`extensions/`へ入れるPatPat拡張です。統合版で撫でる操�
 
 ## 導入・更新
 
-1. 古いPatPatGeyserExtensionのJARを外し、新しい`PatPatGeyserExtension-0.3.0.jar`を**`plugins/Geyser-Velocity/extensions/`**へ配置。
+1. 古いPatPatGeyserExtensionのJARを外し、新しい`PatPatGeyserExtension-0.3.1.jar`を**`plugins/Geyser-Velocity/extensions/`**へ配置。
 2. Paper用PatPatGeyserAddonが残っていれば外します。**バックエンドのPatPat本体は残してください。**
 3. Proxyを再起動。`extensions/patpatbedrock/`に初期GIF、設定、新しいパックを自動生成します。旧設定には新しいキーを追加し、既存の値は保持します。
 4. 統合版で入り直して生成パックを受信。Geyserの`force-resource-packs: true`を推奨します。
@@ -44,15 +50,18 @@ plugins/Geyser-Velocity/extensions/patpatbedrock/config.properties
 
 ```properties
 renderer=image
+offset-space=view
 image-scale=1.2
-offset-x=0.0
+offset-x=0.25
 offset-y=-0.2
 offset-z=0.0
 ```
 
 - `image-scale`: 透明な正方形キャンバスの幅／高さをブロック単位で指定。既定0.8、範囲0.05〜8。画像に余白が多いほど、見える絵の部分は小さくなります。
 - `offset-y`: 対象の当たり判定の上端を基準とした画像中心の高さ。正で上、負で下。文字ネームタグの高さ補正は使いません。
-- `offset-x`／`offset-z`: ワールドのX／Z軸方向のずれ。対象が回転してもワールド軸は変わりません。
+- `offset-space=view`（既定）: `offset-x`プラスで対象から見る人側へ水平移動、マイナスで奥へ移動。`offset-z`プラスで見る人から見て右、マイナスで左へ移動します。X／Zで高さは変わりません。
+- `offset-space=world`: 旧0.3.0と同じワールドX／Z軸方向のずれを使う場合に指定します。
+- 自分の頭上や真上から見る場合は、水平位置が重なるため見る人のyawを使います。画像の回転自体は統合版の実際のカメラ角度に追従します。
 - 非正方形の画像は縦横比を保ったまま中央へ収め、残りを透明にします。描画モデルはカメラを向く板です。
 - 旧`height-offset`は`offset-y`の初期値へ引き継ぎます。以後は`offset-y`を編集してください。
 
@@ -117,7 +126,8 @@ image-loop=true
 | renderer | image | `image`はPNG/GIFモデル、`glyph`は旧文字方式 |
 | image-file | images/hand.gif | 設定フォルダー内の画像への相対パス |
 | image-scale | 0.8 | 正方形キャンバスの幅・高さ（ブロック） |
-| offset-x / offset-y / offset-z | 0 / 0.05 / 0 | 当たり判定上端からの画像中心位置 |
+| offset-space | view | `view`は見る人基準、`world`はワールド軸 |
+| offset-x / offset-y / offset-z | 0 / 0.05 / 0 | viewでは、自分側／上／右へ移動 |
 | duration-ms | 0 | 0で画像の1周分、それ以外は固定表示時間 |
 | image-loop | true | 固定表示時間中にGIFを繰り返す |
 | auto-pack | true | 表示用パックを自動登録 |
@@ -164,3 +174,5 @@ mvn -B verify
 - [Geyser Entity API](https://geysermc.org/wiki/geyser/custom-entities/)
 - [対象のGeyser commit](https://github.com/GeyserMC/Geyser/commit/64bb3993b4beef6743af0ab76ee5dfc8e67a0d21)
 - [PatPat Plugin](https://github.com/LopyMine/PatPat-Plugin) — 通信確認元 `8a5810960441fee6906447b074406247eda0c57c`
+
+ビルボード式の参照: [Microsoft公式カスタム投射物の2Dスプライト例](https://learn.microsoft.com/en-us/minecraft/creator/documents/custom_projectiles?view=minecraft-bedrock-stable)。表示用アニメーション式のみ参照しており、投射物や実験的なBehavior Packは使用しません。

@@ -62,7 +62,8 @@ class ImageSupportTest {
     }
     @Test void imageScaleIsIndependentOfPositionAndHasNoNameplateOffset() {
         Properties p=new Properties();p.setProperty("offset-x","0.2");p.setProperty("offset-y","-0.4");p.setProperty("offset-z","-0.3");p.setProperty("image-scale","1.5");
-        Settings cfg=Settings.from(p);Vector3f anchor=HandRenderer.anchor(Vector3f.from(10,20,30),2,cfg);
+        p.setProperty("offset-space","world");
+        Settings cfg=Settings.from(p);Vector3f anchor=HandRenderer.anchor(Vector3f.from(10,20,30),2,Vector3f.ZERO,0,cfg);
         assertEquals(10.2,anchor.getX(),.0001);assertEquals(21.6,anchor.getY(),.0001);assertEquals(29.7,anchor.getZ(),.0001);
         var packet=HandRenderer.spawnImagePacket(50,anchor,(float)cfg.scale(),2);
         assertEquals(ImagePack.ENTITY,packet.getIdentifier());assertEquals(1.5f,packet.getMetadata().get(EntityDataTypes.SCALE));

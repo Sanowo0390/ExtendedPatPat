@@ -45,11 +45,11 @@ public final class PatPatExtension implements Extension {
         Path file=dataFolder().resolve("config.properties");Properties old=new Properties();
         try(var reader=Files.newBufferedReader(file,java.nio.charset.StandardCharsets.UTF_8)){old.load(reader);}
         Map<String,String> added=new LinkedHashMap<>();
-        added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","0.8");added.put("image-loop","true");
+        added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","0.8");added.put("image-loop","true");added.put("offset-space","view");
         added.put("offset-x","0.0");added.put("offset-y",old.getProperty("height-offset","0.05"));added.put("offset-z","0.0");
         StringBuilder append=new StringBuilder();
         added.forEach((key,value)->{if(!old.containsKey(key))append.append(key).append('=').append(value).append('\n');});
-        if(!append.isEmpty())Files.writeString(file,"\n# Added by 0.3.0: offsets in blocks, image-scale is square width in blocks.\n"+append,
+        if(!append.isEmpty())Files.writeString(file,"\n# Added image options: offset-space=view means X toward viewer, Y up, Z right.\n"+append,
                 java.nio.charset.StandardCharsets.UTF_8,StandardOpenOption.APPEND);
     }
     private void copyDefaultImage() throws IOException {
@@ -112,8 +112,8 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.3.0 / compatible="+compatible+" / backendHello="+state.ready()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()));
-            else source.sendMessage("PatPatExtension 0.3.0 / compatible="+compatible+" / sessions="+sessions.size());
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.3.1 / compatible="+compatible+" / backendHello="+state.ready()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            else source.sendMessage("PatPatExtension 0.3.1 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
