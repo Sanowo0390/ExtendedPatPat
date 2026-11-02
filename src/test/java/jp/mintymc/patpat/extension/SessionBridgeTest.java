@@ -241,4 +241,39 @@ class SessionBridgeTest {
         verify(owner,never()).recordPat(any());
     }
 
+    @Test void backendPatOnlyBobsTheRecipientAndNotOtherViewers() {
+        setupAimedTarget();
+        Properties p=new Properties();
+        p.setProperty("camera-shake-enabled","true");
+        p.setProperty("require-empty-hand","false");
+        when(owner.settings()).thenReturn(Settings.from(p));
+        when(session.camera()).thenReturn(mock(org.geysermc.geyser.api.bedrock.camera.CameraData.class));
+
+        // Local player Java ID is 1, and the incoming Pat was sent by player 2.
+        bridge.packetReceived(network,new ClientboundCustomPayloadPacket(
+                Key.key(PatProtocol.PAT_S2C),new byte[]{1,2}));
+        verify(session).sendUpstreamPacket(argThat(packet ->
+                packet instanceof org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket camera
+                        && camera.getSetInstruction()!=null));
+        clearInvocations(session);
+
+        // Different entity is patted: the player may see the hand but never bobs.
+        bridge.packetReceived(network,new ClientboundCustomPayloadPacket(
+                Key.key(PatProtocol.PAT_S2C),new byte[]{(byte)0xAC,2,2}));
+        verify(session,never()).sendUpstreamPacket(argThat(packet ->
+                packet instanceof org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket));
+    }
+
+    @Test void pattingAnotherEntityNeverStartsCameraFeedbackForThePatter() {
+        setupAimedTarget();
+        Properties p=new Properties();
+        p.setProperty("camera-shake-enabled","true");
+        p.setProperty("require-empty-hand","false");
+        when(owner.settings()).thenReturn(Settings.from(p));
+
+        bridge.packetSending(new PacketSendingEvent(network,interact()));
+        verify(session,never()).sendUpstreamPacket(argThat(packet ->
+                packet instanceof org.cloudburstmc.protocol.bedrock.packet.CameraInstructionPacket));
+    }
+
 }
