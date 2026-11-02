@@ -21,6 +21,7 @@ class PatCameraTest {
         when(recipient.getGameMode()).thenReturn(GameMode.SURVIVAL);
         PatCamera animation=new PatCamera(recipient);
         assertTrue(animation.play(.1f));
+        assertFalse(animation.play(.1f),"Repeated Pats must not keep free camera active forever");
         verify(recipient).sendUpstreamPacket(argThat(packet -> {
             if(!(packet instanceof CameraInstructionPacket c) || c.getSetInstruction()==null)return false;
             var pos=c.getSetInstruction().getPos();
