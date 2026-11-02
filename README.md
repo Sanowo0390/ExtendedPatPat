@@ -67,8 +67,6 @@ image-file=images/hand.gif
 image-scale=0.5
 image-loop=true
 offset-x=0.5
-hand-avoid-occlusion=true
-hand-front-clearance=0.15
 offset-space=view
 offset-y=0.0
 offset-z=0.0
@@ -90,17 +88,12 @@ sound-pitch=1.0
 
 `/patpatbedrock reload` で位置・サイズ・表示時間などを再読み込みできます。**既存の設定ファイルは更新時に上書きしません。** 旧設定に `cooldown-ms=600` などが残っている場合は、必要に応じて手動で変更してください。
 
-## 手の重なり対策と腕振り
+## 手の表示位置と腕振り
 
-`hand-avoid-occlusion=true` のとき、手の画像がモブの当たり判定と重なりにくいよう、**モブの横幅、斜めからの視線、画像サイズ**を考慮して手を視聴者側へ移動します。
+手の座標は `offset-x` / `offset-y` / `offset-z` の設定に従います。v0.9.0で導入した**モブの当たり判定に合わせて手を手前に動かす自動補正は撤回しました**。旧設定の `hand-avoid-occlusion` / `hand-front-clearance` がファイルに残っていても無視されます。
 
-- `hand-front-clearance=0.15`：当たり判定面と画像の間に追加する余裕（ブロック単位）
-- `hand-avoid-occlusion=false`：自動補正をOFFにして従来どおりの手動オフセットを使用
-- `offset-space=world`：ワールド基準の位置指定では自動補正しません
-- `swing-hand-enabled=true`：Pat成功時に**左クリックと同じ腕振りアニメーション**を本人と同じGeyser上の統合版プレイヤーに再生。攻撃・ダメージは発生しません
-- `camera-shake-enabled=false`：元Modにあるカメラの軽い揺れを任意で有効にできます。`camera-shake-intensity=0.06` は揺れの強さです（0〜0.3）。酔いやすさを考慮して既定ではOFFです
-
-なお、当たり判定と実際の3Dモデル形状が違うモブ、視点が非常に近い場合、異なるリソースパックを使う場合は完全に重なりを防げないことがあります。
+- `swing-hand-enabled=true`：Pat成功時に左クリックと同じ腕振りアニメーションを再生（攻撃・ダメージなし）
+- `camera-shake-enabled=false`：任意の短いカメラ振動（既定OFF）
 
 ## 除外リストとPat回数
 
@@ -127,7 +120,9 @@ PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240ms
 
 通常の位置設定 `offset-x` / `offset-y` / `offset-z` は**基準位置**として維持され、上下移動はY方向にだけ加算されます。GIFやPNGのサイズ、各フレームの表示時間には影響しません。文字だけの `test text` は移動させません。
 
-この機能はGeyserから送る表示用エンティティの位置パケットを利用し、表示中の約240msは20ms間隔で位置更新します。Squishも**標準設定では同じ240msと同じイージングカーブ**で再生します。 カスタムの `hand-motion-duration-ms` を使う場合、Squish側は標準の240msのままなので完全には同期しません。**サーバープラグイン不要**で、設定の変更は `/patpatbedrock reload` で反映できます。画像素材・リソースパックを再生成する必要はありません。
+**画像/GIF表示では、手の上下動をリソースパック内のBedrockアニメーションで再生**します。従来の20msごとのサーバー位置更新は手の上下動に使いません。そのため、手の動きはエンティティが表示された時点から開始され、Squishと同じ約240msのカーブで動きます。文字表示モードでは従来のサーバー側移動処理を使用します。
+
+`hand-motion-enabled`、`hand-motion-depth`、`hand-motion-duration-ms`、`image-scale` を変更した場合は、**リソースパックの再生成が必要なのでVelocityを再起動し、統合版で再接続してください**（`reload`だけでは適用できません）。手のモーション時間を240ms以外に変更した場合、Squishは240msのままなので完全には同期しません。
 
 ## Squish（潰れる演出）
 
