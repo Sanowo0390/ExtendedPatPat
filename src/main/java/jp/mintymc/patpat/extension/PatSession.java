@@ -27,6 +27,7 @@ final class PatSession extends SessionAdapter {
     private final GeyserSession session;
     private final Session downstream;
     private final HandRenderer renderer;
+    private final PatCamera camera;
     private final Set<Packet> bypass=Collections.synchronizedSet(Collections.newSetFromMap(new IdentityHashMap<>()));
     private volatile boolean ready,closed;
     private int generation;
@@ -34,13 +35,14 @@ final class PatSession extends SessionAdapter {
     PatSession(PatPatExtension owner,GeyserSession session) {
         this.owner=owner;this.session=session;this.downstream=session.getDownstream().getSession();
         this.renderer=new HandRenderer(session,owner::settings,owner::animation);
+        this.camera=new PatCamera(session);
     }
     GeyserSession session(){return session;}
     boolean ready(){return ready;}
     boolean closed(){return closed;}
     int active(){return renderer.size();}
     void beginHandshake() {
-        ready=false;nextPat=0;generation++;renderer.clear();
+        ready=false;nextPat=0;generation++;renderer.clear();camera.stop();
         if(!closed && owner.settings().enabled()) handshake(generation,0);
     }
     private void handshake(int current,int attempts) {
@@ -73,7 +75,14 @@ final class PatSession extends SessionAdapter {
             } else if(channel.equals(PatProtocol.PAT_S2C)) {
                 try {
                     PatProtocol.Pat pat=PatProtocol.decode(custom.getData());
-                    session.executeInEventLoop(()->{if(!closed && owner.settings().enabled() && owner.patEnabled(session))renderer.show(pat.target(),false);});
+                    session.executeInEventLoop(()->{
+                        if(closed || !owner.settings().enabled() || !owner.patEnabled(session)) return;
+                        renderer.show(pat.target(),false);
+                        // Backend broadcasts the target's Java ID to each viewer.
+                        // Only the recipient's own session gets the camera effect.
+                        if(session.getPlayerEntity()!=null && pat.target()==session.getPlayerEntity().javaId())
+                            receivePatFeedback();
+                    });
                 } catch(IllegalArgumentException ignored) { /* Ignore malformed packets without log spam. */ }
             }
         }
@@ -162,8 +171,6 @@ final class PatSession extends SessionAdapter {
             session.sendUpstreamPacket(PatSwing.packet(session.getPlayerEntity().geyserId()));
             owner.relaySwing(this);
         }
-        if(owner.settings().cameraShakeEnabled())
-            session.sendUpstreamPacket(PatCamera.shake((float)owner.settings().cameraShakeIntensity()));
         if(ready) {
             // Preserve the backend protocol when PatPat is present.
             payload(PatProtocol.PAT_C2S,PatProtocol.pat(target.javaId()));
@@ -202,6 +209,13 @@ final class PatSession extends SessionAdapter {
                 && owner.settings().swingHandEnabled() && owner.patEnabled(session))
             session.sendUpstreamPacket(PatSwing.packet(actorRuntimeId));
     }
+    void receivePatFeedback() {
+        // Only invoked when another player Pats this session's own player entity.
+        // The initiating player must never receive the effect here.
+        if(closed || session.isClosed() || !owner.settings().enabled() || !owner.patEnabled(session))return;
+        if(owner.settings().cameraShakeEnabled())
+            camera.play((float)owner.settings().cameraShakeIntensity());
+    }
     void showStandalone(int targetJavaId) {
         if(!closed && !session.isClosed() && owner.settings().enabled() && owner.patEnabled(session)) renderer.show(targetJavaId,false);
     }
@@ -216,15 +230,15 @@ final class PatSession extends SessionAdapter {
         else {session.sendMessage("使い方: /patpatbedrock toggle [on|off]");return;}
         try {
             owner.setPatEnabled(session,next);
-            if(!next)renderer.clear();
+            if(!next){renderer.clear();camera.stop();}
             session.sendMessage("Patの送受信を"+(next?"ON":"OFF")+"にしました（再接続後も保持されます）。");
         }catch(java.io.IOException e) {
             session.sendMessage("Pat設定の保存に失敗しました: "+e.getMessage());
         }
     }
-    void clear(){renderer.clear();}
+    void clear(){renderer.clear();camera.stop();}
     void close() {
         closed=true;ready=false;downstream.removeListener(this);bypass.clear();
-        if(!session.isClosed())session.executeInEventLoop(renderer::clear);
+        if(!session.isClosed())session.executeInEventLoop(()->{renderer.clear();camera.stop();});
     }
 }
