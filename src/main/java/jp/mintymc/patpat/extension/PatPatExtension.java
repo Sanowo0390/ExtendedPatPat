@@ -10,6 +10,7 @@ import org.geysermc.geyser.api.entity.custom.CustomEntityDefinition;
 import org.geysermc.geyser.api.pack.*;
 import org.geysermc.geyser.api.util.TriState;
 import org.geysermc.geyser.session.GeyserSession;
+import org.geysermc.geyser.entity.type.Entity;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -106,6 +107,33 @@ public final class PatPatExtension implements Extension {
         if(sessions.putIfAbsent(session,state)!=null) return;
         session.getDownstream().getSession().addListener(state);
         session.executeInEventLoop(state::beginHandshake);
+    }
+    /**
+     * Optional backend-free Pat. Each viewer owns a distinct Geyser entity cache,
+     * so resolve the target by UUID on that viewer's event loop. Never broadcast by
+     * Java entity ID: IDs may be reused on another Velocity backend.
+     */
+    void relayStandalone(PatSession sender,Entity target) {
+        UUID targetUuid=target.uuid();
+        if(targetUuid==null)return; // Actor has already received its own preview.
+        GeyserSession actor=sender.session();
+        var world=actor.getWorldName();
+        var remote=actor.getRemoteServer();
+        var at=target.position();
+        if(world==null || remote==null || at==null)return;
+        sessions.values().forEach(viewer->{
+            if(viewer==sender)return;
+            GeyserSession other=viewer.session();
+            other.executeInEventLoop(()->{
+                if(viewer.closed() || other.isClosed() || !settings.enabled()
+                        || !Objects.equals(world,other.getWorldName())
+                        || !Objects.equals(remote,other.getRemoteServer()))return;
+                Entity candidate=other.getEntityCache().getEntityByUuid(targetUuid);
+                if(candidate==null || !candidate.isValid() || !targetUuid.equals(candidate.uuid())
+                        || candidate.position()==null || candidate.position().distanceSquared(at)>16)return;
+                viewer.showStandalone(candidate.javaId());
+            });
+        });
     }
     @Subscribe public void quit(SessionDisconnectEvent event) {
         if(event.connection() instanceof GeyserSession s) { PatSession state=sessions.remove(s);if(state!=null)state.close(); }
