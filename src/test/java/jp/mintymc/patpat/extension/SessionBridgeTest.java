@@ -22,15 +22,16 @@ import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SessionBridgeTest {
-    GeyserSession session;ClientSession network;PatSession bridge;EntityCache cache;
+    PatPatExtension owner;GeyserSession session;ClientSession network;PatSession bridge;EntityCache cache;
     @BeforeEach void setup() {
-        PatPatExtension owner=mock(PatPatExtension.class);
+        owner=mock(PatPatExtension.class);
         Properties props=new Properties();props.setProperty("local-preview","false");
         // Item registries need a real running Geyser. These session tests focus on the
         // protocol bridge; actual empty-hand behavior is an in-game verification item.
         props.setProperty("require-empty-hand","false");
         when(owner.settings()).thenReturn(Settings.from(props));
         session=mock(GeyserSession.class);network=mock(ClientSession.class);cache=mock(EntityCache.class);
+        when(owner.patEnabled(session)).thenReturn(true);
         var downstream=mock(DownstreamSession.class);
         when(session.getDownstream()).thenReturn(downstream);when(downstream.getSession()).thenReturn(network);
         when(downstream.isState(ProtocolState.GAME)).thenReturn(true);when(session.getEntityCache()).thenReturn(cache);
@@ -171,5 +172,33 @@ class SessionBridgeTest {
         verify(session,never()).sendUpstreamPacket(any());
     }
 
+
+    @Test void personalToggleMutesInteractionsAndTestsUntilReenabled() throws Exception {
+        setupAimedTarget();
+        var enabled=new java.util.concurrent.atomic.AtomicBoolean(true);
+        when(owner.patEnabled(session)).thenAnswer(inv->enabled.get());
+        when(owner.setPatEnabled(eq(session),anyBoolean())).thenAnswer(inv->{
+            boolean value=inv.getArgument(1);enabled.set(value);return value;
+        });
+        bridge.toggle(new String[]{"off"});
+        assertFalse(enabled.get());
+        verify(session).sendMessage(contains("OFF"));
+        clearInvocations(session);
+        var gesture=new PacketSendingEvent(network,interact());bridge.packetSending(gesture);
+        assertFalse(gesture.isCancelled(),"Disabled users retain ordinary vanilla interactions");
+        bridge.test(false);
+        verify(session,never()).sendUpstreamPacket(any());
+        bridge.toggle(new String[]{"on"});
+        assertTrue(enabled.get());
+        clearInvocations(session);
+        var active=new PacketSendingEvent(network,interact());bridge.packetSending(active);
+        assertTrue(active.isCancelled(),"Re-enabled users can Pat again");
+        verify(session,atLeastOnce()).sendUpstreamPacket(any());
+    }
+    @Test void invalidToggleArgumentsDoNotChangePreference() throws Exception {
+        bridge.toggle(new String[]{"perhaps"});
+        verify(owner,never()).setPatEnabled(any(),anyBoolean());
+        verify(session).sendMessage(contains("使い方"));
+    }
 
 }
