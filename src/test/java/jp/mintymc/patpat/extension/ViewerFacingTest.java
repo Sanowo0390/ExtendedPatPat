@@ -54,4 +54,38 @@ class ViewerFacingTest {
             assertEquals(5,manifest.getAsJsonObject("header").getAsJsonArray("version").get(0).getAsInt(),"Force update of cached 0.3.0 billboard");
         }
     }
+    @Test void autoFrontPlacementKeepsSpriteOutsideWideHitboxesAcrossViewAngles() {
+        Properties p=new Properties();
+        p.setProperty("offset-x","0.5");
+        p.setProperty("image-scale","0.5");
+        p.setProperty("hand-front-clearance","0.15");
+        Settings cfg=Settings.from(p);
+        Vector3f feet=Vector3f.ZERO;
+        float width=2.4f;
+        for(int degrees=0;degrees<360;degrees+=15) {
+            double angle=Math.toRadians(degrees);
+            Vector3f viewer=Vector3f.from((float)(12*Math.cos(angle)),2,(float)(12*Math.sin(angle)));
+            Vector3f hand=HandRenderer.visibleAnchor(feet,2,width,viewer,0,cfg);
+            double dx=hand.getX(),dz=hand.getZ();
+            double viewX=Math.cos(angle),viewZ=Math.sin(angle);
+            double faceDistance=(width/2)/Math.max(Math.abs(viewX),Math.abs(viewZ));
+            double depth=dx*viewX+dz*viewZ;
+            assertTrue(depth>=faceDistance+.5*.5+.15-0.002,
+                    "The entire half-width of the billboard must be outside hitbox; angle "+degrees);
+        }
+    }
+    @Test void disablingFrontPlacementOrUsingWorldOffsetsPreservesCoordinates() {
+        Properties p=new Properties();
+        p.setProperty("hand-avoid-occlusion","false");
+        Settings cfg=Settings.from(p);
+        Vector3f viewer=Vector3f.from(10,3,0);
+        Vector3f expected=HandRenderer.anchor(Vector3f.ZERO,2,viewer,0,cfg);
+        assertEquals(expected,HandRenderer.visibleAnchor(Vector3f.ZERO,2,5,viewer,0,cfg));
+        p.setProperty("hand-avoid-occlusion","true");
+        p.setProperty("offset-space","world");
+        cfg=Settings.from(p);
+        expected=HandRenderer.anchor(Vector3f.ZERO,2,viewer,0,cfg);
+        assertEquals(expected,HandRenderer.visibleAnchor(Vector3f.ZERO,2,5,viewer,0,cfg));
+    }
+
 }
