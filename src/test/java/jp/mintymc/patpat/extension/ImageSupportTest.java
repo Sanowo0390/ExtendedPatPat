@@ -117,7 +117,7 @@ class ImageSupportTest {
     }
     @Test void oldBundledGifMigratesToNewPngWhileKeepingOtherOptions() throws Exception {
         Files.writeString(directory.resolve("config.properties"),
-                "image-file=images/hand.gif\\nimage-scale=0.75\\n");
+                "image-file=images/hand.gif\nimage-scale=0.75\n");
         Path images=directory.resolve("images");
         Files.createDirectories(images);
         try(var in=getClass().getResourceAsStream("/default-hand.gif")) {
@@ -137,7 +137,7 @@ class ImageSupportTest {
 
     @Test void customGifAtOldDefaultPathIsNotReplaced() throws Exception {
         Files.writeString(directory.resolve("config.properties"),
-                "image-file=images/hand.gif\\n");
+                "image-file=images/hand.gif\n");
         Path images=directory.resolve("images");
         Files.createDirectories(images);
         try(var in=getClass().getResourceAsStream("/disposal.gif")) {
