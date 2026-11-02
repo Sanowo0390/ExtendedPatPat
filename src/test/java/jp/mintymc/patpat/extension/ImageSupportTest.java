@@ -66,8 +66,25 @@ class ImageSupportTest {
         Path changed=ImagePack.build(directory,new ImageAnimation(a.frames(),List.of(200,200,300)));
         assertNotEquals(first,changed);
     }
-    @Test void bundledDefaultGifIsDecodable() throws Exception {
-        ImageAnimation a=ImageAnimation.load(fixture("default-hand.gif"));assertEquals(5,a.frames().size());
+    @Test void defaultPngSpriteSheetExtractsFiveHandShapesAndKeepsAlpha() throws Exception {
+        Path path=fixture("default-hand.png");
+        ImageAnimation a=ImageAnimation.load(path,5,50);
+        assertEquals(5,a.frames().size());
+        assertEquals(List.of(50,50,50,50,50),a.delays());
+        assertEquals(250,a.duration());
+        assertEquals(0,a.frameAt(0,true));
+        assertEquals(2,a.frameAt(125,true));
+        assertEquals(4,a.frameAt(240,true));
+        assertEquals(0,a.frameAt(250,true));
+        assertEquals(0,a.frames().get(0).getRGB(0,0)>>>24);
+        assertNotEquals(a.frames().get(0).getRGB(64,64),a.frames().get(2).getRGB(64,64));
+    }
+    @Test void customGifAndOrdinaryPngStillLoadNormallyWithSpriteOptions() throws Exception {
+        ImageAnimation gif=ImageAnimation.load(fixture("disposal.gif"),5,50);
+        assertEquals(3,gif.frames().size());
+        Path path=directory.resolve("single.png");
+        ImageIO.write(new BufferedImage(64,64,BufferedImage.TYPE_INT_ARGB),"PNG",path.toFile());
+        assertEquals(1,ImageAnimation.load(path,5,50).frames().size());
     }
     @Test void imageScaleIsIndependentOfPositionAndHasNoNameplateOffset() {
         Properties p=new Properties();p.setProperty("offset-x","0.2");p.setProperty("offset-y","-0.4");p.setProperty("offset-z","-0.3");p.setProperty("image-scale","1.5");
@@ -91,7 +108,8 @@ class ImageSupportTest {
         extension.pre(null);
         assertNotNull(extension.animation());assertEquals(5,extension.animation().frames().size());
         assertEquals(-.25,extension.settings().height());assertEquals(1400,extension.settings().duration());
-        assertTrue(Files.isRegularFile(directory.resolve("images/hand.gif")));
+        assertTrue(Files.isRegularFile(directory.resolve("images/hand.png")));
+        assertEquals("images/hand.png",extension.settings().imageFile());
         assertTrue(Files.readString(directory.resolve("config.properties")).contains("offset-y=-0.25"));
         assertTrue(Files.readString(directory.resolve("config.properties")).contains("image-scale=0.5"));
         assertTrue(Files.readString(directory.resolve("config.properties")).contains("offset-x=0.5"));
