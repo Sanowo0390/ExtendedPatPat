@@ -18,15 +18,26 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class PatPatExtension implements Extension {
     private volatile Settings settings=Settings.from(new Properties());
+    private volatile PatPreferences preferences;
     private final Map<GeyserSession,PatSession> sessions=new ConcurrentHashMap<>();
     private volatile boolean compatible;
     private ImageAnimation animation;
     private Path generatedPack;
     Settings settings() { return settings; }
+    boolean patEnabled(GeyserSession session) {
+        PatPreferences store=preferences;
+        return store==null || store.enabled(session.getPlayerEntity().uuid());
+    }
+    boolean setPatEnabled(GeyserSession session,boolean enabled) throws IOException {
+        PatPreferences store=preferences;
+        if(store==null)throw new IOException("Pat preferences have not been initialized");
+        return store.setEnabled(session.getPlayerEntity().uuid(),enabled);
+    }
     ImageAnimation animation() { return animation; }
     @Subscribe public void pre(GeyserPreInitializeEvent event) {
         try {
             Files.createDirectories(dataFolder());
+            preferences=new PatPreferences(dataFolder().resolve("disabled-players.txt"));
             copyDefault("config.properties"); copyDefault("PatPatBedrock.mcpack");
             upgradeConfig();
             settings=Settings.load(dataFolder().resolve("config.properties"));
@@ -48,8 +59,8 @@ public final class PatPatExtension implements Extension {
         Path file=dataFolder().resolve("config.properties");Properties old=new Properties();
         try(var reader=Files.newBufferedReader(file,java.nio.charset.StandardCharsets.UTF_8)){old.load(reader);}
         Map<String,String> added=new LinkedHashMap<>();
-        added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","1.0");added.put("image-loop","true");added.put("offset-space","view");
-        added.put("offset-x","0.0");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","0.2");added.put("standalone-mode","true");
+        added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","0.5");added.put("image-loop","true");added.put("offset-space","view");
+        added.put("offset-x","0.5");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","0.2");added.put("standalone-mode","true");
         StringBuilder append=new StringBuilder();
         added.forEach((key,value)->{if(!old.containsKey(key))append.append(key).append('=').append(value).append('\n');});
         if(!append.isEmpty())Files.writeString(file,"\n# Added image options: offset-space=view means X toward viewer, Y up, Z right.\n"+append,
@@ -142,11 +153,13 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.5.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.6.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
             else source.sendMessage("PatPatExtension 0.5.0 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
+        // Always allow users to disable effects even without the optional use permission.
+        register(event,"toggle",true,(source,args)->withSession(source,s->s.toggle(args),false));
         event.register(Command.builder(this).name("reload").source(CommandSource.class).description("Reload PatPat extension config")
                 .permission("patpatbedrock.admin",TriState.NOT_SET).executor((source,cmd,args)->{
                     try {
@@ -166,7 +179,10 @@ public final class PatPatExtension implements Extension {
                 .executor((source,cmd,args)->action.run(source,args)).build());
     }
     private void withSession(CommandSource source,java.util.function.Consumer<PatSession> action) {
-        if(!settings.allows(source)){source.sendMessage("この操作にはProxy側の権限 "+settings.permission()+" が必要です。");return;}
+        withSession(source,action,true);
+    }
+    private void withSession(CommandSource source,java.util.function.Consumer<PatSession> action,boolean requireUsePermission) {
+        if(requireUsePermission && !settings.allows(source)){source.sendMessage("この操作にはProxy側の権限 "+settings.permission()+" が必要です。");return;}
         PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
         if(state==null){source.sendMessage("このGeyserへ接続中の統合版プレイヤーから実行してください。対応ビルドも確認してください。");return;}
         state.session().executeInEventLoop(()->action.accept(state));
