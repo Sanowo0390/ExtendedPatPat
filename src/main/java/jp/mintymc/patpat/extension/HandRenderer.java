@@ -119,7 +119,7 @@ final class HandRenderer {
                     || hand.entity.getFlag(EntityFlag.INVISIBLE)) { remove(hand.id);it.remove();continue; }
             MoveEntityAbsolutePacket move=new MoveEntityAbsolutePacket();
             move.setRuntimeEntityId(hand.id); move.setPosition(motionPosition(anchor(hand.entity),elapsed,hand.text,cfg)); move.setRotation(Vector3f.ZERO);
-            move.setTeleported(true); session.sendUpstreamPacket(move);
+            move.setTeleported(!cfg.handMotionEnabled() || hand.text || elapsed>=cfg.handMotionDuration()); session.sendUpstreamPacket(move);
             if(hand.image) {
                 int index=animation.get().frameAt(elapsed,cfg.imageLoop());
                 if(index!=hand.frame || cfg.scale()!=hand.scale) {
