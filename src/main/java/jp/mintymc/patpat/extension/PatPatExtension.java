@@ -62,6 +62,7 @@ public final class PatPatExtension implements Extension {
             }catch(IOException formattingError) {
                 logger().warning("Could not reorganize config; using existing values: "+formattingError.getMessage());
             }
+            migrateOldBundledDefault();
             settings=Settings.load(dataFolder().resolve("config.properties"));
             if(!Set.of("image","glyph").contains(settings.renderer()))throw new IOException("renderer must be image or glyph");
             copyDefaultImage();
@@ -71,7 +72,7 @@ public final class PatPatExtension implements Extension {
                 Path folder=dataFolder().toAbsolutePath().normalize();
                 Path source=folder.resolve(settings.imageFile()).normalize();
                 if(!source.startsWith(folder))throw new IOException("image-file must be inside the extension folder");
-                animation=ImageAnimation.load(source);
+                animation=ImageAnimation.load(source,settings.spriteColumns(),settings.spriteFrameMs());
                 generatedPack=ImagePack.build(folder.resolve("generated"),animation,folder.resolve("sounds"),settings);
                 logger().info("Image ready: "+settings.imageFile()+", "+animation.frames().size()+" frames, "+animation.duration()+" ms. Generated pack: "+generatedPack.getFileName());
             }
@@ -81,17 +82,40 @@ public final class PatPatExtension implements Extension {
         Path file=dataFolder().resolve("config.properties");Properties old=new Properties();
         try(var reader=Files.newBufferedReader(file,java.nio.charset.StandardCharsets.UTF_8)){old.load(reader);}
         Map<String,String> added=new LinkedHashMap<>();
-        added.put("renderer","image");added.put("image-file","images/hand.gif");added.put("image-scale","0.5");added.put("image-loop","true");added.put("offset-space","view");
+        added.put("renderer","image");added.put("image-file","images/hand.png");added.put("image-sprite-columns","5");added.put("image-sprite-frame-ms","50");added.put("image-scale","0.5");added.put("image-loop","true");added.put("offset-space","view");
         added.put("offset-x","0.5");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","0.2");added.put("standalone-mode","true");added.put("squish-enabled","true");added.put("hand-motion-enabled","true");added.put("hand-motion-depth","0.425");added.put("hand-motion-duration-ms","240");added.put("swing-hand-enabled","true");added.put("camera-shake-enabled","false");added.put("camera-shake-intensity","0.06");added.put("ignored-entity-types","");added.put("ignored-player-uuids","");
         StringBuilder append=new StringBuilder();
         added.forEach((key,value)->{if(!old.containsKey(key))append.append(key).append('=').append(value).append('\n');});
         if(!append.isEmpty())Files.writeString(file,"\n# Added image options: offset-space=view means X toward viewer, Y up, Z right.\n"+append,
                 java.nio.charset.StandardCharsets.UTF_8,StandardOpenOption.APPEND);
     }
+    /**
+     * Upgrade only unchanged copies of the old bundled GIF. A user-modified
+     * hand.gif is kept as their selected custom image, even if its path is the
+     * historical default name.
+     */
+    private void migrateOldBundledDefault() throws IOException {
+        Path file=dataFolder().resolve("config.properties");
+        String config=Files.readString(file,java.nio.charset.StandardCharsets.UTF_8);
+        String oldLine="image-file=images/hand.gif";
+        if(!config.contains(oldLine))return;
+        Path old=dataFolder().resolve("images/hand.gif");
+        boolean unmodified=!Files.exists(old);
+        if(!unmodified)try(InputStream bundled=getClass().getResourceAsStream("/default-hand.gif")) {
+            unmodified=bundled!=null && java.util.Arrays.equals(Files.readAllBytes(old),bundled.readAllBytes());
+        }
+        if(unmodified) {
+            String next=config.replace(oldLine,"image-file=images/hand.png");
+            Files.writeString(file,next,java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
     private void copyDefaultImage() throws IOException {
-        Path path=dataFolder().resolve("images/hand.gif");Files.createDirectories(path.getParent());
-        if(!Files.exists(path))try(InputStream in=getClass().getResourceAsStream("/default-hand.gif")) {
-            if(in==null)throw new IOException("Missing bundled default-hand.gif");Files.copy(in,path);
+        Path path=dataFolder().resolve("images/hand.png");
+        Files.createDirectories(path.getParent());
+        if(!Files.exists(path))try(InputStream in=getClass().getResourceAsStream("/default-hand.png")) {
+            if(in==null)throw new IOException("Missing bundled default-hand.png");
+            Files.copy(in,path);
         }
     }
     @Subscribe public void entities(GeyserDefineEntitiesEvent event) {
@@ -218,7 +242,9 @@ public final class PatPatExtension implements Extension {
                                     (loaded.handMotionEnabled()!=settings.handMotionEnabled()
                                     || loaded.handMotionDepth()!=settings.handMotionDepth()
                                     || loaded.handMotionDuration()!=settings.handMotionDuration()
-                                    || loaded.scale()!=settings.scale())))
+                                    || loaded.scale()!=settings.scale()
+                                    || loaded.spriteColumns()!=settings.spriteColumns()
+                                    || loaded.spriteFrameMs()!=settings.spriteFrameMs())))
                             throw new IOException("画像/モーションの変更はリソースパック再生成のためProxy再起動が必要です。");
                         settings=loaded;sessions.values().forEach(s->s.session().executeInEventLoop(s::beginHandshake));
                         source.sendMessage("位置・表示時間・standalone-modeを再読み込みしました。画像、画像サイズ、手の上下動設定の変更にはProxy再起動が必要です。");
