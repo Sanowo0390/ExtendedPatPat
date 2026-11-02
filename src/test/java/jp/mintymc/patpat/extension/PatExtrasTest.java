@@ -48,18 +48,21 @@ class PatExtrasTest {
         reloaded.flush();
         assertEquals(3,new PatStatistics(path).total(a));
     }
-    @Test void optionalCameraShakeUsesLowIntensityAndShortDuration() {
+    @Test void optionalCameraFeedbackIsVerticalAndFinishesAtRest() {
         Properties props=new Properties();
-        assertFalse(Settings.from(props).cameraShakeEnabled(),"Avoid involuntary camera motion by default");
+        assertFalse(Settings.from(props).cameraShakeEnabled(),"Do not take over the camera by default");
         props.setProperty("camera-shake-enabled","true");
         props.setProperty("camera-shake-intensity","0.07");
         Settings cfg=Settings.from(props);
         assertTrue(cfg.cameraShakeEnabled());
-        var packet=PatCamera.shake((float)cfg.cameraShakeIntensity());
-        assertEquals(.07f,packet.getIntensity(),1e-6f);
-        assertEquals(.14f,packet.getDuration(),1e-6f);
-        assertEquals(org.cloudburstmc.protocol.bedrock.data.CameraShakeAction.ADD,packet.getShakeAction());
-        assertEquals(org.cloudburstmc.protocol.bedrock.data.CameraShakeType.POSITIONAL,packet.getShakeType());
+        assertEquals(.07,cfg.cameraShakeIntensity(),1e-6);
+        assertEquals(0f,PatCamera.offsetY(0,.07f));
+        float pressed=PatCamera.offsetY(70,.07f);
+        assertTrue(pressed<-.06f,"View should move down, not shake randomly in X/Z");
+        assertTrue(PatCamera.offsetY(180,.07f)<0f);
+        assertEquals(0f,PatCamera.offsetY(PatCamera.DURATION_MS,.07f));
+        assertEquals(0f,PatCamera.offsetY(500,.07f));
+        assertEquals(0f,PatCamera.offsetY(70,0f));
     }
 
 }
