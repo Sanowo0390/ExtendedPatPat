@@ -73,14 +73,14 @@ final class PatSession extends SessionAdapter {
             } else if(channel.equals(PatProtocol.PAT_S2C)) {
                 try {
                     PatProtocol.Pat pat=PatProtocol.decode(custom.getData());
-                    session.executeInEventLoop(()->{if(!closed && owner.settings().enabled())renderer.show(pat.target(),false);});
+                    session.executeInEventLoop(()->{if(!closed && owner.settings().enabled() && owner.patEnabled(session))renderer.show(pat.target(),false);});
                 } catch(IllegalArgumentException ignored) { /* Ignore malformed packets without log spam. */ }
             }
         }
     }
     @Override public void packetSending(PacketSendingEvent event) {
         Packet packet=event.getPacket();
-        if(bypass.remove(packet) || closed || event.isCancelled() || !owner.settings().enabled()
+        if(bypass.remove(packet) || closed || event.isCancelled() || !owner.settings().enabled() || !owner.patEnabled(session)
                 || (!ready && !owner.settings().standaloneMode())) return;
         if(packet instanceof ServerboundInteractPacket interact) {
             if(interact.getHand()!=Hand.MAIN_HAND
@@ -149,7 +149,7 @@ final class PatSession extends SessionAdapter {
     }
     /** true also covers cooldown suppression, to consume duplicate Interact/InteractAt packets. */
     private boolean attempt(Entity target) {
-        if((!ready && !owner.settings().standaloneMode()) || !owner.settings().enabled() || !eligible(target)) return false;
+        if((!ready && !owner.settings().standaloneMode()) || !owner.settings().enabled() || !owner.patEnabled(session) || !eligible(target)) return false;
         long now=System.nanoTime();if(now<nextPat)return true;
         nextPat=now+owner.settings().cooldown()*1_000_000L;
         if(ready) {
@@ -165,6 +165,7 @@ final class PatSession extends SessionAdapter {
         return true;
     }
     void commandPat() {
+        if(!owner.patEnabled(session)){session.sendMessage("PatはOFFです。/patpatbedrock toggle on で有効にしてください。");return;}
         if(!ready && !owner.settings().standaloneMode()){
             session.sendMessage("PatPat本体の応答がなく、standalone-mode=falseです。");
             return;
@@ -173,6 +174,7 @@ final class PatSession extends SessionAdapter {
         if(!attempt(target))session.sendMessage("撫でられる対象がいません。対象に照準を合わせ、空の手と距離を確認してください。");
     }
     void test(boolean text) {
+        if(!owner.patEnabled(session)){session.sendMessage("PatはOFFです。/patpatbedrock toggle on で有効にしてください。");return;}
         Entity target=findAimedTarget();
         // Test uses the same crosshair/distance/entity checks as a real Pat.
         // In particular, never silently fall back to the player's own head.
@@ -184,7 +186,21 @@ final class PatSession extends SessionAdapter {
         session.sendMessage("照準先への表示テスト（自分のみ）。backendHello="+ready);
     }
     void showStandalone(int targetJavaId) {
-        if(!closed && !session.isClosed() && owner.settings().enabled()) renderer.show(targetJavaId,false);
+        if(!closed && !session.isClosed() && owner.settings().enabled() && owner.patEnabled(session)) renderer.show(targetJavaId,false);
+    }
+    void toggle(String[] args) {
+        boolean next;
+        if(args.length==0) next=!owner.patEnabled(session);
+        else if(args.length==1 && args[0].equalsIgnoreCase("on")) next=true;
+        else if(args.length==1 && args[0].equalsIgnoreCase("off")) next=false;
+        else {session.sendMessage("使い方: /patpatbedrock toggle [on|off]");return;}
+        try {
+            owner.setPatEnabled(session,next);
+            if(!next)renderer.clear();
+            session.sendMessage("Patの送受信を"+(next?"ON":"OFF")+"にしました（再接続後も保持されます）。");
+        }catch(java.io.IOException e) {
+            session.sendMessage("Pat設定の保存に失敗しました: "+e.getMessage());
+        }
     }
     void clear(){renderer.clear();}
     void close() {
