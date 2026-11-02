@@ -26,7 +26,7 @@ class CommandPermissionTest {
             extension.commands(event);
         }
         ArgumentCaptor<Command> commands=ArgumentCaptor.forClass(Command.class);
-        verify(event,times(5)).register(commands.capture());
+        verify(event,times(6)).register(commands.capture());
         CommandManager<GeyserCommandSource> manager=mock(CommandManager.class);
         GeyserCommandSource source=mock(GeyserCommandSource.class);
         when(source.connection()).thenReturn(mock(GeyserSession.class));
