@@ -32,6 +32,7 @@ class SessionBridgeTest {
         when(owner.settings()).thenReturn(Settings.from(props));
         session=mock(GeyserSession.class);network=mock(ClientSession.class);cache=mock(EntityCache.class);
         when(owner.patEnabled(session)).thenReturn(true);
+        when(owner.cameraSupported()).thenReturn(true);
         var downstream=mock(DownstreamSession.class);
         when(session.getDownstream()).thenReturn(downstream);when(downstream.getSession()).thenReturn(network);
         when(downstream.isState(ProtocolState.GAME)).thenReturn(true);when(session.getEntityCache()).thenReturn(cache);
