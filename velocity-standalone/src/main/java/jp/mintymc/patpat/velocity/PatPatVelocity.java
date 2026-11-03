@@ -195,7 +195,7 @@ public final class PatPatVelocity {
                     if(packet.getEntityId()>=1_900_000_000)return;
                     Optional<UUID> uuid=packet.getUUID();
                     if(uuid.isPresent())view.track(new Tracked(packet.getEntityId(),uuid.get(),
-                        packet.getEntityType().getName(),packet.getPosition()));
+                        packet.getEntityType().getName().toString(),packet.getPosition()));
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.ENTITY_TELEPORT) {
                     var packet=new WrapperPlayServerEntityTeleport(event);
                     Tracked old=view.byId.get(packet.getEntityId());
