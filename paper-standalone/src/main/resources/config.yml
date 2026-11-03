@@ -1,0 +1,31 @@
+# Paper/Purpur 26.3 (Java 25); no client mod or resource pack.
+enabled: true
+interaction:
+  sneaking: true
+  empty-hand: true
+  allow-players: true
+  cancel-interact: true
+  cooldown-ms: 250
+  ignored-worlds: []
+animation:
+  enabled: true
+  material: PINK_TERRACOTTA
+  size: 1.0
+  offset-y: 0.16
+  depth: 0.425
+  ticks: 6
+  view-range: 16.0
+  max-active: 24
+effects:
+  swing-hand: true
+  hearts: false
+sound:
+  enabled: true
+  volume: 0.65
+  pitch-min: 0.90
+  pitch-max: 1.10
+  ids:
+    - minecraft:block.wool.place
+    - minecraft:block.moss.place
+    - minecraft:block.honey_block.place
+disabled-players: []
