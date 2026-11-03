@@ -7,9 +7,9 @@ This repository provides two pieces that run in the same Velocity JVM:
 | Component | Install directory | Responsibility |
 |---|---|---|
 | PatPatVelocity 0.1.2 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
-| PatPatGeyserExtension 0.11.1 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
+| PatPatGeyserExtension 0.12.0 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
 
-Requirements: Velocity 3.5, **PacketEvents 2.14.0 for Velocity**, and **Geyser-Velocity 2.12.1-b1280** (exact build pinned by this extension). The normal Geyser-Velocity plugin is also in \`Velocity/plugins/\`.
+Requirements: Velocity 3.5, **PacketEvents 2.14.0 for Velocity**, and **Geyser-Velocity 2.12.1系** (required Geyser internals are checked at startup). The normal Geyser-Velocity plugin is also in \`Velocity/plugins/\`.
 
 ## How standalone mode works
 
@@ -23,9 +23,9 @@ No official PatPat Plugin and no server-side Paper plugin are necessary.
 
 ## Install
 
-1. Install **PacketEvents 2.14.0 Velocity** and **Geyser-Velocity 2.12.1-b1280** in \`Velocity/plugins/\` as normal Velocity plugins.
+1. Install **PacketEvents 2.14.0 Velocity** and **Geyser-Velocity 2.12.1系** in \`Velocity/plugins/\` as normal Velocity plugins.
 2. Put the **PatPatVelocity-0.1.2.jar** from the **Build PatPatVelocity** GitHub Action in \`Velocity/plugins/\`.
-3. Put **PatPatGeyserExtension-0.11.1.jar** from the **Build Extension** GitHub Action in \`Velocity/plugins/Geyser-Velocity/extensions/\`. **Remove older copies** of this extension first.
+3. Put **PatPatGeyserExtension-0.12.0.jar** from the **Build Extension** GitHub Action in \`Velocity/plugins/Geyser-Velocity/extensions/\`. **Remove older copies** of this extension first.
 4. Restart Velocity. Run \`/ppv status\`; the default mode is **standalone**, and Geyser bridge should be \`true\`.
 5. Java: sneak + right-click a mob or another player; Bedrock: use the configured Geyser gesture. Other people on the same backend should see it.
 
@@ -53,7 +53,7 @@ Upstream does not always notify the initiating Java player for mob Pats. \`offic
 - Velocity doesn't expose Paper's inventory, server-side hitbox API, WorldGuard or other plugin rules. The standalone proxy checks tracked entity position, sneaking, proximity, cooldown and an optional Velocity permission. It **cannot currently require an empty main hand**; Geyser has its own empty-hand check. Do not treat this as a protection/anti-cheat plugin.
 - Java entity tracking relies on packets and is not guaranteed to show a hand when a target isn't tracked, immediately after a server switch or when receiving an unsupported client version.
 - Real PatPat client Mod compatibility in backend-free mode requires additional testing; detected client Mods suppress the vanilla proxy hand to avoid double rendering.
-- The Geyser extension is deliberately pinned to Geyser b1280 for binary compatibility. It fails closed on other builds.
+- The Geyser extension checks runtime API capabilities instead of pinning one build. Geyser 2.12.1-b1280 and b1284 compile and pass unit tests; future builds are allowed if the internal API remains compatible. Incompatible internals fail closed with a descriptive log.
 - **GitHub Actions compilation and unit tests are not an in-game test**. Validate Java→Bedrock, Bedrock→Java, cross-world and cross-backend transitions before public production deployment.
 
 ## Build
@@ -63,3 +63,5 @@ mvn -B -ntp -f velocity-standalone/pom.xml verify
 python scripts/prepare_build.py
 mvn -B -ntp verify
 \`\`\`
+
+Geyser builds are verified by SHA-256 from its official download API, and the extension CI runs both the b1280 baseline and the newest 2.12.1 build. New untested builds should still be validated in-game before production deployment.
