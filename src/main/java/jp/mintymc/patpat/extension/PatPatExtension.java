@@ -21,6 +21,8 @@ public final class PatPatExtension implements Extension {
     private volatile PatStatistics statistics;
     private final Map<GeyserSession,PatSession> sessions=new ConcurrentHashMap<>();
     private volatile boolean compatible;
+    private volatile boolean cameraSupported=true;
+    boolean cameraSupported() {return cameraSupported;}
     // Shared JDK-only bridge; no classloading dependency between Velocity and Geyser.
     private static final String PROXY_TO_BEDROCK="jp.mintymc.patpat.bridge.v1.java-to-bedrock";
     private static final String BEDROCK_TO_PROXY="jp.mintymc.patpat.bridge.v1.bedrock-to-java";
@@ -159,6 +161,7 @@ public final class PatPatExtension implements Extension {
         // enable this extension if the methods actually used still exist.
         GeyserCompatibility.Report report=GeyserCompatibility.inspect();
         compatible=report.supported();
+        cameraSupported=report.optionalMissing().isEmpty();
         String running=GeyserCompatibility.runtimeVersion();
         if(!compatible) {
             logger().error("PatPat disabled for Geyser "+running+

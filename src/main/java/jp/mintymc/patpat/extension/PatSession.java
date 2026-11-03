@@ -218,7 +218,7 @@ final class PatSession extends SessionAdapter {
         // Only invoked when another player Pats this session's own player entity.
         // The initiating player must never receive the effect here.
         if(closed || session.isClosed() || !owner.settings().enabled() || !owner.patEnabled(session))return;
-        if(owner.settings().cameraShakeEnabled())
+        if(owner.cameraSupported() && owner.settings().cameraShakeEnabled())
             camera.play((float)owner.settings().cameraShakeIntensity());
     }
     void showStandalone(int targetJavaId) {
