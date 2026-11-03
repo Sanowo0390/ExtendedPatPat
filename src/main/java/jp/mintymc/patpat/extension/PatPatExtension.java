@@ -22,6 +22,13 @@ public final class PatPatExtension implements Extension {
     private volatile PatStatistics statistics;
     private final Map<GeyserSession,PatSession> sessions=new ConcurrentHashMap<>();
     private volatile boolean compatible;
+    // Shared JDK-only bridge; no classloading dependency between Velocity and Geyser.
+    private static final String PROXY_TO_BEDROCK="jp.mintymc.patpat.bridge.v1.java-to-bedrock";
+    private static final String BEDROCK_TO_PROXY="jp.mintymc.patpat.bridge.v1.bedrock-to-java";
+    private static final String BEDROCK_USERS="jp.mintymc.patpat.bridge.v1.bedrock-users";
+    private final Set<UUID> bridgedBedrockUsers=ConcurrentHashMap.newKeySet();
+    private final java.util.function.Consumer<Object[]> proxyBridge=this::receiveJavaPat;
+
     private ImageAnimation animation;
     private Path generatedPack;
     Settings settings() { return settings; }
@@ -151,7 +158,9 @@ public final class PatPatExtension implements Extension {
             compatible=compatible(build,commit);
         } catch(ReflectiveOperationException | LinkageError e) {compatible=false;}
         if(!compatible) { logger().error("This build targets Geyser 2.12.1-b1280 (64bb399). Running "+running+". Bridge disabled to avoid incompatible packet hooks.");return; }
-        logger().info("PatPat extension ready for Geyser b1280. Paper addon is NOT needed. Backend PatPat Plugin 1.2.5+ is optional; standalone Bedrock fallback is available.");
+        System.getProperties().put(PROXY_TO_BEDROCK,proxyBridge);
+        System.getProperties().put(BEDROCK_USERS,bridgedBedrockUsers);
+        logger().info("PatPat extension ready for Geyser b1280. Optional proxy-only Java bridge is enabled; standalone Bedrock fallback is available.");
         geyserApi().onlineConnections().forEach(c->{ if(c instanceof GeyserSession s) attach(s); });
     }
     static boolean compatible(String build,String commit) {
@@ -162,6 +171,8 @@ public final class PatPatExtension implements Extension {
         if(session.getDownstream()==null || sessions.containsKey(session)) return;
         PatSession state=new PatSession(this,session);
         if(sessions.putIfAbsent(session,state)!=null) return;
+        if(session.getPlayerEntity()!=null && session.getPlayerEntity().uuid()!=null)
+            bridgedBedrockUsers.add(session.getPlayerEntity().uuid());
         session.getDownstream().getSession().addListener(state);
         session.executeInEventLoop(state::beginHandshake);
     }
@@ -219,9 +230,50 @@ public final class PatPatExtension implements Extension {
         });
     }
     @Subscribe public void quit(SessionDisconnectEvent event) {
-        if(event.connection() instanceof GeyserSession s) { PatSession state=sessions.remove(s);if(state!=null)state.close(); }
+        if(event.connection() instanceof GeyserSession s) {
+            if(s.getPlayerEntity()!=null) bridgedBedrockUsers.remove(s.getPlayerEntity().uuid());
+            PatSession state=sessions.remove(s);if(state!=null)state.close();
+        }
     }
-    @Subscribe public void shutdown(GeyserShutdownEvent event) { flushStatistics();sessions.values().forEach(PatSession::close);sessions.clear(); }
+    @Subscribe public void shutdown(GeyserShutdownEvent event) {
+        if(System.getProperties().get(PROXY_TO_BEDROCK)==proxyBridge)
+            System.getProperties().remove(PROXY_TO_BEDROCK);
+        if(System.getProperties().get(BEDROCK_USERS)==bridgedBedrockUsers)
+            System.getProperties().remove(BEDROCK_USERS);
+        bridgedBedrockUsers.clear();
+        flushStatistics();sessions.values().forEach(PatSession::close);sessions.clear();
+    }
+
+    /** Bedrock-origin Pat events are forwarded only to Java viewers by the optional Velocity plugin. */
+    void relayToJava(PatSession sender,Entity target) {
+        if(!compatible || target==null || target.uuid()==null
+                || sender.session().getPlayerEntity()==null)return;
+        Object callback=System.getProperties().get(BEDROCK_TO_PROXY);
+        if(callback instanceof java.util.function.Consumer<?> raw) {
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<Object[]> bridge=(java.util.function.Consumer<Object[]>)raw;
+            try {bridge.accept(new Object[]{sender.session().getPlayerEntity().uuid(),target.uuid()});}
+            catch(RuntimeException exception) {logger().warning("Java bridge refused Bedrock Pat: "+exception.getMessage());}
+        }
+    }
+
+    /** Java-origin Pat events: resolve UUID in each Bedrock viewer's own cache. */
+    private void receiveJavaPat(Object[] message) {
+        if(!compatible || !settings.enabled() || message==null || message.length!=2
+                || !(message[0] instanceof UUID actor) || !(message[1] instanceof UUID target))return;
+        sessions.values().forEach(viewer->{
+            GeyserSession s=viewer.session();
+            s.executeInEventLoop(()->{
+                if(viewer.closed() || s.isClosed() || !patEnabled(s))return;
+                Entity entity=s.getPlayerEntity()!=null && target.equals(s.getPlayerEntity().uuid())
+                    ? s.getPlayerEntity():s.getEntityCache().getEntityByUuid(target);
+                if(entity==null || !entity.isValid())return;
+                viewer.showStandalone(entity.javaId());
+                if(target.equals(s.getPlayerEntity().uuid()) && !actor.equals(target))
+                    viewer.receivePatFeedback();
+            });
+        });
+    }
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;

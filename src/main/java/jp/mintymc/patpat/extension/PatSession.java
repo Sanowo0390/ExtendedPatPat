@@ -183,6 +183,7 @@ final class PatSession extends SessionAdapter {
             renderer.show(target.javaId(),false);
             owner.relayStandalone(this,target);
         }
+        owner.relayToJava(this,target);
         return true;
     }
     void commandPat() {
