@@ -26,12 +26,20 @@ public final class PatPatExtension implements Extension {
     private static final String PROXY_TO_BEDROCK="jp.mintymc.patpat.bridge.v1.java-to-bedrock";
     private static final String BEDROCK_TO_PROXY="jp.mintymc.patpat.bridge.v1.bedrock-to-java";
     private static final String BEDROCK_USERS="jp.mintymc.patpat.bridge.v1.bedrock-users";
+    private static final String PROXY_PREFER_STANDALONE="jp.mintymc.patpat.bridge.v1.prefer-standalone";
     private final Set<UUID> bridgedBedrockUsers=ConcurrentHashMap.newKeySet();
     private final java.util.function.Consumer<Object[]> proxyBridge=this::receiveJavaPat;
 
     private ImageAnimation animation;
     private Path generatedPack;
     Settings settings() { return settings; }
+    /** Use the Java proxy's standalone choice across both client editions.
+     * The callback is a JDK interface, so separate plugin classloaders work.
+     */
+    boolean preferProxyStandalone() {
+        Object pref=System.getProperties().get(PROXY_PREFER_STANDALONE);
+        return pref instanceof java.util.function.BooleanSupplier supplier && supplier.getAsBoolean();
+    }
     boolean patEnabled(GeyserSession session) {
         PatPreferences store=preferences;
         return store==null || store.enabled(session.getPlayerEntity().uuid());
@@ -277,8 +285,8 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.11.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
-            else source.sendMessage("PatPatExtension 0.11.0 / compatible="+compatible+" / sessions="+sessions.size());
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.11.1 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            else source.sendMessage("PatPatExtension 0.11.1 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));

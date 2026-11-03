@@ -67,7 +67,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="patpatvelocity",
     name="PatPatVelocity",
-    version="0.1.1",
+    version="0.1.2",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -75,6 +75,7 @@ public final class PatPatVelocity {
     private static final String JAVA_TO_BEDROCK="jp.mintymc.patpat.bridge.v1.java-to-bedrock";
     private static final String BEDROCK_TO_JAVA="jp.mintymc.patpat.bridge.v1.bedrock-to-java";
     private static final String BEDROCK_USERS="jp.mintymc.patpat.bridge.v1.bedrock-users";
+    private static final String PREFER_STANDALONE="jp.mintymc.patpat.bridge.v1.prefer-standalone";
     // These names and packet formats are defined by the upstream LopyMine/PatPat-Plugin.
     private static final String REGISTER_CHANNEL="minecraft:register";
     private final ProxyServer proxy;
@@ -86,6 +87,8 @@ public final class PatPatVelocity {
     private final AtomicInteger entitySequence=new AtomicInteger(1_900_000_000);
     private final AtomicInteger active=new AtomicInteger();
     private final Consumer<Object[]> bedrockConsumer=this::receiveBedrockPat;
+    private final java.util.function.BooleanSupplier standalonePreference=
+        ()->!enabled("official-integration-enabled",false);
 
     @Inject
     public PatPatVelocity(ProxyServer proxy,Logger log,@DataDirectory Path folder) {
@@ -99,13 +102,17 @@ public final class PatPatVelocity {
         var meta=proxy.getCommandManager().metaBuilder("patpatvelocity").aliases("ppv").plugin(this).build();
         proxy.getCommandManager().register(meta,new Commands());
         System.getProperties().put(BEDROCK_TO_JAVA,bedrockConsumer);
-        log.info("PatPatVelocity active; Java: PacketEvents virtual BlockDisplays, Bedrock: optional Geyser bridge");
+        System.getProperties().put(PREFER_STANDALONE,standalonePreference);
+        log.info("PatPatVelocity ready; mode={}, bridge via Geyser",
+            enabled("official-integration-enabled",false)?"optional-official":"proxy-standalone");
     }
 
     @Subscribe
     public void shutdown(ProxyShutdownEvent event) {
         if(System.getProperties().get(BEDROCK_TO_JAVA)==bedrockConsumer)
             System.getProperties().remove(BEDROCK_TO_JAVA);
+        if(System.getProperties().get(PREFER_STANDALONE)==standalonePreference)
+            System.getProperties().remove(PREFER_STANDALONE);
         views.clear();
     }
 
@@ -118,7 +125,7 @@ public final class PatPatVelocity {
         View replacement=new View(uuid,null);
         replacement.backend=serverOf(player);
         views.put(uuid,replacement);
-        if(!enabled("official-integration-enabled",true) || isBedrock(uuid))return;
+        if(!enabled("official-integration-enabled",false) || isBedrock(uuid))return;
         // The official Paper plugin sends HELLO only after the client has registered
         // its incoming channels (PlayerRegisterChannelEvent). The proxy does this for vanilla.
         for(int attempt=0;attempt<3;attempt++) {
@@ -297,14 +304,16 @@ public final class PatPatVelocity {
                     if(actor==null || actor.getCurrentServer().isEmpty())return;
                     String permission=text("required-permission","");
                     if(!permission.isBlank() && !actor.hasPermission(permission))return;
-                    if(view.self!=null && squared(view.self,target.pos)
+                    // No world data is available in Velocity; require a recent actor
+                    // position and a nearby entity ID tracked for this connection.
+                    if(view.self==null || squared(view.self,target.pos)
                             > Math.pow(number("max-distance",4,1,6),2))return;
                     long now=System.nanoTime();
-                    boolean official=enabled("official-integration-enabled",true) && view.officialHello;
-                    if(!official && enabled("official-integration-enabled",true)
-                        && now-view.connectedAt < (long)number("official-detection-ms",3000,250,10000)*1_000_000L)
-                        return; // Do not emit a standalone Pat before the backend handshake settles.
-                    if(!official && !enabled("standalone-fallback",true))return;
+                    PatModePolicy.Mode mode=modeFor(view);
+                    if(mode==PatModePolicy.Mode.NATIVE_CLIENT_MOD ||
+                       mode==PatModePolicy.Mode.DETECTING ||
+                       mode==PatModePolicy.Mode.DISABLED)return;
+                    boolean official=mode==PatModePolicy.Mode.OFFICIAL_BACKEND;
                     long cooldown=(long)number("cooldown-ms",250,0,10000)*1_000_000L;
                     if(now-view.lastPat<cooldown)return;
                     view.lastPat=now;
@@ -332,7 +341,7 @@ public final class PatPatVelocity {
 
     /** Only trust an official serverbound approval notification for Java viewers. */
     private void onBackendMessage(UUID viewerId,View view,WrapperPlayServerPluginMessage message) {
-        if(!enabled("enabled",true) || !enabled("official-integration-enabled",true)
+        if(!enabled("enabled",true) || !enabled("official-integration-enabled",false)
                 || isBedrock(viewerId))return;
         String channel=message.getChannelName();
         if(PatPatProtocol.HELLO_S2C.equals(channel)) {
@@ -373,6 +382,14 @@ public final class PatPatVelocity {
             name.contains("projectile") || name.contains("arrow") ||
             name.contains("fireball") || name.contains("experience_orb") ||
             name.contains("fishing_bobber") || name.contains("leash_knot"));
+    }
+
+    private PatModePolicy.Mode modeFor(View view) {
+        return PatModePolicy.resolve(view.realMod,
+            enabled("official-integration-enabled",false),view.officialHello,
+            enabled("standalone-fallback",true),
+            Math.max(0L,(System.nanoTime()-view.connectedAt)/1_000_000L),
+            (long)number("official-detection-ms",3000,250,10000));
     }
 
     private static Vector3d add(Vector3d p,double dx,double dy,double dz) {
@@ -527,12 +544,8 @@ public final class PatPatVelocity {
             String[] args=ctx.arguments();
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
-                String state=view==null?"unknown":view.realMod?"native-client-mod":
-                    view.officialHello?"official-backend":
-                    (System.nanoTime()-view.connectedAt <
-                        (long)number("official-detection-ms",3000,250,10000)*1_000_000L)
-                        ?"detecting":"standalone";
-                sender.sendMessage(Component.text("PatPatVelocity v0.1.1 | mode="+state
+                String state=view==null?"unknown":modeFor(view).status();
+                sender.sendMessage(Component.text("PatPatVelocity v0.1.2 | mode="+state
                     +" | active="+active.get()
                     +" | Geyser bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
                 return;

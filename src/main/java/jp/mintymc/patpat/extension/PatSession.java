@@ -92,7 +92,7 @@ final class PatSession extends SessionAdapter {
     @Override public void packetSending(PacketSendingEvent event) {
         Packet packet=event.getPacket();
         if(bypass.remove(packet) || closed || event.isCancelled() || !owner.settings().enabled() || !owner.patEnabled(session)
-                || (!ready && !owner.settings().standaloneMode())) return;
+                || ((!ready || owner.preferProxyStandalone()) && !owner.settings().standaloneMode())) return;
         if(packet instanceof ServerboundInteractPacket interact) {
             if(interact.getHand()!=Hand.MAIN_HAND
                     || (owner.settings().sneak() && !interact.isSneaking() && !session.isSneaking())) return;
@@ -165,7 +165,8 @@ final class PatSession extends SessionAdapter {
     }
     /** true also covers cooldown suppression, to consume duplicate Interact/InteractAt packets. */
     private boolean attempt(Entity target) {
-        if((!ready && !owner.settings().standaloneMode()) || !owner.settings().enabled() || !owner.patEnabled(session) || !eligible(target)) return false;
+        final boolean useBackend=ready && !owner.preferProxyStandalone();
+        if((!useBackend && !owner.settings().standaloneMode()) || !owner.settings().enabled() || !owner.patEnabled(session) || !eligible(target)) return false;
         long now=System.nanoTime();if(now<nextPat)return true;
         nextPat=now+owner.settings().cooldown()*1_000_000L;
         owner.recordPat(session);
@@ -173,8 +174,8 @@ final class PatSession extends SessionAdapter {
             session.sendUpstreamPacket(PatSwing.packet(session.getPlayerEntity().geyserId()));
             owner.relaySwing(this);
         }
-        if(ready) {
-            // Preserve the backend protocol when PatPat is present.
+        if(useBackend) {
+            // Only use the optional backend PatPat protocol if explicitly enabled.
             payload(PatProtocol.PAT_C2S,PatProtocol.pat(target.javaId()));
             if(owner.settings().localPreview()) renderer.show(target.javaId(),false);
         } else {
@@ -183,15 +184,14 @@ final class PatSession extends SessionAdapter {
             renderer.show(target.javaId(),false);
             owner.relayStandalone(this,target);
         }
-        // The official Paper plugin provides the authoritative broadcast when ready.
-        // Only standalone Bedrock Pats need our independent Java bridge.
-        if(!ready)owner.relayToJava(this,target);
+        // Route accepted standalone Bedrock Pats to Java viewers exactly once.
+        if(!useBackend)owner.relayToJava(this,target);
         return true;
     }
     void commandPat() {
         if(!owner.patEnabled(session)){session.sendMessage("PatはOFFです。/patpatbedrock toggle on で有効にしてください。");return;}
-        if(!ready && !owner.settings().standaloneMode()){
-            session.sendMessage("PatPat本体の応答がなく、standalone-mode=falseです。");
+        if((!ready || owner.preferProxyStandalone()) && !owner.settings().standaloneMode()){
+            session.sendMessage("PatPatのstandalone-modeが無効です。");
             return;
         }
         Entity target=findAimedTarget();
