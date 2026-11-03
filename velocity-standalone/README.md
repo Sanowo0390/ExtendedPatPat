@@ -41,3 +41,18 @@ No backend Paper plugin or original PatPat Plugin is required. **Do not install 
 
 ## Build
 \`mvn -B -ntp -f velocity-standalone/pom.xml package\`
+
+## Official PatPat Plugin integration (v0.1.1)
+
+The preferred setup is **official PatPat Plugin 1.2.5+ installed on each Paper/Purpur backend** + PatPatVelocity on Velocity + PatPatGeyserExtension for Bedrock. No other backend plugin is necessary.
+
+The proxy registers \`patpat:hello_patpat_player_s2c_packet\` and \`patpat:pat_entity_s2c_packet_v2\` with each backend using \`minecraft:register\`. The official backend sends its hello in response. Velocity then replies with v2 client hello, effectively negotiating for vanilla Java clients that cannot load the original PatPat Mod. On a sneak-right-click, **the proxy sends only an upstream PatPacketV2 request**. The official backend validates the recipient as a living entity, range, player permission, rate limit, allow/deny lists, and the cancellable API event, then broadcasts the approved event to registered nearby viewers. This plugin renders the approved server-to-client event **only to its intended Java viewer**, not to everyone by proxy assumption.
+
+- Java clients with the **real PatPat Mod** use the original protocol and renderer. Observing their real hello suppresses our synthetic messages and voxel effect, preventing duplicate hands.
+- Bedrock clients continue their own Geyser handshake. The official backend's approved S2C is handled by the Geyser extension; its direct Java bridge is used **only in standalone mode**. This prevents double-rendering approved Pats.
+- If no compatible upstream hello is received within \`official-detection-ms\` (default 3000), the proxy uses its existing standalone mode when \`standalone-fallback=true\`; use \`false\` to require the official plugin.
+- \`official-local-preview=false\` (default) ensures rejected requests do **not** render optimistically. **Upstream PatPat Plugin excludes the actor from its notification list when patting a mob**, so the initiator may not see their own animation in this authoritative mode. Set \`official-local-preview=true\` for the instant initiator effect; this may appear even when the backend rejects.
+- \`/ppv status\`: \`official-backend\` / \`detecting\` / \`standalone\` / \`native-client-mod\`.
+- For multi-backend networks, install official PatPat Plugin independently on each backend whose protection rules should govern Patting.
+
+**Limitations:** Backend does not send an explicit acceptance/rejection ACK to the actor. Velocity cannot guarantee visual feedback for rejected actions when official-local-preview is enabled, nor can it enforce all official plugin restrictions by itself when standalone. The vanilla Java voxel hand remains an approximation; custom PNG/GIF requires a pack or client mod. Live server/Bedrock/Java interaction testing is necessary in addition to GitHub Actions compile/unit tests.

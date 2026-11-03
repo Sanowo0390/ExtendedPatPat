@@ -183,7 +183,9 @@ final class PatSession extends SessionAdapter {
             renderer.show(target.javaId(),false);
             owner.relayStandalone(this,target);
         }
-        owner.relayToJava(this,target);
+        // The official Paper plugin provides the authoritative broadcast when ready.
+        // Only standalone Bedrock Pats need our independent Java bridge.
+        if(!ready)owner.relayToJava(this,target);
         return true;
     }
     void commandPat() {

@@ -14,6 +14,7 @@ import com.github.retrooper.packetevents.protocol.world.states.WrappedBlockState
 import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.util.Vector3f;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPluginMessage;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerPosition;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerPositionAndRotation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
@@ -23,6 +24,8 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRelativeMoveAndRotation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerJoinGame;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPluginMessage;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.event.Subscribe;
@@ -35,6 +38,7 @@ import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitypowered.api.scheduler.ScheduledTask;
 import jakarta.inject.Inject;
 import net.kyori.adventure.key.Key;
@@ -45,6 +49,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -62,7 +67,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="patpatvelocity",
     name="PatPatVelocity",
-    version="0.1.0",
+    version="0.1.1",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -70,6 +75,8 @@ public final class PatPatVelocity {
     private static final String JAVA_TO_BEDROCK="jp.mintymc.patpat.bridge.v1.java-to-bedrock";
     private static final String BEDROCK_TO_JAVA="jp.mintymc.patpat.bridge.v1.bedrock-to-java";
     private static final String BEDROCK_USERS="jp.mintymc.patpat.bridge.v1.bedrock-users";
+    // These names and packet formats are defined by the upstream LopyMine/PatPat-Plugin.
+    private static final String REGISTER_CHANNEL="minecraft:register";
     private final ProxyServer proxy;
     private final Logger log;
     private final Path folder;
@@ -104,8 +111,35 @@ public final class PatPatVelocity {
 
     @Subscribe
     public void switchServer(ServerConnectedEvent event) {
-        // Every backend has independent entity IDs: never keep cached entities on switches.
-        views.remove(event.getPlayer().getUniqueId());
+        // A server switch invalidates entity IDs, hello status and player preferences
+        // negotiated with the previous backend (but not the persistent opt-out).
+        Player player=event.getPlayer();
+        UUID uuid=player.getUniqueId();
+        View replacement=new View(uuid,null);
+        replacement.backend=serverOf(player);
+        views.put(uuid,replacement);
+        if(!enabled("official-integration-enabled",true) || isBedrock(uuid))return;
+        // The official Paper plugin sends HELLO only after the client has registered
+        // its incoming channels (PlayerRegisterChannelEvent). The proxy does this for vanilla.
+        for(int attempt=0;attempt<3;attempt++) {
+            final int retry=attempt;
+            proxy.getScheduler().buildTask(this,()->registerPatPatChannels(player,replacement))
+                .delay(350L+retry*1000L,TimeUnit.MILLISECONDS).schedule();
+        }
+    }
+
+    private void registerPatPatChannels(Player actor,View state) {
+        if(!actor.isActive() || views.get(actor.getUniqueId())!=state
+            || state.officialHello || state.realMod || isBedrock(actor.getUniqueId()))return;
+        actor.getCurrentServer().ifPresent(server->{
+            if(!java.util.Objects.equals(state.backend,server.getServerInfo().getName()))return;
+            server.sendPluginMessage(MinecraftChannelIdentifier.from(REGISTER_CHANNEL),PatPatProtocol.REGISTERED_CHANNELS);
+        });
+    }
+
+    private boolean sendBackend(Player player,String channel,byte[] payload) {
+        return player.getCurrentServer().map(server->server.sendPluginMessage(
+            MinecraftChannelIdentifier.from(channel),payload)).orElse(false);
     }
 
     @Subscribe
@@ -165,6 +199,11 @@ public final class PatPatVelocity {
         final Map<Integer,Tracked> byId=new ConcurrentHashMap<>();
         final Map<UUID,Tracked> byUuid=new ConcurrentHashMap<>();
         volatile long lastPat;
+        final long connectedAt=System.nanoTime();
+        volatile String backend;
+        volatile boolean officialHello;
+        volatile boolean realMod;
+        volatile int selfEntityId=Integer.MIN_VALUE;
         View(UUID player,User user){this.player=player;this.user=user;}
         void track(Tracked target) {
             Tracked old=byId.put(target.id,target);
@@ -190,7 +229,9 @@ public final class PatPatVelocity {
             var type=event.getPacketType();
             View view=view(userId,event.getUser());
             try {
-                if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.SPAWN_ENTITY) {
+                if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.PLUGIN_MESSAGE) {
+                    onBackendMessage(userId,view,new WrapperPlayServerPluginMessage(event));
+                } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.SPAWN_ENTITY) {
                     var packet=new WrapperPlayServerSpawnEntity(event);
                     if(packet.getEntityId()>=1_900_000_000)return;
                     Optional<UUID> uuid=packet.getUUID();
@@ -219,6 +260,8 @@ public final class PatPatVelocity {
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.RESPAWN
                     || type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.JOIN_GAME) {
                     view.byId.clear();view.byUuid.clear();view.self=null;
+                    if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.JOIN_GAME)
+                        view.selfEntityId=new WrapperPlayServerJoinGame(event).getEntityId();
                 }
             } catch(Exception ex) {log.debug("Ignored malformed entity tracking packet",ex);}
         }
@@ -228,17 +271,28 @@ public final class PatPatVelocity {
             View view=view(uuid,event.getUser());
             var type=event.getPacketType();
             try {
-                if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client.PLAYER_POSITION) {
+                if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client.PLUGIN_MESSAGE) {
+                    // A real PatPat client already negotiates and renders the official
+                    // protocol. Never register a second version or draw duplicate hands.
+                    String channel=new WrapperPlayClientPluginMessage(event).getChannelName();
+                    if(PatPatProtocol.HELLO_C2S.equals(channel) || PatPatProtocol.PAT_C2S.equals(channel))
+                        view.realMod=true;
+                    else if(REGISTER_CHANNEL.equals(channel)) {
+                        byte[] data=new WrapperPlayClientPluginMessage(event).getData();
+                        if(new String(data,StandardCharsets.UTF_8).contains(PatPatProtocol.HELLO_S2C))
+                            view.realMod=true;
+                    }
+                } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client.PLAYER_POSITION) {
                     view.self=new WrapperPlayClientPlayerPosition(event).getPosition();
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client.PLAYER_POSITION_AND_ROTATION) {
                     view.self=new WrapperPlayClientPlayerPositionAndRotation(event).getPosition();
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client.INTERACT_ENTITY) {
-                    if(!enabled("enabled",true) || isBedrock(uuid) || disabled.contains(uuid))return;
+                    if(!enabled("enabled",true) || isBedrock(uuid) || disabled.contains(uuid) || view.realMod)return;
                     var p=new WrapperPlayClientInteractEntity(event);
                     if(p.getHand()!=InteractionHand.MAIN_HAND)return;
                     if(enabled("require-sneaking",true) && !p.isSneaking().orElse(false))return;
                     Tracked target=view.byId.get(p.getEntityId());
-                    if(target==null || target.uuid.equals(uuid))return;
+                    if(target==null || target.uuid.equals(uuid) || !looksLiving(target.type))return;
                     Player actor=proxy.getPlayer(uuid).orElse(null);
                     if(actor==null || actor.getCurrentServer().isEmpty())return;
                     String permission=text("required-permission","");
@@ -246,11 +300,27 @@ public final class PatPatVelocity {
                     if(view.self!=null && squared(view.self,target.pos)
                             > Math.pow(number("max-distance",4,1,6),2))return;
                     long now=System.nanoTime();
+                    boolean official=enabled("official-integration-enabled",true) && view.officialHello;
+                    if(!official && enabled("official-integration-enabled",true)
+                        && now-view.connectedAt < (long)number("official-detection-ms",3000,250,10000)*1_000_000L)
+                        return; // Do not emit a standalone Pat before the backend handshake settles.
+                    if(!official && !enabled("standalone-fallback",true))return;
                     long cooldown=(long)number("cooldown-ms",250,0,10000)*1_000_000L;
                     if(now-view.lastPat<cooldown)return;
                     view.lastPat=now;
                     if(enabled("cancel-interaction",false))event.setCancelled(true);
                     UUID targetUuid=target.uuid;
+                    if(official) {
+                        // Upstream validates: permission, rate limit, whitelist/blacklist,
+                        // living target/range, and cancellable PatPacketReceiveEvent.
+                        // Only its S2C event is allowed to confirm a Pat.
+                        boolean sent=sendBackend(actor,PatPatProtocol.PAT_C2S,PatPatProtocol.request(target.id));
+                        if(!sent)log.debug("Cannot send PatPat v2 request to backend {}",view.backend);
+                        if(sent && enabled("official-local-preview",false))
+                            proxy.getScheduler().buildTask(PatPatVelocity.this,
+                                ()->renderToJavaViewer(actor,view,targetUuid)).schedule();
+                        return;
+                    }
                     proxy.getScheduler().buildTask(PatPatVelocity.this,()->{
                         renderToJava(uuid,targetUuid);
                         if(enabled("bridge-enabled",true))sendToBedrock(uuid,targetUuid);
@@ -258,6 +328,51 @@ public final class PatPatVelocity {
                 }
             } catch(Exception ex) {log.debug("Ignored malformed interaction",ex);}
         }
+    }
+
+    /** Only trust an official serverbound approval notification for Java viewers. */
+    private void onBackendMessage(UUID viewerId,View view,WrapperPlayServerPluginMessage message) {
+        if(!enabled("enabled",true) || !enabled("official-integration-enabled",true)
+                || isBedrock(viewerId))return;
+        String channel=message.getChannelName();
+        if(PatPatProtocol.HELLO_S2C.equals(channel)) {
+            if(!PatPatProtocol.supportedHello(message.getData()))return;
+            view.officialHello=true;
+            if(!view.realMod) {
+                proxy.getPlayer(viewerId).ifPresent(player->{
+                    if(views.get(viewerId)==view)
+                        sendBackend(player,PatPatProtocol.HELLO_C2S,PatPatProtocol.hello());
+                });
+            }
+            return;
+        }
+        if(!PatPatProtocol.PAT_S2C.equals(channel) || !view.officialHello
+                || view.realMod || disabled.contains(viewerId))return;
+        try {
+            PatPatProtocol.Pat pat=PatPatProtocol.decode(message.getData());
+            // Backend entity IDs are scoped to the recipient's current server.
+            Tracked target=view.byId.get(pat.target());
+            UUID targetUuid=target!=null?target.uuid:
+                pat.target()==view.selfEntityId?viewerId:null;
+            if(targetUuid==null)return;
+            proxy.getPlayer(viewerId).ifPresent(player->
+                proxy.getScheduler().buildTask(PatPatVelocity.this,()->
+                    renderToJavaViewer(player,view,targetUuid)).schedule());
+        }catch(IllegalArgumentException badPacket) {
+            log.debug("Malformed PatPat v2 notification from backend {}",view.backend);
+        }
+    }
+
+    private static boolean looksLiving(String type) {
+        // A conservative non-living exclusion list; the official Paper plugin
+        // always performs the authoritative LivingEntity check itself.
+        String name=type.toLowerCase(java.util.Locale.ROOT);
+        return !(name.contains("armor_stand") || name.contains("display") ||
+            name.contains("minecart") || name.contains("boat") ||
+            name.contains("item") || name.contains("painting") ||
+            name.contains("projectile") || name.contains("arrow") ||
+            name.contains("fireball") || name.contains("experience_orb") ||
+            name.contains("fishing_bobber") || name.contains("leash_knot"));
     }
 
     private static Vector3d add(Vector3d p,double dx,double dy,double dz) {
@@ -302,21 +417,26 @@ public final class PatPatVelocity {
             if(isBedrock(player.getUniqueId()) || disabled.contains(player.getUniqueId())
                     || !server.equals(serverOf(player)))continue;
             View view=views.get(player.getUniqueId());
-            if(view==null || view.user==null)continue;
-            Tracked target=view.find(targetId);
-            Vector3d pos=target==null && targetId.equals(player.getUniqueId()) ? view.self
-                : target==null?null:target.pos;
-            if(pos==null || !enabled("hand-enabled",true)
-                    || (view.self!=null && squared(view.self,pos)>256))continue;
-            startHand(view,player,targetId);
-            if(enabled("sound-enabled",true)) {
-                try {
-                    String key=text("sound-event","minecraft:block.wool.place");
-                    float volume=(float)number("sound-volume",0.6,0,4);
-                    float pitch=(float)number("sound-pitch",1,0.1,4);
-                    player.playSound(Sound.sound(Key.key(key),Sound.Source.PLAYER,volume,pitch),Sound.Emitter.self());
-                } catch(Exception ex) {log.debug("Sound is not available",ex);}
-            }
+            renderToJavaViewer(player,view,targetId);
+        }
+    }
+    private void renderToJavaViewer(Player player,View view,UUID targetId) {
+        if(view==null || views.get(player.getUniqueId())!=view || view.user==null ||
+            !player.isActive() || isBedrock(player.getUniqueId()) ||
+            disabled.contains(player.getUniqueId()) || view.realMod ||
+            !enabled("hand-enabled",true))return;
+        Tracked target=view.find(targetId);
+        Vector3d pos=target==null && targetId.equals(player.getUniqueId()) ? view.self
+            : target==null?null:target.pos;
+        if(pos==null || (view.self!=null && squared(view.self,pos)>256))return;
+        startHand(view,player,targetId);
+        if(enabled("sound-enabled",true)) {
+            try {
+                String key=text("sound-event","minecraft:block.wool.place");
+                float volume=(float)number("sound-volume",0.6,0,4);
+                float pitch=(float)number("sound-pitch",1,0.1,4);
+                player.playSound(Sound.sound(Key.key(key),Sound.Source.PLAYER,volume,pitch),Sound.Emitter.self());
+            } catch(Exception ex) {log.debug("Sound is not available",ex);}
         }
     }
     private void startHand(View view,Player player,UUID targetId) {
@@ -406,8 +526,15 @@ public final class PatPatVelocity {
             CommandSource sender=ctx.source();
             String[] args=ctx.arguments();
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
-                sender.sendMessage(Component.text("PatPatVelocity v0.1.0 | active="+active.get()
-                    +" | bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
+                View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
+                String state=view==null?"unknown":view.realMod?"native-client-mod":
+                    view.officialHello?"official-backend":
+                    (System.nanoTime()-view.connectedAt <
+                        (long)number("official-detection-ms",3000,250,10000)*1_000_000L)
+                        ?"detecting":"standalone";
+                sender.sendMessage(Component.text("PatPatVelocity v0.1.1 | mode="+state
+                    +" | active="+active.get()
+                    +" | Geyser bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
                 return;
             }
             if(args[0].equalsIgnoreCase("reload")) {
