@@ -207,11 +207,13 @@ public final class PatPatVelocity {
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.ENTITY_RELATIVE_MOVE) {
                     var packet=new WrapperPlayServerEntityRelativeMove(event);
                     Tracked old=view.byId.get(packet.getEntityId());
-                    if(old!=null)old.pos=add(old.pos,packet.getDeltaX(),packet.getDeltaY(),packet.getDeltaZ());
+                    if(old!=null)old.pos=packet.getDelta()!=null ? packet.getDelta().apply(old.pos)
+                        : add(old.pos,packet.getDeltaX(),packet.getDeltaY(),packet.getDeltaZ());
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.ENTITY_RELATIVE_MOVE_AND_ROTATION) {
                     var packet=new WrapperPlayServerEntityRelativeMoveAndRotation(event);
                     Tracked old=view.byId.get(packet.getEntityId());
-                    if(old!=null)old.pos=add(old.pos,packet.getDeltaX(),packet.getDeltaY(),packet.getDeltaZ());
+                    if(old!=null)old.pos=packet.getDelta()!=null ? packet.getDelta().apply(old.pos)
+                        : add(old.pos,packet.getDeltaX(),packet.getDeltaY(),packet.getDeltaZ());
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.DESTROY_ENTITIES) {
                     for(int id:new WrapperPlayServerDestroyEntities(event).getEntityIds())view.remove(id);
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.RESPAWN
@@ -304,7 +306,8 @@ public final class PatPatVelocity {
             Tracked target=view.find(targetId);
             Vector3d pos=target==null && targetId.equals(player.getUniqueId()) ? view.self
                 : target==null?null:target.pos;
-            if(pos==null || !enabled("hand-enabled",true))continue;
+            if(pos==null || !enabled("hand-enabled",true)
+                    || (view.self!=null && squared(view.self,pos)>256))continue;
             startHand(view,player,targetId);
             if(enabled("sound-enabled",true)) {
                 try {
