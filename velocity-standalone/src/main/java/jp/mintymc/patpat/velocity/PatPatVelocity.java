@@ -1,6 +1,8 @@
 package jp.mintymc.patpat.velocity;
 
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.protocol.ConnectionState;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.event.PacketListenerAbstract;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
@@ -40,6 +42,7 @@ import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.player.ServerConnectedEvent;
+import com.velocitypowered.api.event.player.ServerPreConnectEvent;
 import com.velocitypowered.api.event.player.PlayerResourcePackStatusEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
@@ -138,6 +141,15 @@ public final class PatPatVelocity {
         if(System.getProperties().get(JAVA_TOGGLE_READ)==javaToggleRead)
             System.getProperties().remove(JAVA_TOGGLE_READ);
         views.clear();
+    }
+
+    @Subscribe
+    public void switchingServer(ServerPreConnectEvent event) {
+        // Fired before Velocity begins switching the backend. Cancel any
+        // queued/active fake PLAY packets while the client moves into CONFIGURATION.
+        if(event.getPreviousServer()==null)return;
+        View previous=views.get(event.getPlayer().getUniqueId());
+        if(previous!=null)previous.switching=true;
     }
 
     @Subscribe
@@ -298,6 +310,7 @@ public final class PatPatVelocity {
         volatile String backend;
         volatile boolean officialHello;
         volatile boolean realMod;
+        volatile boolean switching;
         volatile int selfEntityId=Integer.MIN_VALUE;
         View(UUID player,User user){this.player=player;this.user=user;}
         void track(Tracked target) {
@@ -317,6 +330,23 @@ public final class PatPatVelocity {
         return view;
     }
 
+    private boolean canSendPlay(View view) {
+        if(view==null || view.user==null)return false;
+        Player player=proxy.getPlayer(view.player).orElse(null);
+        return PlayPacketGate.permits(view.switching,
+            views.get(view.player)==view,
+            player!=null && player.isActive(),
+            player!=null && view.backend!=null &&
+                java.util.Objects.equals(view.backend,serverOf(player)),
+            view.user.getEncoderState());
+    }
+
+    private boolean sendPlay(View view,PacketWrapper<?> packet) {
+        if(!canSendPlay(view))return false;
+        view.user.sendPacketSilently(packet);
+        return true;
+    }
+
     private final class Listener extends PacketListenerAbstract {
         @Override public void onPacketSend(PacketSendEvent event) {
             UUID userId=event.getUser().getUUID();
@@ -324,6 +354,12 @@ public final class PatPatVelocity {
             var type=event.getPacketType();
             View view=view(userId,event.getUser());
             try {
+                if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.CONFIGURATION_START) {
+                    // Backend requested a protocol transition; PLAY rendering
+                    // must stop even if the connection has not switched yet.
+                    view.switching=true;
+                    return;
+                }
                 if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.PLUGIN_MESSAGE) {
                     onBackendMessage(userId,view,new WrapperPlayServerPluginMessage(event));
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.SPAWN_ENTITY) {
@@ -363,12 +399,15 @@ public final class PatPatVelocity {
                     || type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.JOIN_GAME) {
                     view.byId.clear();view.byUuid.clear();view.squishing.clear();
                     view.sentMaps.clear();view.self=null;
-                    if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.JOIN_GAME)
+                    if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.JOIN_GAME) {
                         view.selfEntityId=new WrapperPlayServerJoinGame(event).getEntityId();
+                        view.switching=false;
+                    }
                 }
             } catch(Exception ex) {log.debug("Ignored malformed entity tracking packet",ex);}
         }
         @Override public void onPacketReceive(PacketReceiveEvent event) {
+            if(event.getConnectionState()!=ConnectionState.PLAY)return;
             UUID uuid=event.getUser().getUUID();
             if(uuid==null)return;
             View view=view(uuid,event.getUser());
@@ -534,8 +573,7 @@ public final class PatPatVelocity {
         }
     }
     private void renderToJavaViewer(Player player,View view,UUID targetId,UUID actorId) {
-        if(view==null || views.get(player.getUniqueId())!=view || view.user==null ||
-            !player.isActive() || isBedrock(player.getUniqueId()) ||
+        if(!canSendPlay(view) || !player.isActive() || isBedrock(player.getUniqueId()) ||
             !personalEnabled(player.getUniqueId()) || !personalEnabled(targetId) ||
             (actorId!=null && !personalEnabled(actorId)) || view.realMod ||
             !enabled("hand-enabled",true))return;
@@ -559,14 +597,17 @@ public final class PatPatVelocity {
         return ItemStack.builder().user(user).type(ItemTypes.FILLED_MAP).amount(1)
             .component(ComponentTypes.MAP_ID,id).build();
     }
-    private void sendMap(View view,SkinCatalog.Skin style,int sprite,int pose){
+    private boolean sendMap(View view,SkinCatalog.Skin style,int sprite,int pose){
+        if(!canSendPlay(view))return false;
         int id=mapFrames.mapId(style,sprite,pose);
-        // Send each 16KiB map only on first use for this connection.
-        if(!view.sentMaps.add(id))return;
+        // Each 16KiB map is sent at most once per connection, and never in CONFIGURATION.
+        if(!view.sentMaps.add(id))return true;
         try{
-            view.user.sendPacketSilently(new WrapperPlayServerMapData(id,
+            if(sendPlay(view,new WrapperPlayServerMapData(id,
                 (byte)0,false,true,List.of(),128,128,0,0,
-                mapFrames.frame(style,sprite,pose)));
+                mapFrames.frame(style,sprite,pose))))return true;
+            view.sentMaps.remove(id);
+            return false;
         }catch(RuntimeException error){
             view.sentMaps.remove(id);
             throw error;
@@ -580,7 +621,7 @@ public final class PatPatVelocity {
     private void sendSquish(View view,int id,WrapperPlayServerUpdateAttributes.Property baseline,double multiplier) {
         double original=baseline==null?1.0:baseline.getValue();
         double modified=Math.max(1.0/16,original*multiplier);
-        view.user.sendPacketSilently(new WrapperPlayServerUpdateAttributes(id,List.of(
+        sendPlay(view,new WrapperPlayServerUpdateAttributes(id,List.of(
             new WrapperPlayServerUpdateAttributes.Property(Attributes.SCALE,modified,List.of()))));
     }
     private void restoreSquish(View view,int id,Tracked tracked) {
@@ -588,12 +629,13 @@ public final class PatPatVelocity {
         try {
             WrapperPlayServerUpdateAttributes.Property original=
                 tracked!=null?tracked.originalScale:null;
-            view.user.sendPacketSilently(new WrapperPlayServerUpdateAttributes(id,List.of(
+            sendPlay(view,new WrapperPlayServerUpdateAttributes(id,List.of(
                 original!=null?original:
                 new WrapperPlayServerUpdateAttributes.Property(Attributes.SCALE,1.0,List.of()))));
         } catch(Exception ex) {log.debug("Could not restore viewer-only squash",ex);}
     }
     private void startHand(View view,Player player,UUID targetId,UUID actorId) {
+        if(!canSendPlay(view))return;
         if(active.incrementAndGet()>(int)number("max-active",24,1,128)){
             active.decrementAndGet();return;
         }
@@ -617,20 +659,22 @@ public final class PatPatVelocity {
                 if(squash)view.squishing.remove(targetEntityId);
                 active.decrementAndGet();return;
             }
-            sendMap(view,style,0,0);
+            if(!sendMap(view,style,0,0))throw new IllegalStateException("Play state ended");
             int face=faceTowardViewer(pos,view.self);
             // Invisible item frame: the map is visible, its background frame is not.
             // Unlike the old six-BlockDisplay hand, this renders at map resolution.
-            view.user.sendPacketSilently(new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
+            if(!sendPlay(view,new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
                 EntityTypes.ITEM_FRAME,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),
-                0,face,null));
-            view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,
-                ItemFrameMetadata.onSpawn(mapItem(view.user,mapFrames.mapId(style,0,0)))));
+                0,face,null)))throw new IllegalStateException("Play state ended");
+            if(!sendPlay(view,new WrapperPlayServerEntityMetadata(id,
+                ItemFrameMetadata.onSpawn(mapItem(view.user,mapFrames.mapId(style,0,0))))))
+                throw new IllegalStateException("Play state ended");
         } catch(Exception ex) {
             cleanup(view,fakeIds);
             if(squash)view.squishing.remove(targetEntityId);
             active.decrementAndGet();
-            log.warn("Unable to spawn Java Pat map hand: {}",ex.getMessage());
+            if(canSendPlay(view))log.warn("Unable to spawn Java Pat map hand: {}",ex.getMessage());
+            else log.debug("Stopped Pat map spawn during backend switch");
             return;
         }
         final AtomicReference<ScheduledTask> job=new AtomicReference<>();
@@ -641,8 +685,8 @@ public final class PatPatVelocity {
             private boolean finished;
             @Override public void run() {
                 try {
-                    if(tick++>=duration || views.get(player.getUniqueId())!=view ||
-                            !player.isActive() || !personalEnabled(player.getUniqueId()) ||
+                    if(tick++>=duration || !canSendPlay(view) ||
+                            !personalEnabled(player.getUniqueId()) ||
                             !personalEnabled(targetId) ||
                             (actorId!=null && !personalEnabled(actorId))){
                         finish();return;
@@ -654,10 +698,12 @@ public final class PatPatVelocity {
                     int frame=style.at(tick,duration);
                     int pose=MapMotion.poseAt(tick,duration,depth);
                     if(frame!=sentFrame || pose!=sentPose){
-                        sendMap(view,style,frame,pose);
-                        view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,
-                            List.of(ItemFrameMetadata.mapItem(
-                                mapItem(view.user,mapFrames.mapId(style,frame,pose))))));
+                        if(!sendMap(view,style,frame,pose) ||
+                                !sendPlay(view,new WrapperPlayServerEntityMetadata(id,
+                                    List.of(ItemFrameMetadata.mapItem(
+                                        mapItem(view.user,mapFrames.mapId(style,frame,pose))))))){
+                            finish();return;
+                        }
                         sentFrame=frame;
                         sentPose=pose;
                     }
@@ -696,12 +742,13 @@ public final class PatPatVelocity {
         return null;
     }
     private void cleanup(View view,int[] ids) {
+        if(!canSendPlay(view))return;
         try {
             int count=0;for(int id:ids)if(id>0)count++;
             if(count==0)return;
             int[] valid=new int[count];int i=0;
             for(int id:ids)if(id>0)valid[i++]=id;
-            view.user.sendPacketSilently(new WrapperPlayServerDestroyEntities(valid));
+            sendPlay(view,new WrapperPlayServerDestroyEntities(valid));
         }catch(Exception ignored) {}
     }
 
