@@ -1,4 +1,4 @@
-# Paper/Purpur 26.3 (Java 25); no client mod or resource pack.
+# Paper/Purpur 26.3 (Java 25); animated Java resource pack, no client Mod.
 enabled: true
 interaction:
   sneaking: true
@@ -9,6 +9,9 @@ interaction:
   ignored-worlds: []
 animation:
   enabled: true
+  # resourcepack = 5-frame PNG hand; voxel = original block hand
+  # Install the matching PatPatJava-26.3.zip into the Java client or deliver with server.properties.
+  renderer: resourcepack
   material: PINK_TERRACOTTA
   size: 1.0
   offset-y: 0.16

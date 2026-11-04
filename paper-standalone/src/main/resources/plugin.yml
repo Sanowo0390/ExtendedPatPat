@@ -1,5 +1,5 @@
 name: PatPatVanilla
-version: 0.1.0
+version: 0.2.0
 main: jp.mintymc.patpat.paper.PatPatVanillaPlugin
 api-version: '26.3'
 description: Pat living entities with a vanilla server-only animated voxel hand

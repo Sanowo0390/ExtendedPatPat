@@ -2,6 +2,7 @@ package jp.mintymc.patpat.paper;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.SoundCategory;
@@ -9,6 +10,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
 import org.bukkit.entity.BlockDisplay;
+import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -16,6 +18,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Transformation;
@@ -45,6 +48,22 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     private final Map<UUID,Long> lastPat = new HashMap<>();
     private final Set<UUID> disabled = new HashSet<>();
     private final Set<Animation> animations = new HashSet<>();
+    /** A single shared Java resource pack supplies these five item models. */
+    private static final int HAND_FRAMES=5;
+    private final ItemStack[] handFrames=new ItemStack[HAND_FRAMES];
+    private ItemStack handFrame(int index) {
+        int i=Math.floorMod(index,HAND_FRAMES);
+        if(handFrames[i]!=null)return handFrames[i].clone();
+        ItemStack item=new ItemStack(Material.PAPER);
+        var meta=item.getItemMeta();
+        meta.setItemModel(new NamespacedKey("patpat","hand_"+i));
+        item.setItemMeta(meta);
+        handFrames[i]=item;
+        return item.clone();
+    }
+    private boolean useResourcePack() {
+        return getConfig().getString("animation.renderer","resourcepack").equalsIgnoreCase("resourcepack");
+    }
 
     @Override public void onEnable() {
         saveDefaultConfig();
@@ -109,7 +128,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0 || args[0].equalsIgnoreCase("status")) {
-            sender.sendMessage("§aPatPatVanilla §7v0.1.0 | active animations: " + animations.size());
+            sender.sendMessage("§aPatPatVanilla §7v0.2.0 | active animations: " + animations.size());
             return true;
         }
         if (args[0].equalsIgnoreCase("reload")) {
@@ -139,6 +158,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     private final class Animation extends BukkitRunnable {
         private final LivingEntity target;
         private final List<BlockDisplay> blocks = new ArrayList<>();
+        private ItemDisplay sprite;
         private final int ticks;
         private final double offsetY, depth;
         private int frame;
@@ -155,7 +175,25 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             if (material == null || !material.isBlock() || material.isAir()) material = Material.PINK_TERRACOTTA;
             var blockData = material.createBlockData();
             Location origin = position(0);
-            for (Part part : HAND) {
+            if(useResourcePack()) {
+                sprite=target.getWorld().spawn(origin,ItemDisplay.class,d->{
+                    d.setPersistent(false);
+                    d.setGravity(false);
+                    d.setInvulnerable(true);
+                    d.setBillboard(Display.Billboard.CENTER);
+                    d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
+                    d.setViewRange(range);
+                    d.setShadowRadius(0);
+                    d.setShadowStrength(0);
+                    d.setItemStack(handFrame(0));
+                    d.setTransformation(new Transformation(
+                        new Vector3f(-0.5f*size,-0.5f*size,0),
+                        new Quaternionf(),
+                        new Vector3f(size,size,0.02f),
+                        new Quaternionf()
+                    ));
+                });
+            } else for (Part part : HAND) {
                 BlockDisplay block = target.getWorld().spawn(origin,BlockDisplay.class,d -> {
                     d.setPersistent(false);
                     d.setGravity(false);
@@ -186,6 +224,12 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             double eased = 1.0-(1.0-t)*(1.0-t);
             Location p = position(depth*Math.sin(Math.PI*eased));
             for (BlockDisplay block : blocks) if (block.isValid()) block.teleport(p);
+            if(sprite!=null && sprite.isValid()) {
+                sprite.teleport(p);
+                // 5-frame PNG sprites are advanced per animation tick, not globally.
+                sprite.setItemStack(handFrame(Math.min(HAND_FRAMES-1,
+                    (int)((long)frame*HAND_FRAMES/Math.max(1,ticks+1)))));
+            }
             frame++;
         }
         private void finish() {
@@ -193,6 +237,8 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             done = true;
             try { cancel(); } catch (IllegalStateException ignored) { }
             for (BlockDisplay block : blocks) if (block.isValid()) block.remove();
+            if(sprite!=null && sprite.isValid())sprite.remove();
+            sprite=null;
             blocks.clear(); animations.remove(this);
         }
     }
