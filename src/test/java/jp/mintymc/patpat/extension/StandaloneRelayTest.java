@@ -7,6 +7,9 @@ import org.geysermc.geyser.entity.type.Entity;
 import org.geysermc.geyser.session.GeyserSession;
 import org.geysermc.geyser.session.cache.EntityCache;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.geysermc.geyser.entity.type.player.SessionPlayerEntity;
+import java.nio.file.Path;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.UUID;
@@ -14,6 +17,20 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class StandaloneRelayTest {
+    @TempDir Path directory;
+    // Real preference storage is required: a relay is now forbidden for
+    // either a muted sender or muted recipient.
+    private void configure(PatPatExtension extension,GeyserSession... connections) throws Exception {
+        Field field=PatPatExtension.class.getDeclaredField("preferences");
+        field.setAccessible(true);
+        field.set(extension,new PatPreferences(directory.resolve("disabled-players.txt")));
+        for(GeyserSession connection:connections){
+            if(connection.getPlayerEntity()!=null)continue;
+            SessionPlayerEntity player=mock(SessionPlayerEntity.class);
+            when(player.uuid()).thenReturn(UUID.randomUUID());
+            when(connection.getPlayerEntity()).thenReturn(player);
+        }
+    }
     @SuppressWarnings("unchecked")
     private static Map<GeyserSession,PatSession> sessions(PatPatExtension extension) throws Exception {
         Field f=PatPatExtension.class.getDeclaredField("sessions");
@@ -39,6 +56,7 @@ class StandaloneRelayTest {
         var viewer=session(world,remote);
         var wrongWorld=session(otherWorld,remote);
         var wrongServer=session(world,another);
+        configure(extension,source,viewer,wrongWorld,wrongServer);
         PatSession sourceState=mock(PatSession.class),viewerState=mock(PatSession.class),
                 worldState=mock(PatSession.class),serverState=mock(PatSession.class);
         when(sourceState.session()).thenReturn(source);
@@ -72,6 +90,7 @@ class StandaloneRelayTest {
         var remote=mock(RemoteServer.class);
         var source=session(world,remote);
         var viewer=session(world,remote);
+        configure(extension,source,viewer);
         PatSession actor=mock(PatSession.class),recipient=mock(PatSession.class);
         when(actor.session()).thenReturn(source);when(recipient.session()).thenReturn(viewer);
         sessions(extension).put(source,actor);sessions(extension).put(viewer,recipient);
@@ -112,6 +131,7 @@ class StandaloneRelayTest {
         when(self.javaId()).thenReturn(29);
         when(self.isValid()).thenReturn(true);
         when(recipient.getPlayerEntity()).thenReturn(self);
+        configure(extension,source,recipient,observer);
 
         var observerCache=mock(EntityCache.class);
         when(observer.getEntityCache()).thenReturn(observerCache);
@@ -128,6 +148,40 @@ class StandaloneRelayTest {
         verify(observerState).showStandalone(29);
         verify(observerState,never()).receivePatFeedback();
         verify(initiatorState,never()).receivePatFeedback();
+    }
+
+    @Test void disabledViewerAndSenderNeverReceiveOrBroadcastPat() throws Exception {
+        var extension=new PatPatExtension();
+        Key world=Key.key("minecraft:overworld");
+        RemoteServer remote=mock(RemoteServer.class);
+        GeyserSession sender=session(world,remote),receiver=session(world,remote);
+        configure(extension,sender,receiver);
+        PatSession patter=mock(PatSession.class),viewer=mock(PatSession.class);
+        when(patter.session()).thenReturn(sender);
+        when(viewer.session()).thenReturn(receiver);
+        sessions(extension).put(sender,patter);sessions(extension).put(receiver,viewer);
+        UUID targetId=UUID.randomUUID();
+        Entity target=mock(Entity.class);
+        when(target.uuid()).thenReturn(targetId);
+        when(target.position()).thenReturn(Vector3f.from(0,64,0));
+        EntityCache cache=mock(EntityCache.class);
+        when(receiver.getEntityCache()).thenReturn(cache);
+        Entity candidate=mock(Entity.class);
+        when(cache.getEntityByUuid(targetId)).thenReturn(candidate);
+        when(candidate.uuid()).thenReturn(targetId);
+        when(candidate.isValid()).thenReturn(true);
+        when(candidate.position()).thenReturn(Vector3f.from(0,64,0));
+        when(candidate.javaId()).thenReturn(42);
+        extension.setPatEnabled(receiver,false);
+        extension.relayStandalone(patter,target);
+        verify(viewer,never()).showStandalone(anyInt());
+        extension.setPatEnabled(receiver,true);
+        extension.setPatEnabled(sender,false);
+        extension.relayStandalone(patter,target);
+        verify(viewer,never()).showStandalone(anyInt());
+        extension.setPatEnabled(sender,true);
+        extension.relayStandalone(patter,target);
+        verify(viewer).showStandalone(42);
     }
 
 }
