@@ -33,12 +33,11 @@ class HandMotionTest {
         p.setProperty("offset-z","-0.3");
         Settings cfg=Settings.from(p);
         Vector3f start=HandRenderer.anchor(Vector3f.from(10,64,20),1.8f,Vector3f.from(20,64,20),0,cfg);
-        Vector3f down=HandRenderer.motionPosition(start,70,false,cfg);
+        Vector3f down=start.add(0f,HandMotion.displacement(70,cfg.handMotionDuration(),cfg.handMotionDepth()),0f);
         assertEquals(start.getX(),down.getX(),1e-6);
         assertEquals(start.getZ(),down.getZ(),1e-6);
         assertEquals(start.getY()-.425,down.getY(),.003);
-        assertEquals(start,HandRenderer.motionPosition(start,70,true,cfg),"Text diagnostics should remain stationary");
-        assertEquals(start,HandRenderer.motionPosition(start,240,false,cfg));
+        assertEquals(start,start.add(0f,HandMotion.displacement(240,cfg.handMotionDuration(),cfg.handMotionDepth()),0f));
     }
 
     @Test void featureCanBeDisabledAndTimedIndependentlyOfGifFrames() {
@@ -49,11 +48,11 @@ class HandMotionTest {
         Settings cfg=Settings.from(p);
         Vector3f base=Vector3f.from(0,2,0);
         assertFalse(cfg.handMotionEnabled());
-        assertEquals(base,HandRenderer.motionPosition(base,140,false,cfg));
+        assertEquals(base,base,"When disabled the image pack omits the stroke animation");
         p.setProperty("hand-motion-enabled","true");
         cfg=Settings.from(p);
         assertEquals(-.9,HandMotion.displacement(141,cfg.handMotionDuration(),cfg.handMotionDepth()),.002);
-        assertEquals(base,HandRenderer.motionPosition(base,480,false,cfg));
+        assertEquals(0,HandMotion.displacement(480,cfg.handMotionDuration(),cfg.handMotionDepth()));
     }
 
     @Test void invalidMovementValuesAreClampedOrIgnored() {

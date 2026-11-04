@@ -3,11 +3,14 @@ import org.junit.jupiter.api.Test;
 import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.*;
 class ConfigurationTest {
-    @Test void clampsInvalidSettingsAndPreservesValidGlyphs() {
-        Properties p=new Properties();p.setProperty("duration-ms","-1");p.setProperty("max-distance","NaN");p.setProperty("frames",",,");
+    @Test void clampsInvalidSettingsWithoutLegacyGlyphOptions() {
+        Properties p=new Properties();
+        p.setProperty("duration-ms","-1");
+        p.setProperty("max-distance","NaN");
         Settings cfg=Settings.from(p);
-        assertEquals(0,cfg.duration());assertEquals(3,cfg.distance());assertEquals(4,cfg.frames().size());
-        p.setProperty("frames","A,B");assertEquals(2,Settings.from(p).frames().size());
+        assertEquals(0,cfg.duration());
+        assertEquals(3,cfg.distance());
+        assertEquals("images/hand.png",cfg.imageFile());
     }
     @Test void discoversRequiredGeyserCapabilitiesWithoutPinningBuildHash() {
         GeyserCompatibility.Report report=GeyserCompatibility.inspect();

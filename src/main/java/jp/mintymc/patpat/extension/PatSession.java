@@ -43,7 +43,8 @@ final class PatSession extends SessionAdapter {
     int active(){return renderer.size();}
     void beginHandshake() {
         ready=false;nextPat=0;generation++;renderer.clear();camera.stop();
-        if(!closed && owner.settings().enabled()) handshake(generation,0);
+        if(!closed && owner.settings().enabled() && !owner.preferProxyStandalone())
+            handshake(generation,0);
     }
     private void handshake(int current,int attempts) {
         if(closed || session.isClosed() || generation!=current || ready || attempts>=5) return;
@@ -66,6 +67,7 @@ final class PatSession extends SessionAdapter {
         } else if(packet instanceof ClientboundCustomPayloadPacket custom) {
             String channel=custom.getChannel().asString();
             if(channel.equals(PatProtocol.HELLO_S2C)) {
+                if(owner.preferProxyStandalone())return;
                 boolean supported=PatProtocol.supportedHello(custom.getData());
                 session.executeInEventLoop(()->{
                     if(closed || !owner.settings().enabled()) return;
@@ -73,11 +75,12 @@ final class PatSession extends SessionAdapter {
                     if(ready) payload(PatProtocol.HELLO_C2S,PatProtocol.hello());
                 });
             } else if(channel.equals(PatProtocol.PAT_S2C)) {
+                if(owner.preferProxyStandalone())return;
                 try {
                     PatProtocol.Pat pat=PatProtocol.decode(custom.getData());
                     session.executeInEventLoop(()->{
                         if(closed || !owner.settings().enabled() || !owner.patEnabled(session)) return;
-                        renderer.show(pat.target(),false);
+                        renderer.show(pat.target());
                         // Backend broadcasts the target's Java ID to each viewer.
                         // Only the recipient's own session gets the camera effect.
                         if(session.getPlayerEntity()!=null
@@ -176,11 +179,11 @@ final class PatSession extends SessionAdapter {
         if(useBackend) {
             // Only use the optional backend PatPat protocol if explicitly enabled.
             payload(PatProtocol.PAT_C2S,PatProtocol.pat(target.javaId()));
-            if(owner.settings().localPreview()) renderer.show(target.javaId(),false);
+            if(owner.settings().localPreview()) renderer.show(target.javaId());
         } else {
             // Backend-free mode: render locally, and relay only to Bedrock clients
             // whose entity cache independently contains the same entity UUID.
-            renderer.show(target.javaId(),false);
+            renderer.show(target.javaId());
             owner.relayStandalone(this,target);
         }
         // Route accepted standalone Bedrock Pats to Java viewers exactly once.
@@ -196,7 +199,7 @@ final class PatSession extends SessionAdapter {
         Entity target=findAimedTarget();
         if(!attempt(target))session.sendMessage("撫でられる対象がいません。対象に照準を合わせ、空の手と距離を確認してください。");
     }
-    void test(boolean text) {
+    void test() {
         if(!owner.patEnabled(session)){session.sendMessage("PatはOFFです。/extendedpatpatgeyser toggle on で有効にしてください。");return;}
         Entity target=findAimedTarget();
         // Test uses the same crosshair/distance/entity checks as a real Pat.
@@ -205,7 +208,7 @@ final class PatSession extends SessionAdapter {
             session.sendMessage("表示できません。撫でられる対象に照準を合わせ、距離と空の手を確認してください。");
             return;
         }
-        renderer.show(target.javaId(),text);
+        renderer.show(target.javaId());
         session.sendMessage("照準先への表示テスト（自分のみ）。backendHello="+ready);
     }
     void swingForViewer(long actorRuntimeId) {
@@ -221,7 +224,7 @@ final class PatSession extends SessionAdapter {
             camera.play((float)owner.settings().cameraShakeIntensity());
     }
     void showStandalone(int targetJavaId) {
-        if(!closed && !session.isClosed() && owner.settings().enabled() && owner.patEnabled(session)) renderer.show(targetJavaId,false);
+        if(!closed && !session.isClosed() && owner.settings().enabled() && owner.patEnabled(session)) renderer.show(targetJavaId);
     }
     void toggle(String[] args) {
         boolean next;

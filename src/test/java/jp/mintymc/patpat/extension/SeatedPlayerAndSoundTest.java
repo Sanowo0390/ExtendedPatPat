@@ -40,8 +40,12 @@ class SeatedPlayerAndSoundTest {
         when(target.isValid()).thenReturn(true);
         when(target.position()).thenReturn(Vector3f.from(10,60,20));
         when(target.getBoundingBoxHeight()).thenReturn(1.5f);
-        HandRenderer renderer=new HandRenderer(session,()->Settings.from(new Properties()),()->null);
-        renderer.show(300,false);
+        var sprite=new ImageAnimation(
+            java.util.List.of(new java.awt.image.BufferedImage(8,8,java.awt.image.BufferedImage.TYPE_INT_ARGB)),
+            java.util.List.of(250));
+        when(cache.nextEntityId()).thenReturn(101L);
+        HandRenderer renderer=new HandRenderer(session,()->Settings.from(new Properties()),()->sprite);
+        renderer.show(300);
         ArgumentCaptor<org.cloudburstmc.protocol.bedrock.packet.BedrockPacket> packets=
                 ArgumentCaptor.forClass(org.cloudburstmc.protocol.bedrock.packet.BedrockPacket.class);
         verify(session,atLeastOnce()).sendUpstreamPacket(packets.capture());

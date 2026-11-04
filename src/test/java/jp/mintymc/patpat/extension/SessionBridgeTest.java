@@ -33,6 +33,11 @@ class SessionBridgeTest {
         session=mock(GeyserSession.class);network=mock(ClientSession.class);cache=mock(EntityCache.class);
         when(owner.patEnabled(session)).thenReturn(true);
         when(owner.cameraSupported()).thenReturn(true);
+        var sprite=new ImageAnimation(
+            java.util.List.of(new java.awt.image.BufferedImage(8,8,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB)),
+            java.util.List.of(250));
+        when(owner.animation()).thenReturn(sprite);
         var downstream=mock(DownstreamSession.class);
         when(session.getDownstream()).thenReturn(downstream);when(downstream.getSession()).thenReturn(network);
         when(downstream.isState(ProtocolState.GAME)).thenReturn(true);when(session.getEntityCache()).thenReturn(cache);
@@ -133,7 +138,7 @@ class SessionBridgeTest {
 
     @Test void testCommandDoesNotFallBackToSelfWhenNothingIsAimed() {
         setupAimedTarget();
-        bridge.test(false);
+        bridge.test();
         verify(session,never()).sendUpstreamPacket(any());
         verify(session).sendMessage(contains("照準"));
     }
@@ -142,14 +147,14 @@ class SessionBridgeTest {
         var hovered=cache.getEntityByJavaId(300);
         when(session.getMouseoverEntity()).thenReturn(hovered);
         when(session.getPlayerEntity().getYaw()).thenReturn(90f);
-        bridge.test(false);
+        bridge.test();
         verify(session,never()).sendUpstreamPacket(any());
     }
     @Test void testCommandAcceptsAimedTargetWithoutBackend() {
         setupAimedTarget();
         var hovered=cache.getEntityByJavaId(300);
         when(session.getMouseoverEntity()).thenReturn(hovered);
-        bridge.test(true);
+        bridge.test();
         verify(session,atLeastOnce()).sendUpstreamPacket(any());
         verify(session).sendMessage(contains("表示テスト"));
     }
@@ -187,7 +192,7 @@ class SessionBridgeTest {
         clearInvocations(session);
         var gesture=new PacketSendingEvent(network,interact());bridge.packetSending(gesture);
         assertFalse(gesture.isCancelled(),"Disabled users retain ordinary vanilla interactions");
-        bridge.test(false);
+        bridge.test();
         verify(session,never()).sendUpstreamPacket(any());
         bridge.toggle(new String[]{"on"});
         assertTrue(enabled.get());

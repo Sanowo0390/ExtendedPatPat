@@ -48,7 +48,7 @@ URLを用意しない場合はプレイヤーによる手動導入、または�
 | `/extendedpatpat skin list` / `/extendedpatpat skin default` | 利用できる手画像の確認／選択 |
 | `/extendedpatpat reload` | 設定再読み込み（管理者） |
 
-統合版：`/extendedpatpatgeyser status`、`test`、`pat`、`toggle`、`stats`、`reload`。詳細は[Geyser拡張の設定](src/main/resources/config.properties)を参照してください。
+統合版：`/extendedpatpatgeyser status`、`test`、`pat`、`toggle`、`reload`。詳細は[Geyser拡張の設定](src/main/resources/config.properties)を参照してください。
 
 ## 更新時の注意
 
@@ -63,3 +63,7 @@ Geyserの内部APIに依存するため、更新後は互換性の確認を推�
 本リポジトリの独自コードは [MIT License](LICENSE) 表記ですが、**元のPatPatに由来する手画像・効果音はMITとして再ライセンスされません**。上流と一致する音声や、上流の手画像に由来する素材を含みます。配布条件・素材の来歴については [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) と [LGPL-3.0](LICENSES/LGPL-3.0.txt) を参照してください。第三者素材の再配布には各作者の権利・ライセンスを確認してください。
 
 不具合・要望：[GitHub Issues](https://github.com/Sanowo0390/ExtendedPatPat/issues)。
+
+### シンプル化（互換性なし）
+
+Geyserの旧Glyph／文字表示モード、`test text`、Pat回数統計、古いConfig移行機能は削除しました。統合版はPNG／GIF画像の手に一本化し、停止中のエンティティに毎フレーム移動パケットを送らないよう最適化しています。旧ファイルは移行されません。

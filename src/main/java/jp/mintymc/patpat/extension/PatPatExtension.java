@@ -54,20 +54,18 @@ public final class PatPatExtension implements Extension {
         try {
             Files.createDirectories(dataFolder());
             preferences=new PatPreferences(dataFolder().resolve("disabled-players.txt"));
-            copyDefault("config.properties"); copyDefault("PatPatBedrock.mcpack");
+            copyDefault("config.properties");
             settings=Settings.load(dataFolder().resolve("config.properties"));
-            if(!Set.of("image","glyph").contains(settings.renderer()))throw new IOException("renderer must be image or glyph");
             copyDefaultImage();
             Path sounds=dataFolder().resolve("sounds");Files.createDirectories(sounds);
             for(String name:List.of("pat","pat1","pat2"))if(!Files.exists(sounds.resolve(name+".ogg")))try(InputStream in=getClass().getResourceAsStream("/"+name+".ogg")){if(in!=null)Files.copy(in,sounds.resolve(name+".ogg"));}
-            if(settings.renderer().equals("image")) {
-                Path folder=dataFolder().toAbsolutePath().normalize();
-                Path source=folder.resolve(settings.imageFile()).normalize();
-                if(!source.startsWith(folder))throw new IOException("image-file must be inside the extension folder");
-                animation=ImageAnimation.load(source,settings.spriteColumns(),settings.spriteFrameMs());
-                generatedPack=ImagePack.build(folder.resolve("generated"),animation,folder.resolve("sounds"),settings);
-                logger().info("Image ready: "+settings.imageFile()+", "+animation.frames().size()+" frames, "+animation.duration()+" ms. Generated pack: "+generatedPack.getFileName());
-            }
+            Path folder=dataFolder().toAbsolutePath().normalize();
+            Path source=folder.resolve(settings.imageFile()).normalize();
+            if(!source.startsWith(folder))throw new IOException("image-file must be inside the extension folder");
+            animation=ImageAnimation.load(source,settings.spriteColumns(),settings.spriteFrameMs());
+            generatedPack=ImagePack.build(folder.resolve("generated"),animation,folder.resolve("sounds"),settings);
+            logger().info("Image ready: "+settings.imageFile()+", "+animation.frames().size()+" frames, "+
+                animation.duration()+" ms. Generated pack: "+generatedPack.getFileName());
         } catch(IOException e) { Properties disabled=new Properties();disabled.setProperty("enabled","false");settings=Settings.from(disabled);animation=null;generatedPack=null;logger().error("Unable to load configuration/image; bridge disabled",e); }
     }
     private void copyDefaultImage() throws IOException {
@@ -91,11 +89,10 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void packs(GeyserDefineResourcePacksEvent event) {
         if(!settings.autoPack()) return;
         try {
-            if(settings.renderer().equals("image") && generatedPack==null)return;
-            Path path=settings.renderer().equals("image")?generatedPack:dataFolder().resolve("PatPatBedrock.mcpack");
-            ResourcePack pack=ResourcePack.create(PackCodec.path(path));
+            if(generatedPack==null)return;
+            ResourcePack pack=ResourcePack.create(PackCodec.path(generatedPack));
             if(event.resourcePacks().stream().noneMatch(p->p.uuid().equals(pack.uuid()))) event.register(pack);
-        } catch(Exception e) {logger().error("Unable to register hand pack; text test remains available",e);}
+        } catch(Exception e) {logger().error("Unable to register custom hand resource pack",e);}
     }
     @Subscribe public void permissions(GeyserRegisterPermissionsEvent event) {
         event.register("extendedpatpatgeyser.admin",TriState.NOT_SET);
@@ -250,25 +247,24 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("ExtendedPatPat Geyser 0.13.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("ExtendedPatPat Geyser 0.13.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
             else source.sendMessage("ExtendedPatPat Geyser 0.13.0 / compatible="+compatible+" / sessions="+sessions.size());
         });
-        register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
+        register(event,"test",true,(source,args)->withSession(source,PatSession::test));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
         // Always allow users to disable effects even without the optional use permission.
         register(event,"toggle",true,(source,args)->withSession(source,s->s.toggle(args),false));
-        event.register(Command.builder(this).name("reload").source(CommandSource.class).description("Reload PatPat extension config")
+        event.register(Command.builder(this).name("reload").source(CommandSource.class).description("Reload ExtendedPatPat Geyser config")
                 .permission("extendedpatpatgeyser.admin",TriState.NOT_SET).executor((source,cmd,args)->{
                     try {
                         Settings loaded=Settings.load(dataFolder().resolve("config.properties"));
-                        if(!loaded.renderer().equals(settings.renderer()) || !loaded.imageFile().equals(settings.imageFile())
-                                || (settings.renderer().equals("image") &&
-                                    (loaded.handMotionEnabled()!=settings.handMotionEnabled()
-                                    || loaded.handMotionDepth()!=settings.handMotionDepth()
-                                    || loaded.handMotionDuration()!=settings.handMotionDuration()
-                                    || loaded.scale()!=settings.scale()
-                                    || loaded.spriteColumns()!=settings.spriteColumns()
-                                    || loaded.spriteFrameMs()!=settings.spriteFrameMs())))
+                        if(!loaded.imageFile().equals(settings.imageFile())
+                                || loaded.handMotionEnabled()!=settings.handMotionEnabled()
+                                || loaded.handMotionDepth()!=settings.handMotionDepth()
+                                || loaded.handMotionDuration()!=settings.handMotionDuration()
+                                || loaded.scale()!=settings.scale()
+                                || loaded.spriteColumns()!=settings.spriteColumns()
+                                || loaded.spriteFrameMs()!=settings.spriteFrameMs())
                             throw new IOException("画像/モーションの変更はリソースパック再生成のためProxy再起動が必要です。");
                         settings=loaded;sessions.values().forEach(s->s.session().executeInEventLoop(s::beginHandshake));
                         source.sendMessage("位置・表示時間・standalone-modeを再読み込みしました。画像、画像サイズ、手の上下動設定の変更にはProxy再起動が必要です。");
@@ -277,7 +273,7 @@ public final class PatPatExtension implements Extension {
                 }).build());
     }
     private void register(GeyserDefineCommandsEvent event,String name,boolean player,CommandAction action) {
-        event.register(Command.builder(this).name(name).source(CommandSource.class).description("PatPat Bedrock "+name)
+        event.register(Command.builder(this).name(name).source(CommandSource.class).description("ExtendedPatPat Geyser "+"+name)
                 // Velocity cannot apply Geyser's permission defaults. Keep public commands
                 // visible; check an explicitly configured node at execution time instead.
                 .permission("",TriState.TRUE).bedrockOnly(player).playerOnly(player)
