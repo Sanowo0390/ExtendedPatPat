@@ -40,6 +40,12 @@ class PlayPacketGateTest {
             "Give NPC server transfer handlers an opportunity to begin before spawning maps");
         assertTrue(source.contains("if(event.getConnectionState()!=ConnectionState.PLAY)return;"),
             "No PacketEvents callbacks in configuration should rebuild a play-only view");
+        assertTrue(source.contains("PatRelayPolicy.sameOrigin"),
+            "Deferred Pats must retain their source backend lease");
+        assertTrue(source.contains("PatPatProtocol.notification(targetIdInView,sourceId)"),
+            "Modded Java viewers must receive native v2 notifications");
+        assertTrue(source.contains("handleNativeRequest(view,uuid,message.getData())"),
+            "Native PatPat C2S requests should be validated in proxy-only mode");
         assertTrue(source.contains("sendPlay(view,new WrapperPlayServerDestroyEntities"),
             "Even cleanup packets must be suppressed in CONFIGURATION");
         assertTrue(source.contains("event.getConnectionState()!=ConnectionState.PLAY"),

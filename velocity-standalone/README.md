@@ -4,7 +4,7 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.7.0.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.7.1.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
@@ -40,6 +40,15 @@ Velocity版の `plugins/extendedpatpatvelocity/config.properties` で `hand-rend
 生成データは `plugins/extendedpatpatvelocity/head-tiles/` に保存され、次回起動後も再利用します。カスタムスキンも `/extendedpatpat tiles generate <skin-id>` で生成できます。透明なタイルは署名生成をスキップし、同じタイルはSHA-256で重複排除します。
 
 古いJavaクライアント、キャッシュ未生成、または生成失敗のときは**従来のitem_frame方式に自動フォールバック**します。 `text_display` も引き続き選択できます。Minecraft 1.21.9以降を含むサーバーバージョン間のViaVersion変換・実機の透過は要検証です。
+
+## Geyser ⇔ Java版のPat同期（0.7.1）
+
+- **統合版→Java版:** Geyserの操作を同じバックエンドにいるJavaプレイヤーへ転送します。JavaプレイヤーにPatPat Modがある場合はネイティブのPatPat v2通知を送信し、リソースパック不要のマップ表示と重複させません。Modがない場合は従来の `hand-renderer` を使います。
+- **Java版→統合版:** Javaプレイヤーの操作を検証してからGeyserへ送信します。NPCによるサーバー移動などで元の接続や対象エンティティが変わった場合は、遅延通知を破棄します。Geyser側でも撫でたJavaプレイヤーと対象が同じ受信者のワールドに存在し、近いことを確認します。
+- **Java版PatPat Modからの操作:** `official-integration-enabled=false` のproxy-standalone運用では、PatPat v2クライアント要求を受け取り、Java版・統合版へ配信します。権限・距離・対象・クールダウンを再検証します。公式Paperプラグイン連携を有効にしている場合は、その承認結果を優先します。
+- **個人設定:** 統合版のON/OFFはGeyser側で管理し、Velocityが読み取ります。接続直後にBedrockのUUIDが未確定でも、初回確定時に登録を更新します。
+
+**必要な構成:** Velocity **0.7.1** とGeyser拡張 **0.13.2**。基本は `bridge-enabled=true`、`official-integration-enabled=false`、Geyserの `standalone-mode=true`。公式PatPat Pluginとの二重配信は避けてください。通信の自動テストはありますが、Minecraft実機での全組み合わせの動作は未検証です。
 
 ## マップ表示
 
