@@ -33,4 +33,16 @@ class MapFramesTest {
             }
         }
     }
+
+    @Test void geyserImageScaleHalfProducesSmallerMapHand() {
+        SkinCatalog catalog=SkinCatalog.load();
+        var style=catalog.get("default");
+        var normal=new MapFrames(catalog,1.0).frame(style,0,0);
+        var half=new MapFrames(catalog,0.5).frame(style,0,0);
+        long large=0,small=0;
+        for(byte b:normal)if(b!=0)large++;
+        for(byte b:half)if(b!=0)small++;
+        assertTrue(small<large,"image-scale=0.5 should be smaller than 1.0");
+        assertTrue(small>0,"Scaled map should not become transparent");
+    }
 }
