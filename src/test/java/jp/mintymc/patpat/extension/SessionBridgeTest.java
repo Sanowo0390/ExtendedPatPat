@@ -201,6 +201,19 @@ class SessionBridgeTest {
         assertTrue(active.isCancelled(),"Re-enabled users can Pat again");
         verify(session,atLeastOnce()).sendUpstreamPacket(any());
     }
+    @Test void bareToggleWithEmptyGeyserArgumentFlipsThePreference() throws Exception {
+        when(owner.patEnabled(session)).thenReturn(true);
+        bridge.toggle(new String[]{""});
+        verify(owner).setPatEnabled(session,false);
+        verify(session).sendMessage(contains("OFF"));
+    }
+    @Test void explicitOffAndOnAreAppliedWithoutFlippingUnexpectedly() throws Exception {
+        bridge.toggle(new String[]{"off"});
+        bridge.toggle(new String[]{"on"});
+        var order=inOrder(owner);
+        order.verify(owner).setPatEnabled(session,false);
+        order.verify(owner).setPatEnabled(session,true);
+    }
     @Test void invalidToggleArgumentsDoNotChangePreference() throws Exception {
         bridge.toggle(new String[]{"perhaps"});
         verify(owner,never()).setPatEnabled(any(),anyBoolean());
