@@ -417,12 +417,14 @@ public final class PatPatVelocity {
                         if(!sent)log.debug("Cannot send PatPat v2 request to backend {}",view.backend);
                         if(sent && enabled("official-local-preview",false))
                             proxy.getScheduler().buildTask(PatPatVelocity.this,
-                                ()->renderToJavaViewer(actor,view,targetUuid)).schedule();
+                                ()->renderToJavaViewer(actor,view,targetUuid,uuid)).schedule();
                         return;
                     }
                     proxy.getScheduler().buildTask(PatPatVelocity.this,()->{
+                        if(!personalEnabled(uuid))return;
                         renderToJava(uuid,targetUuid);
-                        if(enabled("bridge-enabled",true))sendToBedrock(uuid,targetUuid);
+                        if(enabled("bridge-enabled",true) && personalEnabled(uuid))
+                            sendToBedrock(uuid,targetUuid);
                     }).schedule();
                 }
             } catch(Exception ex) {log.debug("Ignored malformed interaction",ex);}
@@ -456,7 +458,7 @@ public final class PatPatVelocity {
             if(targetUuid==null)return;
             proxy.getPlayer(viewerId).ifPresent(player->
                 proxy.getScheduler().buildTask(PatPatVelocity.this,()->
-                    renderToJavaViewer(player,view,targetUuid)).schedule());
+                    renderToJavaViewer(player,view,targetUuid,null)).schedule());
         }catch(IllegalArgumentException badPacket) {
             log.debug("Malformed PatPat v2 notification from backend {}",view.backend);
         }
@@ -503,26 +505,31 @@ public final class PatPatVelocity {
     private void receiveBedrockPat(Object[] payload) {
         if(payload==null || payload.length!=2 || !(payload[0] instanceof UUID actor)
                 || !(payload[1] instanceof UUID target))return;
-        if(!enabled("enabled",true) || !enabled("bridge-enabled",true))return;
-        proxy.getScheduler().buildTask(this,()->renderToJava(actor,target)).schedule();
+        if(!enabled("enabled",true) || !enabled("bridge-enabled",true)
+                || !personalEnabled(actor))return;
+        proxy.getScheduler().buildTask(this,()->{
+            if(personalEnabled(actor))renderToJava(actor,target);
+        }).schedule();
     }
 
     private void renderToJava(UUID actorId,UUID targetId) {
+        if(!personalEnabled(actorId))return;
         Player actor=proxy.getPlayer(actorId).orElse(null);
         if(actor==null)return;
         String server=serverOf(actor);
         if(server==null)return;
         for(Player player:proxy.getAllPlayers()) {
-            if(isBedrock(player.getUniqueId()) || disabled.contains(player.getUniqueId())
+            if(isBedrock(player.getUniqueId()) || !personalEnabled(player.getUniqueId())
                     || !server.equals(serverOf(player)))continue;
             View view=views.get(player.getUniqueId());
-            renderToJavaViewer(player,view,targetId);
+            renderToJavaViewer(player,view,targetId,actorId);
         }
     }
-    private void renderToJavaViewer(Player player,View view,UUID targetId) {
+    private void renderToJavaViewer(Player player,View view,UUID targetId,UUID actorId) {
         if(view==null || views.get(player.getUniqueId())!=view || view.user==null ||
             !player.isActive() || isBedrock(player.getUniqueId()) ||
-            disabled.contains(player.getUniqueId()) || view.realMod ||
+            !personalEnabled(player.getUniqueId()) ||
+            (actorId!=null && !personalEnabled(actorId)) || view.realMod ||
             !enabled("hand-enabled",true))return;
         // Item frames and maps are supported by old Java clients and ViaVersion.
         if(player.getProtocolVersion().getProtocol()<393)return;
@@ -530,7 +537,7 @@ public final class PatPatVelocity {
         Vector3d pos=target==null && targetId.equals(player.getUniqueId()) ? view.self
             : target==null?null:target.pos;
         if(pos==null || (view.self!=null && squared(view.self,pos)>256))return;
-        startHand(view,player,targetId);
+        startHand(view,player,targetId,actorId);
         if(enabled("sound-enabled",true)) {
             try {
                 String key=text("sound-event","minecraft:block.wool.place");
@@ -580,7 +587,7 @@ public final class PatPatVelocity {
                 new WrapperPlayServerUpdateAttributes.Property(Attributes.SCALE,1.0,List.of()))));
         } catch(Exception ex) {log.debug("Could not restore viewer-only squash",ex);}
     }
-    private void startHand(View view,Player player,UUID targetId) {
+    private void startHand(View view,Player player,UUID targetId,UUID actorId) {
         if(active.incrementAndGet()>(int)number("max-active",24,1,128)){
             active.decrementAndGet();return;
         }
@@ -630,8 +637,11 @@ public final class PatPatVelocity {
             private boolean finished;
             @Override public void run() {
                 try {
-                    if(tick++>=duration || views.get(player.getUniqueId())!=view
-                            || !player.isActive()){finish();return;}
+                    if(tick++>=duration || views.get(player.getUniqueId())!=view ||
+                            !player.isActive() || !personalEnabled(player.getUniqueId()) ||
+                            (actorId!=null && !personalEnabled(actorId))){
+                        finish();return;
+                    }
                     double t=(double)tick/duration;
                     double eased=1-(1-t)*(1-t);
                     double down=depth*Math.sin(Math.PI*eased);
