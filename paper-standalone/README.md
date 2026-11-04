@@ -1,22 +1,22 @@
-# PatPatVanilla — Paper/Purpur 26.3
+# ExtendedPatPat Paper — Paper/Purpur 26.3
 
 Independent **server-only** implementation for unmodified Java Edition clients. The existing Geyser extension remains a separate build.
 
-Install the JAR from the **Build PatPatVanilla Paper** GitHub Actions artifact into your backend server's plugins folder (not Velocity/Geyser). Restart. Sneak and right-click a mob or player with an empty main hand. No client Mod. The new animated image mode requires PatPatJava-26.3.zip; fallback voxel mode needs no pack.
+Install the JAR from the **Build ExtendedPatPat Paper Paper** GitHub Actions artifact into your backend server's plugins folder (not Velocity/Geyser). Restart. Sneak and right-click a mob or player with an empty main hand. No client Mod. The new animated image mode requires PatPatJava-26.3.zip; fallback voxel mode needs no pack.
 
 - Animated voxel hand built with 6 vanilla BlockDisplay entities; follows the target and moves smoothly down/up
 - Optional arm swing and hearts, randomized vanilla sounds, cooldown and per-user toggle
-- Configure in plugins/PatPatVanilla/config.yml; use /ppv reload (permission patpatvanilla.admin)
+- Configure in plugins/ExtendedPatPatPaper/config.yml; use /ppv reload (permission patpatvanilla.admin)
 - /ppv toggle [on|off]; permission patpatvanilla.use defaults to everyone
 
-**Limitations:** this is **not pixel-identical** to PatPat's client 2D PNG/GIF renderer. Client-side keybindings, shaders/mixins, and exact player/mob squish/camera transforms cannot be recreated by a pure vanilla server plugin. This variant does not import the original PatPat's source or assets. Not tested with Folia. Bedrock visuals are managed independently by PatPatGeyserExtension; test carefully if both addons handle Bedrock interactions, to avoid duplicated effects.
+**Limitations:** this is **not pixel-identical** to PatPat's client 2D PNG/GIF renderer. Client-side keybindings, shaders/mixins, and exact player/mob squish/camera transforms cannot be recreated by a pure vanilla server plugin. This project includes original PatPat-derived hand and sound assets under the upstream LGPL-3.0; see the repository's THIRD_PARTY_NOTICES.md. Not tested with Folia. Bedrock visuals are managed independently by ExtendedPatPat Geyser; test carefully if both addons handle Bedrock interactions, to avoid duplicated effects.
 
-Requires Java 25 and Paper or Purpur 26.3. To build: `mvn -B -ntp -f paper-standalone/pom.xml package`. Output: target/PatpatPaper-0.4.0.jar.
+Requires Java 25 and Paper or Purpur 26.3. To build: `mvn -B -ntp -f paper-standalone/pom.xml package`. Output: target/ExtendedPatPat-Paper-0.5.0.jar.
 
 
 ## Animated Java hand (v0.2.0)
 
-The Paper plugin now uses one `ItemDisplay` with the five image frames from the shared [PatPat Java pack](../resourcepack/README.md). Download `PatPatJava-26.3.zip` from the resource-pack GitHub Actions workflow. Install it on each client or configure Paper's `server.properties` resource pack URL and SHA-1 to distribute it. The server cycles the five `patpat:hand_*` item models using `ItemMeta.setItemModel`.
+The Paper plugin now uses one `ItemDisplay` with the five image frames from the shared [PatPat Java pack](../resourcepack/README.md). The matching `PatPatJava-26.3.zip` is already embedded in the ExtendedPatPat Paper JAR and extracted at startup; it is not a separate Actions artifact. Install it on each client or configure Paper's `server.properties` resource pack URL and SHA-1 to distribute it. The server cycles the five `patpat:hand_*` item models using `ItemMeta.setItemModel`.
 
 ```yaml
 animation:
@@ -40,12 +40,16 @@ with their selected frame sequence and optional sound. That is heavier than
 one shared display, so check \`animation.max-active\` and \`view-range\`.
 
 
-## 内包型リソースパック・別スタックで配布（v0.4.0）
+## 内包型リソースパック・別スタックで配布（v0.5.0）
 
-**PatpatPaper.jar** は標準Java手のZIPを内包します。起動時に `plugins/PatpatPaper/PatPatJava-26.3.zip` へ自動書き出しされます。これをHTTP(S)でホストした公開URLを `pack.url` に設定すると、Paperの `Player.addResourcePack(UUID,...)` によって、通常のserver.propertiesのリソースパックに**追加**として提示されます。単独のパック配布プラグインは不要です。
+**ExtendedPatPat-Paper.jar** は標準Java手のZIPを内包します。起動時に `plugins/ExtendedPatPatPaper/PatPatJava-26.3.zip` へ自動書き出しされます。これをHTTP(S)でホストした公開URLを `pack.url` に設定すると、Paperの `Player.addResourcePack(UUID,...)` によって、通常のserver.propertiesのリソースパックに**追加**として提示されます。単独のパック配布プラグインは不要です。
 
 内蔵Web配信を使う場合は `pack.http-enabled=true` にしてポートを設定し、Nginx Proxy Manager等で公開したURLを `pack.url` に入力します。外部アクセス可能な公開URLの設定は必要です。
 
 ViaVersionが**Paper自身に導入されている場合**、そのAPIで実際のクライアントバージョンを読み取り、1.21.4以上にPNGモデル、1.19.4～1.21.3にVoxelを個別表示します。それ以前のクライアントにはDisplayを送信しません。ViaがVelocityにしか導入されていない場合、Paper側で元のバージョンを判別できない可能性があります。混合クライアント環境ではVelocity版を推奨します。
 
 以前のBonkなど追加スキンは含まれず、デフォルト素材だけが内包されます。
+
+## Rebranding & migration
+
+The release artifact is now `ExtendedPatPat-Paper-0.5.0.jar` and the Bukkit plugin display name is `ExtendedPatPatPaper`. The previous `plugins/PatpatPaper/config.yml` is copied on first startup if the new config does not exist. The legacy `/ppv` and `/patpatvanilla` command and permission nodes remain functional; `/extendedpatpat` and `/epp` are added as aliases. The old JAR must be removed before installing the renamed file.

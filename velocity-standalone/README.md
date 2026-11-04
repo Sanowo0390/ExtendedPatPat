@@ -1,4 +1,4 @@
-# PatPatVelocity — Velocity + PacketEvents + Geyser
+# ExtendedPatPat Velocity — Velocity + PacketEvents + Geyser
 
 **Preferred deployment: no Paper/Purpur PatPat Plugin is needed.**
 
@@ -6,8 +6,8 @@ This repository provides two pieces that run in the same Velocity JVM:
 
 | Component | Install directory | Responsibility |
 |---|---|---|
-| PatPatVelocity 0.4.0 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
-| PatPatGeyserExtension 0.12.0 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
+| ExtendedPatPat Velocity 0.5.0 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
+| ExtendedPatPat Geyser 0.12.0 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
 
 Requirements: Velocity 3.5, **PacketEvents 2.14.0 for Velocity**, and **Geyser-Velocity 2.12.1系** (required Geyser internals are checked at startup). The normal Geyser-Velocity plugin is also in \`Velocity/plugins/\`.
 
@@ -24,14 +24,14 @@ No official PatPat Plugin and no server-side Paper plugin are necessary.
 ## Install
 
 1. Install **PacketEvents 2.14.0 Velocity** and **Geyser-Velocity 2.12.1系** in \`Velocity/plugins/\` as normal Velocity plugins.
-2. Put the **PatPatVelocity-0.4.0.jar** from the **Build PatPatVelocity** GitHub Action in \`Velocity/plugins/\`.
-3. Put **PatPatGeyserExtension-0.12.0.jar** from the **Build Extension** GitHub Action in \`Velocity/plugins/Geyser-Velocity/extensions/\`. **Remove older copies** of this extension first.
+2. Put **ExtendedPatPat-Velocity-0.5.0.jar** from the unified **Build ExtendedPatPat** GitHub Actions run in \`Velocity/plugins/\`.
+3. Put **ExtendedPatPat-Geyser-0.13.0.jar** from the same unified GitHub Actions run in \`Velocity/plugins/Geyser-Velocity/extensions/\`. **Remove older copies** of this extension first.
 4. Restart Velocity. Run \`/ppv status\`; the default mode is **standalone**, and Geyser bridge should be \`true\`.
 5. Java: sneak + right-click a mob or another player; Bedrock: use the configured Geyser gesture. Other people on the same backend should see it.
 
 **If you already ran an earlier version, manually edit \`plugins/patpatvelocity/config.properties\`**. Existing configs are preserved; ensure \`official-integration-enabled=false\`, \`standalone-fallback=true\`, and \`bridge-enabled=true\`. In the Geyser extension's config, keep \`standalone-mode=true\`.
 
-The separate Paper \`PatPatVanilla\` prototype must **not** be installed together with this plugin because it can produce duplicate Java visuals.
+The separate Paper \`ExtendedPatPat Paper\` prototype must **not** be installed together with this plugin because it can produce duplicate Java visuals.
 
 ## Optional upstream PatPat Plugin mode
 
@@ -69,7 +69,7 @@ Geyser builds are verified by SHA-256 from its official download API, and the ex
 
 ## Java sprite pack & client-only squish (v0.2.0)
 
-Build/download **PatPatJava-26.3.zip** from the [resourcepack workflow](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-java-pack.yml), and install it into each Java client's resourcepacks or host it on HTTPS. This repo's source image contains five frames; the server advances `patpat:hand_0` through `patpat:hand_4` in one virtual ItemDisplay, using the per-frame `minecraft:item_model` data component. These are **client-only fake entities**; no world mutation.
+Use the **PatPatJava-26.3.zip embedded in the JAR** (extracted at startup; not a separate Actions artifact), built by the [unified workflow](https://github.com/Sanowo0390/ExtendedPatPat/actions/workflows/build-all.yml), and install it into each Java client's resourcepacks or host it on HTTPS. This repo's source image contains five frames; the server advances `patpat:hand_0` through `patpat:hand_4` in one virtual ItemDisplay, using the per-frame `minecraft:item_model` data component. These are **client-only fake entities**; no world mutation.
 
 New Velocity settings:
 
@@ -107,9 +107,9 @@ and optional sound. Importing \`Bonk Bonk Animation.zip\` as
 installed/accepted by Java clients; commands do not transmit textures.
 
 
-## 内包型パック配布・ViaVersion（v0.4.0）
+## 内包型パック配布・ViaVersion（v0.5.0）
 
-**PatPatVelocity.jarに標準用の `PatPatJava-26.3.zip` が入っています。** 起動すると `plugins/patpatvelocity/PatPatJava-26.3.zip` に取り出します。通常のサーバーパックを置き換える必要はありません。
+**ExtendedPatPat-Velocity.jarに標準用の `PatPatJava-26.3.zip` が入っています。** 起動すると `plugins/patpatvelocity/PatPatJava-26.3.zip` に取り出します。通常のサーバーパックを置き換える必要はありません。
 
 自動適用（任意）にはこのZIPがクライアントからHTTP(S)で取得できるURLが必要です。2つの方法があります。
 
@@ -123,3 +123,7 @@ ZIPをJARから取り出す作業は自動ですが、**公開URLやポートの
 Velocityは `Player.getProtocolVersion()` とPacketEventsのクライアントバージョンを見てViaを含む接続を識別します。Java 1.21.4以上では画像方式、1.19.4～1.21.3はVoxel、それ以前はDisplayパケットを送信しません。実際のVia経由変換は接続元バージョンごとに実機検証が必要です。
 
 例として以前示したBonkパックは同梱せず、標準画像のみを配布します。`/ppv skin list` には配布した画像のみ表示されます。
+
+## Release names and preserved identifiers
+
+The distributed JAR is `ExtendedPatPat-Velocity-0.5.0.jar`. The Velocity plugin's **display name** is `ExtendedPatPatVelocity` but its **ID** remains `patpatvelocity`; this avoids losing `plugins/patpatvelocity/` settings, player choices, and bridge compatibility. Existing `/ppv` and `/patpatvelocity` commands work; aliases `/extendedpatpat` and `/epp` are also available. Remove older PatPatVelocity JARs to avoid duplicate plugin IDs.

@@ -1,10 +1,10 @@
-# PatPat Crossplay Suite — 非公式のJava版・統合版向け撫でる演出
+# ExtendedPatPat — 非公式のJava版・統合版向け撫でる演出
 
 > **このプロジェクトはLopyMine氏による公式「PatPat Mod」「PatPat Plugin」ではありません。公式開発者の承認・提携・サポートを受けたものではなく、独立して開発している関連機能の実装です。**
 >
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 >
-> 開発・配布：本リポジトリのコントリビューター。問い合わせ：[本リポジトリのIssues](https://github.com/Sanowo0390/PatPatGeyserExtension/issues)。
+> 開発・配布：本リポジトリのコントリビューター。問い合わせ：[本リポジトリのIssues](https://github.com/Sanowo0390/ExtendedPatPat/issues)。
 
 ## オリジナルのPatPatについて（重要）
 
@@ -12,7 +12,7 @@
 
 | 元のプロジェクト | 原作者・リンク | 主な役割 | ライセンス |
 |---|---|---|---|
-| **PatPat Mod** | LopyMine / [GitHub](https://github.com/LopyMine/PatPat) / [Modrinth](https://modrinth.com/plugin/patpat) | クライアントでの撫でる操作・画像アニメーション、Mod同士での共有など | **LGPL-3.0** |
+| **PatPat Mod** | LopyMine / [GitHub](https://github.com/LopyMine/PatPat) / [Modrinth](https://modrinth.com/mod/patpat) | クライアントでの撫でる操作・画像アニメーション、Mod同士での共有など | **LGPL-3.0** |
 | **PatPat Plugin** | LopyMine / [GitHub](https://github.com/LopyMine/PatPat-Plugin) | Bukkit/Spigot/Paper向けにPatPat Modのパケット共有を支援 | **LGPL-3.0** |
 
 オリジナルの **PatPat Plugin単体は、元のREADMEによるとPatPatクライアントModが必要**です。一方このリポジトリのVelocity版・Paper版は、ModのないJava版クライアントに表示用パケットを送る独立実装です。**元のMod／Pluginを必須としないのは設計の違いであり、公式版・後継版・正規移植版を名乗るものではありません。** オリジナルのPatPat Modを利用したい人は、上記の公式配布先も確認してください。
@@ -28,21 +28,21 @@
 
 ## 提供する3つのプラグイン
 
-開発・ビルドの正規ブランチは [`main`](https://github.com/Sanowo0390/PatPatGeyserExtension/tree/main) です。
+開発・ビルドの正規ブランチは [`main`](https://github.com/Sanowo0390/ExtendedPatPat/tree/main) です。
 
 | GitHub Actionsの配布名 | バージョン | 導入先 | 機能 |
 |---|---|---|---|
-| **PatPatVelocity** | 0.4.0 | Velocityの `plugins/` | ModなしJava版の操作検出・画像の手・Geyserとの共有 |
-| **PatPatGeyserExtension** | 0.12.0 | Geyser-Velocityの `extensions/` | 統合版のPNG/GIF手・音・Squish |
-| **PatpatPaper** | 0.4.0 | Paper/Purpurの `plugins/` | ModなしJava版への描画・独立動作 |
+| **ExtendedPatPat Velocity** | 0.5.0 | Velocityの `plugins/` | ModなしJava版の操作検出・画像の手・Geyserとの共有 |
+| **ExtendedPatPat Geyser** | 0.13.0 | Geyser-Velocityの `extensions/` | 統合版のPNG/GIF手・音・Squish |
+| **ExtendedPatPat Paper** | 0.5.0 | Paper/Purpurの `plugins/` | ModなしJava版への描画・独立動作 |
 
-**[3種類を同時ビルドするGitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-all.yml)**
+**[3種類を同時ビルドするGitHub Actions](https://github.com/Sanowo0390/ExtendedPatPat/actions/workflows/build-all.yml)**
 
-通常のVelocity構成は **PatPatVelocity＋PacketEvents（Velocity用）＋Geyser-Velocity＋PatPatGeyserExtension** です。Paper/PurpurのバックエンドにPatPat Pluginを導入しなくても動きます。**Paper単体版を同じネットワークに重複導入すると二重演出になるため、Velocity版と併用しないでください。** Java版・統合版との橋渡しはPaper単体版にはありません。
+Velocity構成は **ExtendedPatPat Velocity＋PacketEvents（Velocity用）＋Geyser-Velocity＋ExtendedPatPat Geyser** です。Paper/PurpurのバックエンドにPatPat Pluginを導入しなくても動きます。**Paper単体版を同じネットワークに重複導入すると二重演出になるため、Velocity版と併用しないでください。** Java版・統合版との橋渡しはPaper単体版にはありません。
 
 Actionsの配布物は上記の**3種類だけ**です。`Complete`、Java版パック単体Artifact、Bonkサンプルを含みません。デフォルトJava画像パックはVelocity版とPaper版のJARに内包され、Geyser側の統合版素材は拡張に内包されています。
 
-## Java版リソースパック：URL不要で送信できる？
+## Java版の追加リソースパック・互換性
 
 **Vanilla Java版クライアントに新規テクスチャをネットワーク経由で配布する場合、原理的にパックのダウンロード先URLが必要です。** JAR内包だけではクライアントへ転送されません。Minecraft 1.20.3以降は複数のサーバーリソースパックを別々に積み重ねられるため、PatPat専用のパックを通常のサーバーパックに追加することはできます。
 
@@ -90,7 +90,7 @@ Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**�
 
 ## 導入
 
-1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-all.yml) の成功したビルドから `PatPatGeyserExtension-0.12.0.jar` を取得します。
+1. [GitHub Actions](https://github.com/Sanowo0390/ExtendedPatPat/actions/workflows/build-all.yml) の成功したビルドから `ExtendedPatPat-Geyser-0.13.0.jar` を取得します。
 2. JARをVelocityの `plugins/Geyser-Velocity/extensions/` に配置し、古い同拡張のJARを取り除きます。
 3. Velocityを再起動すると `extensions/patpatbedrock/` に設定・画像・音声ファイルとリソースパックが生成されます。
 4. 統合版プレイヤーで再接続し、配布されるリソースパックを適用します。必要に応じてGeyser側の `force-resource-packs: true` を使用してください。
@@ -262,7 +262,7 @@ PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240ms
 ## 動作モードと制限
 
 - **バックエンドPatPatあり**：本体とのV2通信を利用。PatPat本体の権限・制限に従い、Java版Modからの演出も統合版に届きます。
-- **バックエンドPatPatなし**：Geyserが統合版への演出を直接表示します。PatPatVelocityを併用すると、同じVelocityインスタンスのJava版へも演出を中継できます。PatPatVelocityを導入していない場合は、Java版への中継はありません。
+- **バックエンドPatPatなし**：Geyserが統合版への演出を直接表示します。ExtendedPatPat Velocityを併用すると、同じVelocityインスタンスのJava版へも演出を中継できます。ExtendedPatPat Velocityを導入していない場合は、Java版への中継はありません。
 - `/patpatbedrock test` は照準先の対象が見つからないと表示しません。自分の頭上に自動表示する仕様ではありません。
 - 本機能はGeyserのパケット・エンティティ情報に依存します。端末ごとの操作や他プラグインとの組合せは実際のサーバーで確認してください。
 
@@ -271,7 +271,7 @@ PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240ms
 本プロジェクト独自コード：[MIT License](LICENSE)。上流PatPat Mod/Pluginと元の画像・音声：[LGPL-3.0](LICENSES/LGPL-3.0.txt)、[第三者著作物の通知](THIRD_PARTY_NOTICES.md)。プロジェクト全体を一律MITとは扱いません。
 
 
-## Geyserのビルド更新への対応（v0.12.0）
+## Geyserのビルド更新への対応
 
 Geyserのビルド番号やコミットSHAの固定判定を撤廃しました。起動時には利用中のGeyserに必要なクラス・メソッドが存在するかを確認します。互換性があれば新しいビルドでも有効化します。互換性がなければ不足したAPI名をログに表示して停止します。カメラの内部APIのみ非対応の場合は、カメラ演出を無効化し、他のPat演出を維持します。
 
@@ -282,3 +282,10 @@ GitHub Actionsは **Geyser 2.12.1-b1280と2.12.1系の最新ビルド** を別�
 **注意:** 単体テストの成功は、実際の統合版クライアントで描画・通信できることを保証しません。Geyserの内部APIで戻り値型やパケットの意味が変更された場合、追加対応が必要になる可能性があります。
 
 
+
+## 名前とアップグレードの互換性
+
+以前のリポジトリ名 `PatPatGeyserExtension` から **`ExtendedPatPat`** へ変更しました。GitHub Actionsの3つの成果物とJARの表示名も `ExtendedPatPat-` 接頭辞に統一しています。
+
+旧JARは更新時に必ず削除してください。**Velocityの内部プラグインID `patpatvelocity`、Geyser拡張ID `patpatbedrock`、既存の `/ppv`、`/patpatbedrock` コマンド、権限ノード、内部パケット名は互換性のため変更していません。** Java版では `/extendedpatpat`（`/epp`）も利用できます。
+Paperは表示プラグイン名が `ExtendedPatPatPaper` に変わるためデータフォルダーが `plugins/ExtendedPatPatPaper/` になります。旧 `plugins/PatpatPaper/config.yml` が存在する場合は初回起動時に新しいフォルダーへコピーします。元ファイルは削除しません。

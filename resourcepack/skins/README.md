@@ -22,3 +22,5 @@ assets you have permission to share. GitHub Actions builds every skin added
 here into \`PatPatJava-26.3.zip\`.
 
 **標準リリースでは `PATPAT_DEFAULT_ONLY=1` を指定してこのフォルダーを無視します。例として提供されたBonkは公開JARに含まれません。**
+
+The public project and release artifacts are now called **ExtendedPatPat**. The internal model namespace `patpat:` is retained for compatibility.

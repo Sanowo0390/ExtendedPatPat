@@ -6,7 +6,7 @@
 
 ---
 
-# 0.4.0追加検証
+# ExtendedPatPat リリース検証
 
 添付GIF（5フレーム）と3つのOGGを同梱。生成パックにサウンド定義と3音が含まれることをテストし、既存28テストがすべて成功。実機での再生は未検証です。
 
@@ -74,3 +74,9 @@
 - 画像更新ごとに新しいファイル名とmanifest versionを生成します。パックのJSONキー順を正規化し、同じ素材が起動のたびに別のハッシュになることを避けています。
 
 ビルボード式の一次資料: https://learn.microsoft.com/en-us/minecraft/creator/documents/custom_projectiles?view=minecraft-bedrock-stable （2D雪玉のカメラ正面表示の例）。この回帰テストはパックの式と座標計算を検証し、実機の描画そのものは検証していません。
+
+### Rebranding check
+- [x] Three release artifacts use `ExtendedPatPat-` names.
+- [x] Velocity/Geyser internal IDs and legacy commands remain compatible.
+- [x] Paper migrates an old configuration without deleting it.
+- [ ] Confirm actual Minecraft clients and pack-download flow in-game.

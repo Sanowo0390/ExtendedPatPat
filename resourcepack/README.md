@@ -6,7 +6,7 @@ No textures are copied from the upstream PatPat client Mod.
 
 The Python builder generates \`PatPatJava-26.3.zip\` with item definitions:
 \`patpat:hand_0\` through \`patpat:hand_4\`.
-Both PatPatVelocity (proxy) and PatPatVanilla (Paper/Purpur) use the **same pack**.
+Both ExtendedPatPat Velocity (proxy) and ExtendedPatPat Paper (Paper/Purpur) use the **same pack**.
 
 ### Installation
 
@@ -59,11 +59,12 @@ On Velocity, only the receiving Java client sees their chosen style using
 viewer-local ItemDisplay packets. Paper produces viewer-specific hidden-by-default
 ItemDisplays visible to each chosen player, so selections are independent there too.
 
-**One GitHub Actions run**:
-[Build All PatPat](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-all.yml)
-compiles all three JARs, creates the matching resource pack and publishes
-\`PatPat-Complete\`, a single ZIP containing all four files, plus the
-individual artifacts. Old individual workflows are now manual-only.
+**Unified GitHub Actions run:**
+[Build ExtendedPatPat](https://github.com/Sanowo0390/ExtendedPatPat/actions/workflows/build-all.yml)
+builds all three plugin JARs. It publishes exactly three artifacts:
+`ExtendedPatPat-Velocity`, `ExtendedPatPat-Geyser`, and
+`ExtendedPatPat-Paper`. The Java hand pack is **embedded** in both Java-side JARs;
+there is no standalone pack or Complete artifact.
 
 **Note:** Do not redistribute third-party textures unless you have permission.
 The repository does not automatically commit uploaded third-party skin ZIPs.
@@ -71,9 +72,9 @@ Custom skins must be committed into \`resourcepack/skins/\` for GitHub Actions
 to include them. ZIP extraction is never performed on the build runner.
 
 
-## 標準配布（0.4.0以降）
+## 標準配布（0.5.0以降）
 
-GitHub Actionsからダウンロードできるのは `PatPatVelocity`・`PatPatGeyserExtension`・`PatpatPaper` の**3つのJARのみ**です。Java版の標準画像ZIPはVelocity版とPaper版のJARに内包され、起動時にプラグインのデータフォルダーへ書き出されます。サンプルBonkは同梱しません。
+GitHub Actionsからダウンロードできるのは `ExtendedPatPat Velocity`・`ExtendedPatPat Geyser`・`ExtendedPatPat Paper` の**3つのJARのみ**です。Java版の標準画像ZIPはVelocity版とPaper版のJARに内包され、起動時にプラグインのデータフォルダーへ書き出されます。サンプルBonkは同梱しません。
 
 ユーザー側への適用は、通常のサーバーリソースパックとは独立したパックの追加リクエスト（UUID指定）で行います。ただしMinecraftはクライアントがダウンロードできるHTTP(S) URLを要求します。`resource-pack-url` にZIPの公開URLを設定するか、JARに付属する読み取り専用HTTP配信機能を有効化し、そのURLを公開してください。既存の `server.properties` のリソースパック設定は変更不要です。
 
@@ -82,4 +83,6 @@ ViaVersion経由のJava 1.21.4以降は画像方式、1.19.4～1.21.3はVoxel方
 
 ## GitHubの標準配布に関する変更
 
-`PATPAT_DEFAULT_ONLY=1` で標準画像以外を取り込みません。GitHub Actionsが配布するのはPatPatVelocity・PatPatGeyserExtension・PatpatPaperの各JARのみです。生成されたZIPは前者とPaper版のJAR内に入ります。サンプルBonkなどを取り込むことはありません。
+`PATPAT_DEFAULT_ONLY=1` で標準画像以外を取り込みません。GitHub Actionsが配布するのはExtendedPatPat Velocity・ExtendedPatPat Geyser・ExtendedPatPat Paperの各JARのみです。生成されたZIPは前者とPaper版のJAR内に入ります。サンプルBonkなどを取り込むことはありません。
+
+The internal Java pack ZIP filename and the `patpat:` model namespace are intentionally unchanged for compatibility with existing resource-pack URLs, item models and player selections. The distributed plugins and the project itself are branded **ExtendedPatPat**.
