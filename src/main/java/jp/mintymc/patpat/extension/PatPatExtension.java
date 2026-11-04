@@ -29,6 +29,7 @@ public final class PatPatExtension implements Extension {
     private static final String PROXY_PREFER_STANDALONE="jp.mintymc.patpat.bridge.v1.prefer-standalone";
     private static final String TOGGLE_READ="jp.mintymc.patpat.bridge.v1.toggle-read";
     private static final String TOGGLE_WRITE="jp.mintymc.patpat.bridge.v1.toggle-write";
+    private static final String JAVA_TOGGLE_READ="jp.mintymc.patpat.bridge.v1.java-toggle-read";
     private final Set<UUID> bridgedBedrockUsers=ConcurrentHashMap.newKeySet();
     private final java.util.function.Consumer<Object[]> proxyBridge=this::receiveJavaPat;
     // Share one Bedrock preference store with /extendedpatpat on Velocity.
@@ -52,6 +53,25 @@ public final class PatPatExtension implements Extension {
         PatPreferences store=preferences;
         return store!=null && store.enabled(uuid);
     }
+    /** Players who disabled Pat cannot be selected as targets, even if a
+     * different viewer has their animations enabled.
+     */
+    boolean targetAllowsPat(Entity target) {
+        if(!(target instanceof org.geysermc.geyser.entity.type.player.PlayerEntity) ||
+                target.uuid()==null)return true;
+        UUID uuid=target.uuid();
+        if(bridgedBedrockUsers.contains(uuid))return patEnabled(uuid);
+        Object callback=System.getProperties().get(JAVA_TOGGLE_READ);
+        if(callback instanceof java.util.function.Function<?,?> raw){
+            @SuppressWarnings("unchecked")
+            var read=(java.util.function.Function<UUID,Boolean>)raw;
+            try{return Boolean.TRUE.equals(read.apply(uuid));}
+            catch(RuntimeException ex){
+                logger().warning("Could not query Java target Pat preference: "+ex.getMessage());
+            }
+        }
+        return true;
+    }
     boolean setPatEnabled(GeyserSession session,boolean enabled) throws IOException {
         if(session.getPlayerEntity()==null)throw new IOException("Player is not ready");
         return setPatEnabled(session.getPlayerEntity().uuid(),enabled);
@@ -65,8 +85,11 @@ public final class PatPatExtension implements Extension {
         if(!enabled) {
             sessions.values().forEach(state->{
                 GeyserSession current=state.session();
-                if(current.getPlayerEntity()!=null && uuid.equals(current.getPlayerEntity().uuid()))
-                    current.executeInEventLoop(state::clear);
+                current.executeInEventLoop(()->{
+                    if(current.getPlayerEntity()!=null && uuid.equals(current.getPlayerEntity().uuid()))
+                        state.clear();
+                    else state.hideTarget(uuid);
+                });
             });
         }
         return true;
@@ -189,7 +212,7 @@ public final class PatPatExtension implements Extension {
      * Java entity ID: IDs may be reused on another Velocity backend.
      */
     void relayStandalone(PatSession sender,Entity target) {
-        if(!patEnabled(sender.session()))return;
+        if(!patEnabled(sender.session()) || !targetAllowsPat(target))return;
         UUID targetUuid=target.uuid();
         if(targetUuid==null)return; // Actor has already received its own preview.
         GeyserSession actor=sender.session();
@@ -264,7 +287,8 @@ public final class PatPatExtension implements Extension {
 
     /** Bedrock-origin Pat events are forwarded only to Java viewers by the optional Velocity plugin. */
     void relayToJava(PatSession sender,Entity target) {
-        if(!patEnabled(sender.session()) || !compatible || target==null || target.uuid()==null
+        if(!patEnabled(sender.session()) || !targetAllowsPat(target) ||
+                !compatible || target==null || target.uuid()==null
                 || sender.session().getPlayerEntity()==null)return;
         Object callback=System.getProperties().get(BEDROCK_TO_PROXY);
         if(callback instanceof java.util.function.Consumer<?> raw) {
@@ -285,7 +309,7 @@ public final class PatPatExtension implements Extension {
                 if(viewer.closed() || s.isClosed() || !patEnabled(s))return;
                 Entity entity=s.getPlayerEntity()!=null && target.equals(s.getPlayerEntity().uuid())
                     ? s.getPlayerEntity():s.getEntityCache().getEntityByUuid(target);
-                if(entity==null || !entity.isValid())return;
+                if(entity==null || !entity.isValid() || !targetAllowsPat(entity))return;
                 viewer.showStandalone(entity.javaId());
                 if(target.equals(s.getPlayerEntity().uuid()) && !actor.equals(target))
                     viewer.receivePatFeedback();
