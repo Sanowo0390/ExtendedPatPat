@@ -9,6 +9,7 @@ import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -90,7 +91,8 @@ final class TextFrames {
                     // Neither format is applied to transparent space segments.
                     Component glyph=Component.text(String.valueOf(FILLED).repeat(end-x))
                         .font(FONT).color(TextColor.color(color))
-                        .bold(true).underlined(true);
+                        .decoration(TextDecoration.BOLD,true)
+                        .decoration(TextDecoration.UNDERLINED,true);
                     result.append(glyph);
                 }
                 x=end;
