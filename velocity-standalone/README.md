@@ -4,7 +4,7 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.4.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.5.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
@@ -37,3 +37,7 @@ Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPa
 NPCの右クリックが同時にVelocityの別サーバーへの接続を開始する場合、PatのPLAYパケットを接続中のCONFIGURATION状態へ送信するとMinecraftが切断されます。本バージョンはサーバー移動開始イベントでアニメーションを無効化し、送信直前にPacketEventsの出力側プロトコル状態がPLAYであることを確認します。一般のPat表示はNPC転送の判定を待つため約75ms遅らせます。転送用NPCではPat演出を中止し、通常のサーバー移動を優先します。
 
 サーバー移動に失敗する場合は、Velocityのログも確認してください。プレイヤーの接続設定段階で未知のパケットIDが報告される場合、他のプロキシプラグインも原因となりえます。
+
+### 0.6.5: サーバー接続後にPatが表示されない不具合を修正
+
+Velocityの`ServerConnectedEvent`実行中に`Player#getCurrentServer()`が空になることがあり、表示対象`View.backend`に`null`を格納していた問題を修正しました。接続先は`event.getServer()`から取得します。また、NPCでのサーバー転送失敗時に`View.switching`が解除されず、そのサーバーでPatが使えなくなる問題も、5秒後に旧サーバーかつPLAY状態を確認して復旧するよう修正しました。
