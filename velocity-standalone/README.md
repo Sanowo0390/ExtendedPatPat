@@ -6,7 +6,7 @@ This repository provides two pieces that run in the same Velocity JVM:
 
 | Component | Install directory | Responsibility |
 |---|---|---|
-| PatPatVelocity 0.3.0 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
+| PatPatVelocity 0.4.0 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
 | PatPatGeyserExtension 0.12.0 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
 
 Requirements: Velocity 3.5, **PacketEvents 2.14.0 for Velocity**, and **Geyser-Velocity 2.12.1系** (required Geyser internals are checked at startup). The normal Geyser-Velocity plugin is also in \`Velocity/plugins/\`.
@@ -24,7 +24,7 @@ No official PatPat Plugin and no server-side Paper plugin are necessary.
 ## Install
 
 1. Install **PacketEvents 2.14.0 Velocity** and **Geyser-Velocity 2.12.1系** in \`Velocity/plugins/\` as normal Velocity plugins.
-2. Put the **PatPatVelocity-0.3.0.jar** from the **Build PatPatVelocity** GitHub Action in \`Velocity/plugins/\`.
+2. Put the **PatPatVelocity-0.4.0.jar** from the **Build PatPatVelocity** GitHub Action in \`Velocity/plugins/\`.
 3. Put **PatPatGeyserExtension-0.12.0.jar** from the **Build Extension** GitHub Action in \`Velocity/plugins/Geyser-Velocity/extensions/\`. **Remove older copies** of this extension first.
 4. Restart Velocity. Run \`/ppv status\`; the default mode is **standalone**, and Geyser bridge should be \`true\`.
 5. Java: sneak + right-click a mob or another player; Bedrock: use the configured Geyser gesture. Other people on the same backend should see it.
@@ -105,3 +105,21 @@ and optional sound. Importing \`Bonk Bonk Animation.zip\` as
 \`resourcepack/skins/Bonk Bonk Animation.zip\` makes it available under
 \`bonk_bonk_animation\` with six frames. The resource pack ZIP must also be
 installed/accepted by Java clients; commands do not transmit textures.
+
+
+## 内包型パック配布・ViaVersion（v0.4.0）
+
+**PatPatVelocity.jarに標準用の `PatPatJava-26.3.zip` が入っています。** 起動すると `plugins/patpatvelocity/PatPatJava-26.3.zip` に取り出します。通常のサーバーパックを置き換える必要はありません。
+
+自動適用（任意）にはこのZIPがクライアントからHTTP(S)で取得できるURLが必要です。2つの方法があります。
+
+- 通常のWebサーバー/CDNへZIPを配置し `resource-pack-url=https://.../PatPatJava-26.3.zip` を設定する
+- 内蔵の読み取り専用Web配信を `pack-http-enabled=true` にして `pack-http-bind=127.0.0.1`, `pack-http-port=8765` で起動し、Nginx Proxy Manager等を経由して公開した `https://.../patpat/PatPatJava-26.3.zip` を `resource-pack-url` に設定する
+
+ZIPをJARから取り出す作業は自動ですが、**公開URLやポートの開放はプラグインだけでは自動設定できません**。内蔵配信を直接公開する場合はネットワークのアクセス制限も設定してください。
+
+パックはPatPat専用UUIDでプレイヤーへ追加提供され、既存のリソースパックとは別に扱われます。受け入れたことを確認したプレイヤーにだけPNG製の手を表示する `hand-renderer=auto` が標準です。受け入れなければブロック製の手を使います。
+
+Velocityは `Player.getProtocolVersion()` とPacketEventsのクライアントバージョンを見てViaを含む接続を識別します。Java 1.21.4以上では画像方式、1.19.4～1.21.3はVoxel、それ以前はDisplayパケットを送信しません。実際のVia経由変換は接続元バージョンごとに実機検証が必要です。
+
+例として以前示したBonkパックは同梱せず、標準画像のみを配布します。`/ppv skin list` には配布した画像のみ表示されます。

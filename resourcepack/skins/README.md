@@ -20,3 +20,5 @@ On Paper, each viewer gets a separate visible-only-to-them ItemDisplay.
 The repository does not redistribute third-party skin art by default. Only add
 assets you have permission to share. GitHub Actions builds every skin added
 here into \`PatPatJava-26.3.zip\`.
+
+**標準リリースでは `PATPAT_DEFAULT_ONLY=1` を指定してこのフォルダーを無視します。例として提供されたBonkは公開JARに含まれません。**

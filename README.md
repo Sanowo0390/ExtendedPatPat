@@ -24,7 +24,7 @@
 
 ## 一括ビルド・スキン選択
 
-[**Build All PatPat（統合GitHub Actions）**](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-all.yml) を使うと、**Geyser拡張・Velocity版・Paper版の3つのJARを**並列ビルド**し、同じGitHub Actions実行から個別にダウンロードできます。Java版の標準リソースパックは各JARに内包され、`Complete` やパック単体の配布物は作りません。
+[**Build All PatPat（統合GitHub Actions）**](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-all.yml) を使うと、**Geyser拡張・Velocity版・Paper版の3つのJARを**並列ビルド**し、同じGitHub Actions実行から個別にダウンロードできます。Java版の標準リソースパックはVelocity・PaperのJARに内包され、`Complete` やパック単体の配布物は作りません。
 
 公開Actionsでは標準の手画像だけをビルドします。Bonkなどのサンプル画像は含みません。カスタムビルド時のみ `resourcepack/skins/` に素材を置けます。Java版プレイヤーごとに `/ppv skin list` と `/ppv skin <ID>` で手を選択でき、選択を保存します。詳しくは [カスタムスキンの導入方法](resourcepack/README.md) を確認してください。
 
@@ -246,3 +246,18 @@ GitHub Actionsは **Geyser 2.12.1-b1280と2.12.1系の最新ビルド** を別�
 ローカルでビルドを固定する場合は `GEYSER_BUILD=1284 python scripts/prepare_build.py`、最新を使う場合は `python scripts/prepare_build.py` とします。
 
 **注意:** 単体テストの成功は、実際の統合版クライアントで描画・通信できることを保証しません。Geyserの内部APIで戻り値型やパケットの意味が変更された場合、追加対応が必要になる可能性があります。
+
+
+## 配布構成（v0.4.0）
+
+GitHub Actionsの最新版は**3つの配布物だけ**です。
+
+- **PatPatVelocity** — JARにJava標準手画像パックを内包。Velocity＋PacketEvents＋Geyser拡張の併用構成。
+- **PatPatGeyserExtension** — Bedrock版の画像・音声パックを内包。
+- **PatpatPaper** — JARにJava標準手画像パックを内包。Paper/Purpur専用の独立版。
+
+標準のPatPat画像以外は含まず、Bonkなどのサンプルも配布しません。`PatPat-Complete` やリソースパック単体のArtifactは生成しません。従来の個別Actionsは削除しています。
+
+Java版の追加リソースパックは、プラグインが参加者にUUID付きで別途送る方式です。**既存のserver.properties等のリソースパックとは別**ですが、ゲームクライアントがダウンロードするには公開HTTP(S) URLが必要です。内蔵HTTP配信も任意で使用できます。詳しくは各コンポーネントREADMEを参照してください。
+
+ViaVersionは特別に必須ではありません。接続元のプロトコルを識別できる場合、**1.21.4以降は画像方式、1.19.4～1.21.3はVoxel方式、それ以前はDisplayパケットを送らずに停止**します。Paper単体版がViaVersionをVelocity側からしか利用できない場合、元のクライアントバージョンを自動判別できないことがあります。その場合はVelocity版を使用してください。

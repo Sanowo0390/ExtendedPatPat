@@ -11,7 +11,7 @@ Install the JAR from the **Build PatPatVanilla Paper** GitHub Actions artifact i
 
 **Limitations:** this is **not pixel-identical** to PatPat's client 2D PNG/GIF renderer. Client-side keybindings, shaders/mixins, and exact player/mob squish/camera transforms cannot be recreated by a pure vanilla server plugin. This variant does not import the original PatPat's source or assets. Not tested with Folia. Bedrock visuals are managed independently by PatPatGeyserExtension; test carefully if both addons handle Bedrock interactions, to avoid duplicated effects.
 
-Requires Java 25 and Paper or Purpur 26.3. To build: `mvn -B -ntp -f paper-standalone/pom.xml package`. Output: target/PatPatVanilla-0.3.0.jar.
+Requires Java 25 and Paper or Purpur 26.3. To build: `mvn -B -ntp -f paper-standalone/pom.xml package`. Output: target/PatpatPaper-0.4.0.jar.
 
 
 ## Animated Java hand (v0.2.0)
@@ -38,3 +38,14 @@ Selections are saved under \`selected-skins\` in the plugin config. Each nearby
 Java viewer receives a separate ItemDisplay hidden from all other viewers
 with their selected frame sequence and optional sound. That is heavier than
 one shared display, so check \`animation.max-active\` and \`view-range\`.
+
+
+## 内包型リソースパック・別スタックで配布（v0.4.0）
+
+**PatpatPaper.jar** は標準Java手のZIPを内包します。起動時に `plugins/PatpatPaper/PatPatJava-26.3.zip` へ自動書き出しされます。これをHTTP(S)でホストした公開URLを `pack.url` に設定すると、Paperの `Player.addResourcePack(UUID,...)` によって、通常のserver.propertiesのリソースパックに**追加**として提示されます。単独のパック配布プラグインは不要です。
+
+内蔵Web配信を使う場合は `pack.http-enabled=true` にしてポートを設定し、Nginx Proxy Manager等で公開したURLを `pack.url` に入力します。外部アクセス可能な公開URLの設定は必要です。
+
+ViaVersionが**Paper自身に導入されている場合**、そのAPIで実際のクライアントバージョンを読み取り、1.21.4以上にPNGモデル、1.19.4～1.21.3にVoxelを個別表示します。それ以前のクライアントにはDisplayを送信しません。ViaがVelocityにしか導入されていない場合、Paper側で元のバージョンを判別できない可能性があります。混合クライアント環境ではVelocity版を推奨します。
+
+以前のBonkなど追加スキンは含まれず、デフォルト素材だけが内包されます。
