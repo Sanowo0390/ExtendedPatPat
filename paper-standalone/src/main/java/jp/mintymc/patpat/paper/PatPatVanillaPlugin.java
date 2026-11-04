@@ -18,6 +18,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -27,6 +30,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -49,6 +53,8 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     private final Map<UUID,Long> lastPat = new HashMap<>();
     private final Set<UUID> disabled = new HashSet<>();
     private final Set<Animation> animations = new HashSet<>();
+    private final Set<UUID> packReady=new HashSet<>();
+    private DefaultPackHost defaultPack;
     private final SkinCatalog skinCatalog=SkinCatalog.load();
     private final Map<UUID,String> selectedSkins=new HashMap<>();
     private record ViewerSprite(Player viewer,ItemDisplay display,SkinCatalog.Skin skin) {}
@@ -70,12 +76,93 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     @Override public void onEnable() {
         saveDefaultConfig();
         loadDisabled();
+        try {
+            defaultPack=new DefaultPackHost(getDataFolder().toPath(),
+                msg->getLogger().info(msg));
+            if(getConfig().getBoolean("pack.http-enabled",false))
+                defaultPack.start(getConfig().getString("pack.http-bind","127.0.0.1"),
+                    getConfig().getInt("pack.http-port",8765));
+            getLogger().info("Embedded default PatPat pack SHA1="+defaultPack.sha1());
+        }catch(Exception error) {
+            getLogger().severe("PatPat embedded pack unavailable: "+error);
+        }
         Bukkit.getPluginManager().registerEvents(this, this);
         var command = getCommand("patpatvanilla");
         if (command != null) { command.setExecutor(this); command.setTabCompleter(this); }
     }
     @Override public void onDisable() {
         for (Animation animation : List.copyOf(animations)) animation.finish();
+        packReady.clear();
+        if(defaultPack!=null)defaultPack.close();
+    }
+    /** ViaVersion may be installed on Paper or only at the proxy.
+     * If it is only at the proxy, backend Paper cannot reliably read the original
+     * client protocol; use Velocity mode for networks with mixed client versions.
+     */
+    private int protocol(Player player) {
+        if(Bukkit.getPluginManager().getPlugin("ViaVersion")==null)return 777;
+        try {
+            Class<?> via=Class.forName("com.viaversion.viaversion.api.Via");
+            Object api=via.getMethod("getAPI").invoke(null);
+            Object result=api.getClass().getMethod("getPlayerVersion",UUID.class)
+                .invoke(api,player.getUniqueId());
+            if(result instanceof Number n && n.intValue()>0)return n.intValue();
+        }catch(ReflectiveOperationException | LinkageError problem) {
+            getLogger().fine("Cannot detect ViaVersion client protocol: "+problem.getMessage());
+        }
+        return 777;
+    }
+    private boolean spriteFor(Player viewer) {
+        return useResourcePack() && protocol(viewer)>=769 &&
+            (packReady.contains(viewer.getUniqueId()) ||
+             getConfig().getBoolean("pack.assume-installed",false));
+    }
+    @EventHandler public void onJoin(PlayerJoinEvent event) {
+        Player player=event.getPlayer();
+        packReady.remove(player.getUniqueId());
+        Bukkit.getScheduler().runTaskLater(this,()->{
+            if(player.isOnline())offerPack(player);
+        },20L);
+    }
+    @EventHandler public void onQuit(PlayerQuitEvent event) {
+        packReady.remove(event.getPlayer().getUniqueId());
+    }
+    @EventHandler public void onPackStatus(PlayerResourcePackStatusEvent event) {
+        if(!DefaultPackId.ID.equals(event.getID()))return;
+        if(event.getStatus()==PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED)
+            packReady.add(event.getPlayer().getUniqueId());
+        else if(event.getStatus()==PlayerResourcePackStatusEvent.Status.DECLINED ||
+            event.getStatus()==PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD ||
+            event.getStatus()==PlayerResourcePackStatusEvent.Status.FAILED_RELOAD ||
+            event.getStatus()==PlayerResourcePackStatusEvent.Status.DISCARDED ||
+            event.getStatus()==PlayerResourcePackStatusEvent.Status.INVALID_URL)
+            packReady.remove(event.getPlayer().getUniqueId());
+    }
+    private void offerPack(Player player) {
+        if(protocol(player)<769)return;
+        String url=getConfig().getString("pack.url","");
+        if(url==null || url.isBlank())return;
+        if(!url.startsWith("https://") && !url.startsWith("http://")) {
+            getLogger().warning("PatPat pack URL must be reachable via HTTP(S)");
+            return;
+        }
+        try {
+            byte[] hash=defaultPack==null?null:defaultPack.hash();
+            String custom=getConfig().getString("pack.sha1","");
+            if(custom!=null && !custom.isBlank()) {
+                hash=HexFormat.of().parseHex(custom);
+                if(hash.length!=20)throw new IllegalArgumentException("Pack SHA-1 must be 40 hex chars");
+            }
+            // addResourcePack, not setResourcePack: keep other plugins' packs intact.
+            player.addResourcePack(DefaultPackId.ID,url,hash,
+                "PatPat専用の手アニメーション（サーバーパックとは別）",false);
+        }catch(Exception error){
+            getLogger().warning("Could not offer PatPat resource pack: "+error);
+        }
+    }
+    private static final class DefaultPackId {
+        private static final UUID ID=
+            UUID.fromString("cc05eb6d-9c58-5b4d-9d29-6bd46f1344cc");
     }
     private void loadDisabled() {
         disabled.clear();
@@ -146,7 +233,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0 || args[0].equalsIgnoreCase("status")) {
-            sender.sendMessage("§aPatPatVanilla §7v0.3.0 | active animations: " + animations.size()
+            sender.sendMessage("§aPatpatPaper §7v0.4.0 | active animations: " + animations.size()
                 + (sender instanceof Player p?" | skin="+skin(p).id():""));
             return true;
         }
@@ -201,6 +288,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     private final class Animation extends BukkitRunnable {
         private final LivingEntity target;
         private final List<BlockDisplay> blocks = new ArrayList<>();
+        private final List<Player> voxelViewers=new ArrayList<>();
         private final List<ViewerSprite> sprites=new ArrayList<>();
         private final int ticks;
         private final double offsetY, depth;
@@ -218,12 +306,17 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             if (material == null || !material.isBlock() || material.isAir()) material = Material.PINK_TERRACOTTA;
             var blockData = material.createBlockData();
             Location origin = position(0);
-            if(useResourcePack()) {
-                for(Player viewer:target.getWorld().getPlayers()) {
-                    if(viewer.getLocation().distanceSquared(origin)>range*range ||
-                            disabled.contains(viewer.getUniqueId()))continue;
-                    SkinCatalog.Skin style=skin(viewer);
-                    ItemDisplay sprite=target.getWorld().spawn(
+            for(Player viewer:target.getWorld().getPlayers()) {
+                if(viewer.getLocation().distanceSquared(origin)>range*range ||
+                        disabled.contains(viewer.getUniqueId()))continue;
+                int client=protocol(viewer);
+                if(client<762)continue; // Display entities require Java 1.19.4
+                if(!spriteFor(viewer)) {
+                    voxelViewers.add(viewer);
+                    continue;
+                }
+                SkinCatalog.Skin style=skin(viewer);
+                ItemDisplay sprite=target.getWorld().spawn(
                         origin.clone().add(style.offsetX(),style.offsetY(),style.offsetZ()),
                         ItemDisplay.class,d->{
                             d.setVisibleByDefault(false);
@@ -243,11 +336,12 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                                 new Quaternionf()
                             ));
                         });
-                    viewer.showEntity(PatPatVanillaPlugin.this,sprite);
-                    sprites.add(new ViewerSprite(viewer,sprite,style));
-                }
-            } else for (Part part : HAND) {
+                viewer.showEntity(PatPatVanillaPlugin.this,sprite);
+                sprites.add(new ViewerSprite(viewer,sprite,style));
+            }
+            if(!voxelViewers.isEmpty())for (Part part : HAND) {
                 BlockDisplay block = target.getWorld().spawn(origin,BlockDisplay.class,d -> {
+                    d.setVisibleByDefault(false);
                     d.setPersistent(false);
                     d.setGravity(false);
                     d.setInvulnerable(true);
@@ -263,6 +357,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                         new Quaternionf()
                     ));
                 });
+                for(Player viewer:voxelViewers)viewer.showEntity(PatPatVanillaPlugin.this,block);
                 blocks.add(block);
             }
             animations.add(this);
