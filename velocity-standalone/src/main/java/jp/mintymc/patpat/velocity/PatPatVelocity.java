@@ -98,6 +98,8 @@ public final class PatPatVelocity {
     private volatile Properties config=new Properties();
     private final Map<UUID,View> views=new ConcurrentHashMap<>();
     private final Set<UUID> disabled=ConcurrentHashMap.newKeySet();
+    private final SkinCatalog skinCatalog=SkinCatalog.load();
+    private final Map<UUID,String> selectedSkins=new ConcurrentHashMap<>();
     private final AtomicInteger entitySequence=new AtomicInteger(1_900_000_000);
     private final AtomicInteger active=new AtomicInteger();
     private final Consumer<Object[]> bedrockConsumer=this::receiveBedrockPat;
@@ -225,12 +227,36 @@ public final class PatPatVelocity {
             if(Files.exists(disabledFile))for(String line:Files.readAllLines(disabledFile)) {
                 try { disabled.add(UUID.fromString(line.trim())); }catch(IllegalArgumentException ignored) {}
             }
+            selectedSkins.clear();
+            Path prefs=folder.resolve("player-skins.properties");
+            if(Files.exists(prefs)) {
+                Properties loadedSkins=new Properties();
+                try(var reader=Files.newBufferedReader(prefs,StandardCharsets.UTF_8)) {
+                    loadedSkins.load(reader);
+                }
+                for(String raw:loadedSkins.stringPropertyNames())try {
+                    UUID id=UUID.fromString(raw);
+                    String style=loadedSkins.getProperty(raw,"default");
+                    if(skinCatalog.contains(style))selectedSkins.put(id,style);
+                } catch(IllegalArgumentException ignored) {}
+            }
         } catch(IOException exception) { log.error("Unable to load PatPatVelocity configuration",exception); }
     }
     private void persistDisabled() {
         try { Files.write(folder.resolve("disabled-players.txt"),
             disabled.stream().map(UUID::toString).sorted().toList()); }
         catch(IOException exception) { log.error("Unable to save personal preference",exception); }
+    }
+    private void persistSkins() {
+        Properties props=new Properties();
+        selectedSkins.forEach((id,style)->props.setProperty(id.toString(),style));
+        try(var writer=Files.newBufferedWriter(folder.resolve("player-skins.properties"),
+                    StandardCharsets.UTF_8)) {
+            props.store(writer,"Per-player Java PatPat texture choices");
+        } catch(IOException ex) {log.error("Unable to save PatPat skins",ex);}
+    }
+    private SkinCatalog.Skin skin(UUID viewer) {
+        return skinCatalog.get(selectedSkins.getOrDefault(viewer,"default"));
     }
     private boolean enabled(String key,boolean fallback) {
         return Boolean.parseBoolean(config.getProperty(key,Boolean.toString(fallback)));
@@ -514,9 +540,15 @@ public final class PatPatVelocity {
         startHand(view,player,targetId);
         if(enabled("sound-enabled",true)) {
             try {
-                String key=text("sound-event","minecraft:block.wool.place");
-                float volume=(float)number("sound-volume",0.6,0,4);
-                float pitch=(float)number("sound-pitch",1,0.1,4);
+                SkinCatalog.Skin preference=skin(player.getUniqueId());
+                String key=usesItemHand(player.getUniqueId()) && !preference.sound().isBlank()
+                    ? preference.sound():text("sound-event","minecraft:block.wool.place");
+                float volume=preference.sound().isBlank()
+                    ?(float)number("sound-volume",0.6,0,4):preference.volume();
+                float pitch=preference.sound().isBlank()
+                    ?(float)number("sound-pitch",1,0.1,4)
+                    :preference.pitchMin()+java.util.concurrent.ThreadLocalRandom.current()
+                        .nextFloat()*(preference.pitchMax()-preference.pitchMin());
                 player.playSound(Sound.sound(Key.key(key),Sound.Source.PLAYER,volume,pitch),Sound.Emitter.self());
             } catch(Exception ex) {log.debug("Sound is not available",ex);}
         }
@@ -530,13 +562,12 @@ public final class PatPatVelocity {
         return packReady.contains(viewer) || (text("resource-pack-url","").isBlank()
             && enabled("resource-pack-assume-installed",false));
     }
-    private ItemStack handItem(User user,int frame) {
-        int index=Math.max(0,Math.min(4,frame));
+    private ItemStack handItem(User user,SkinCatalog.Skin style,int frame) {
+        int index=Math.max(0,Math.min(style.frames()-1,frame));
         return ItemStack.builder().user(user).type(ItemTypes.PAPER).amount(1)
             .component(ComponentTypes.ITEM_MODEL,
-                new ItemModel(new ResourceLocation("patpat:hand_"+index))).build();
+                new ItemModel(new ResourceLocation("patpat:hand_"+style.id()+"_"+index))).build();
     }
-    private static final int HAND_FRAMES=5;
     private void sendSquish(View view,int id,WrapperPlayServerUpdateAttributes.Property baseline,double multiplier) {
         double original=baseline==null?1.0:baseline.getValue();
         double modified=Math.max(1.0/16,original*multiplier);
@@ -555,11 +586,14 @@ public final class PatPatVelocity {
     }
     private void startHand(View view,Player player,UUID targetId) {
         if(active.incrementAndGet()>(int)number("max-active",24,1,128)){active.decrementAndGet();return;}
-        final int duration=(int)number("hand-duration-ticks",6,2,40);
-        final double depth=number("hand-depth",0.425,0,2);
-        final double offset=number("hand-offset-y",0.15,-2,2);
-        final float size=(float)number("hand-size",1,0.1,4);
+        final SkinCatalog.Skin style=skin(player.getUniqueId());
         final boolean useSprite=usesItemHand(player.getUniqueId());
+        final int duration=useSprite ? Math.max(2,Math.min(40,
+            (int)Math.ceil(style.durationMs()/50.0)))
+            :(int)number("hand-duration-ticks",6,2,40);
+        final double depth=number("hand-depth",0.425,0,2);
+        final double offset=number("hand-offset-y",0.15,-2,2)+(useSprite?style.offsetY():0);
+        final float size=(float)number("hand-size",1,0.1,4);
         final int[] fakeIds=new int[useSprite?1:HAND.length];
         final Tracked trackedTarget=view.find(targetId);
         final int targetEntityId=trackedTarget!=null?trackedTarget.id:targetId.equals(view.player)?view.selfEntityId:0;
@@ -578,11 +612,14 @@ public final class PatPatVelocity {
                 view.user.sendPacketSilently(new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
                     EntityTypes.ITEM_DISPLAY,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),0,0,null));
                 view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,List.of(
-                    new EntityData<>(11,EntityDataTypes.VECTOR3F,new Vector3f(-size*0.5f,-size*0.5f,0f)),
-                    new EntityData<>(12,EntityDataTypes.VECTOR3F,new Vector3f(size,size,0.04f)),
+                    new EntityData<>(11,EntityDataTypes.VECTOR3F,
+                        new Vector3f(-size*style.scaleX()*0.5f+style.offsetX(),
+                            -size*style.scaleY()*0.5f,style.offsetZ())),
+                    new EntityData<>(12,EntityDataTypes.VECTOR3F,
+                        new Vector3f(size*style.scaleX(),size*style.scaleY(),0.04f)),
                     new EntityData<>(15,EntityDataTypes.BYTE,(byte)3),
                     new EntityData<>(17,EntityDataTypes.FLOAT,16.0f),
-                    new EntityData<>(23,EntityDataTypes.ITEMSTACK,handItem(view.user,0)),
+                    new EntityData<>(23,EntityDataTypes.ITEMSTACK,handItem(view.user,style,0)),
                     new EntityData<>(24,EntityDataTypes.BYTE,(byte)8)
                 )));
             } else {
@@ -625,9 +662,10 @@ public final class PatPatVelocity {
                     for(int id:fakeIds)if(id>0)
                         view.user.sendPacketSilently(new WrapperPlayServerEntityTeleport(id,p,0,0,false));
                     if(useSprite && fakeIds[0]>0) {
-                        int frame=Math.min(HAND_FRAMES-1,(int)Math.floor(t*HAND_FRAMES));
+                        int frame=style.at(tick,duration);
                         view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(fakeIds[0],
-                            List.of(new EntityData<>(23,EntityDataTypes.ITEMSTACK,handItem(view.user,frame)))));
+                            List.of(new EntityData<>(23,EntityDataTypes.ITEMSTACK,
+                                handItem(view.user,style,frame)))));
                     }
                     if(squash) {
                         double pressure=Math.sin(Math.PI*t);
@@ -682,7 +720,8 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("PatPatVelocity v0.2.0 | mode="+state
+                sender.sendMessage(Component.text("PatPatVelocity v0.3.0 | mode="+state
+                    +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
                     +" | active="+active.get()
                     +" | Geyser bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
                 return;
@@ -693,6 +732,26 @@ public final class PatPatVelocity {
                 }
                 reload();sender.sendMessage(Component.text("PatPatVelocity configuration reloaded"));return;
             }
+            if(args[0].equalsIgnoreCase("skin")) {
+                if(!(sender instanceof Player p)) {
+                    sender.sendMessage(Component.text("Skin selection is available to players only."));return;
+                }
+                if(args.length==1) {
+                    sender.sendMessage(Component.text("Current skin: "+skin(p.getUniqueId()).id()
+                        +" | /ppv skin list | /ppv skin <id>"));return;
+                }
+                if(args[1].equalsIgnoreCase("list")) {
+                    sender.sendMessage(Component.text("Available PatPat skins: "+skinCatalog.description()));return;
+                }
+                String id=args[1].toLowerCase(java.util.Locale.ROOT);
+                if(!skinCatalog.contains(id)) {
+                    sender.sendMessage(Component.text("Unknown skin '"+id+"'. Use /ppv skin list."));return;
+                }
+                selectedSkins.put(p.getUniqueId(),id);
+                persistSkins();
+                sender.sendMessage(Component.text("PatPat skin changed to "+id+" (visible only to you)"));
+                return;
+            }
             if(args[0].equalsIgnoreCase("toggle") && sender instanceof Player p) {
                 boolean desired=args.length>1 ? args[1].equalsIgnoreCase("on")
                     : disabled.contains(p.getUniqueId());
@@ -700,12 +759,17 @@ public final class PatPatVelocity {
                 persistDisabled();
                 sender.sendMessage(Component.text("PatPatVelocity "+(desired?"ON":"OFF")));return;
             }
-            sender.sendMessage(Component.text("/ppv <status|toggle [on|off]|reload>"));
+            sender.sendMessage(Component.text("/ppv <status|skin [list|id]|toggle [on|off]|reload>"));
         }
         @Override public List<String> suggest(Invocation invocation) {
             String[] args=invocation.arguments();
-            if(args.length<=1)return List.of("status","toggle","reload");
+            if(args.length<=1)return List.of("status","skin","toggle","reload");
             if(args.length==2 && args[0].equalsIgnoreCase("toggle"))return List.of("on","off");
+            if(args.length==2 && args[0].equalsIgnoreCase("skin")) {
+                List<String> options=new ArrayList<>();
+                options.add("list");options.addAll(skinCatalog.ids());
+                return options;
+            }
             return List.of();
         }
     }
