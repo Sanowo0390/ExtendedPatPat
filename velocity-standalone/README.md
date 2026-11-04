@@ -4,7 +4,7 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.3.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.4.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
@@ -31,3 +31,9 @@ Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPa
 ### 手の上下動
 
 `hand-depth=0.425` が標準の上下動（約28マップピクセル）で、`0` にすると静止します。`hand-duration-ticks=6` で約0.3秒の「下げる→戻す」を実行します。地図の128×128サイズ内に収めるため、元画像は必要な場合のみ縮小されます。額縁自体はブロック座標に固定されるため、座標移動による上下動は行いません。
+
+### サーバー移動NPCをPatする場合
+
+NPCの右クリックが同時にVelocityの別サーバーへの接続を開始する場合、PatのPLAYパケットを接続中のCONFIGURATION状態へ送信するとMinecraftが切断されます。本バージョンはサーバー移動開始イベントでアニメーションを無効化し、送信直前にPacketEventsの出力側プロトコル状態がPLAYであることを確認します。一般のPat表示はNPC転送の判定を待つため約75ms遅らせます。転送用NPCではPat演出を中止し、通常のサーバー移動を優先します。
+
+サーバー移動に失敗する場合は、Velocityのログも確認してください。プレイヤーの接続設定段階で未知のパケットIDが報告される場合、他のプロキシプラグインも原因となりえます。

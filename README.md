@@ -11,7 +11,7 @@
 
 | JAR | 動作環境 |
 |---|---|
-| **ExtendedPatPat-Velocity** (0.6.3) | Velocity 3.5 + PacketEvents 2.14.0 |
+| **ExtendedPatPat-Velocity** (0.6.4) | Velocity 3.5 + PacketEvents 2.14.0 |
 | **ExtendedPatPat-Geyser** (0.13.1) | Geyser-Velocity 2.12.1系 |
 | **ExtendedPatPat-Paper** (0.6.1) | Paper/Purpur 26.3（Java 25） |
 

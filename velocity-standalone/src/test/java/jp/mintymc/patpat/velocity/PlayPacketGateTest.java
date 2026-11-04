@@ -30,6 +30,10 @@ class PlayPacketGateTest {
             "Client-bound writes must use encoder, not decoder protocol state");
         assertTrue(source.contains("ServerPreConnectEvent"),
             "Stop effects at start of a backend switch, not only when it completes");
+        assertTrue(source.contains("delay(75L,TimeUnit.MILLISECONDS)"),
+            "Give NPC server transfer handlers an opportunity to begin before spawning maps");
+        assertTrue(source.contains("if(event.getConnectionState()!=ConnectionState.PLAY)return;"),
+            "No PacketEvents callbacks in configuration should rebuild a play-only view");
         assertTrue(source.contains("sendPlay(view,new WrapperPlayServerDestroyEntities"),
             "Even cleanup packets must be suppressed in CONFIGURATION");
         assertTrue(source.contains("event.getConnectionState()!=ConnectionState.PLAY"),
