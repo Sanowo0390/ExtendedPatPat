@@ -18,7 +18,7 @@ class CommandPermissionTest {
     @SuppressWarnings("unchecked")
     @Test void actualGeyserCommandPredicatesAllowPublicCommandsWithoutProxyNodes() {
         PatPatExtension extension=mock(PatPatExtension.class,CALLS_REAL_METHODS);
-        doReturn("patpatbedrock").when(extension).rootCommand();
+        doReturn("extendedpatpatgeyser").when(extension).rootCommand();
         var event=mock(GeyserDefineCommandsEvent.class);
         // Use the actual pinned Geyser builder, with only its global API factory replaced.
         try(var factory=mockStatic(Command.class)) {

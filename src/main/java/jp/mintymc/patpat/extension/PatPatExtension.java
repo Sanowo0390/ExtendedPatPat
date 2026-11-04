@@ -273,7 +273,7 @@ public final class PatPatExtension implements Extension {
                 }).build());
     }
     private void register(GeyserDefineCommandsEvent event,String name,boolean player,CommandAction action) {
-        event.register(Command.builder(this).name(name).source(CommandSource.class).description("ExtendedPatPat Geyser "+"+name)
+        event.register(Command.builder(this).name(name).source(CommandSource.class).description("ExtendedPatPat Geyser "+name)
                 // Velocity cannot apply Geyser's permission defaults. Keep public commands
                 // visible; check an explicitly configured node at execution time instead.
                 .permission("",TriState.TRUE).bedrockOnly(player).playerOnly(player)
