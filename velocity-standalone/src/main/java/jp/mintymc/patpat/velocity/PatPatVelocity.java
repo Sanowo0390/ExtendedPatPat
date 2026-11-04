@@ -795,7 +795,7 @@ public final class PatPatVelocity {
                     : disabled.contains(p.getUniqueId());
                 if(desired)disabled.remove(p.getUniqueId());else disabled.add(p.getUniqueId());
                 persistDisabled();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity "+"+(desired?"ON":"OFF")));return;
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity "+(desired?"ON":"OFF")));return;
             }
             sender.sendMessage(Component.text("/ppv <status|pack|skin [list|id]|toggle [on|off]|reload>"));
         }
