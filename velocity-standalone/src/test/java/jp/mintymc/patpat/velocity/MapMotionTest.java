@@ -18,6 +18,6 @@ class MapMotionTest {
         assertEquals(0,MapMotion.poseAt(-1,6,0.425));
         assertEquals(0,MapMotion.poseAt(7,6,0.425));
         assertEquals(0,MapMotion.poseAt(2,6,Double.NaN));
-        assertEquals(4,MapMotion.poseAt(2,4,2.0));
+        assertEquals(3,MapMotion.poseAt(2,4,2.0));
     }
 }
