@@ -34,6 +34,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRelativeMoveAndRotation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSetPassengers;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerJoinGame;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerMapData;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPluginMessage;
@@ -81,7 +82,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.5",
+    version="0.6.6",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -103,7 +104,7 @@ public final class PatPatVelocity {
     private final Map<UUID,View> views=new ConcurrentHashMap<>();
     private final Set<UUID> disabled=ConcurrentHashMap.newKeySet();
     private final SkinCatalog skinCatalog=SkinCatalog.load();
-    private final MapFrames mapFrames=new MapFrames(skinCatalog);
+    private volatile MapFrames mapFrames=new MapFrames(skinCatalog);
     private final Map<UUID,String> selectedSkins=new ConcurrentHashMap<>();
     private final AtomicInteger entitySequence=new AtomicInteger(1_900_000_000);
     private final AtomicInteger active=new AtomicInteger();
@@ -221,6 +222,9 @@ public final class PatPatVelocity {
             Properties loaded=new Properties();
             try(var in=Files.newInputStream(file)){loaded.load(in);}
             config=loaded;
+            // Recreate images when the map-pixel scale changes on reload.
+            mapFrames=new MapFrames(skinCatalog,number("image-scale",0.5,0.05,1.0));
+            views.values().forEach(v->v.sentMaps.clear());
             disabled.clear();
             Path disabledFile=folder.resolve("disabled-players.txt");
             if(Files.exists(disabledFile))for(String line:Files.readAllLines(disabledFile)) {
@@ -314,6 +318,7 @@ public final class PatPatVelocity {
         final String type;
         volatile Vector3d pos;
         volatile WrapperPlayServerUpdateAttributes.Property originalScale;
+        volatile int vehicleId=-1;
         Tracked(int id,UUID uuid,String type,Vector3d pos) {
             this.id=id;this.uuid=uuid;this.type=type;this.pos=pos;
         }
@@ -342,6 +347,8 @@ public final class PatPatVelocity {
         void remove(int id) {
             Tracked old=byId.remove(id);
             if(old!=null)byUuid.remove(old.uuid,old);
+            for(Tracked tracked:byId.values())
+                if(tracked.vehicleId==id)tracked.vehicleId=-1;
         }
         Tracked find(UUID target) {return byUuid.get(target);}
     }
@@ -390,6 +397,15 @@ public final class PatPatVelocity {
                     Optional<UUID> uuid=packet.getUUID();
                     if(uuid.isPresent())view.track(new Tracked(packet.getEntityId(),uuid.get(),
                         packet.getEntityType().getName().toString(),packet.getPosition()));
+                } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.SET_PASSENGERS) {
+                    var packet=new WrapperPlayServerSetPassengers(event);
+                    int vehicleId=packet.getEntityId();
+                    for(Tracked tracked:view.byId.values())
+                        if(tracked.vehicleId==vehicleId)tracked.vehicleId=-1;
+                    for(int passengerId:packet.getPassengers()) {
+                        Tracked passenger=view.byId.get(passengerId);
+                        if(passenger!=null)passenger.vehicleId=vehicleId;
+                    }
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.UPDATE_ATTRIBUTES) {
                     var packet=new WrapperPlayServerUpdateAttributes(event);
                     Tracked tracked=view.byId.get(packet.getEntityId());
@@ -463,8 +479,9 @@ public final class PatPatVelocity {
                     if(!permission.isBlank() && !actor.hasPermission(permission))return;
                     // No world data is available in Velocity; require a recent actor
                     // position and a nearby entity ID tracked for this connection.
-                    if(view.self==null || squared(view.self,target.pos)
-                            > Math.pow(number("max-distance",4,1,6),2))return;
+                    Vector3d targetFeet=targetFeet(view,target);
+                    if(view.self==null || targetFeet==null ||
+                            squared(view.self,targetFeet)>Math.pow(number("max-distance",4,1,6),2))return;
                     long now=System.nanoTime();
                     PatModePolicy.Mode mode=modeFor(view);
                     if(mode==PatModePolicy.Mode.NATIVE_CLIENT_MOD ||
@@ -606,7 +623,7 @@ public final class PatPatVelocity {
         if(player.getProtocolVersion().getProtocol()<393)return;
         Tracked target=view.find(targetId);
         Vector3d pos=target==null && targetId.equals(player.getUniqueId()) ? view.self
-            : target==null?null:target.pos;
+            : target==null?null:targetFeet(view,target);
         if(pos==null || (view.self!=null && squared(view.self,pos)>256))return;
         startHand(view,player,targetId,actorId);
         if(enabled("sound-enabled",true)) {
@@ -622,15 +639,15 @@ public final class PatPatVelocity {
         return ItemStack.builder().user(user).type(ItemTypes.FILLED_MAP).amount(1)
             .component(ComponentTypes.MAP_ID,id).build();
     }
-    private boolean sendMap(View view,SkinCatalog.Skin style,int sprite,int pose){
+    private boolean sendMap(View view,SkinCatalog.Skin style,int sprite,int pose,MapFrames images){
         if(!canSendPlay(view))return false;
-        int id=mapFrames.mapId(style,sprite,pose);
+        int id=images.mapId(style,sprite,pose);
         // Each 16KiB map is sent at most once per connection, and never in CONFIGURATION.
         if(!view.sentMaps.add(id))return true;
         try{
             if(sendPlay(view,new WrapperPlayServerMapData(id,
                 (byte)0,false,true,List.of(),128,128,0,0,
-                mapFrames.frame(style,sprite,pose))))return true;
+                images.frame(style,sprite,pose))))return true;
             view.sentMaps.remove(id);
             return false;
         }catch(RuntimeException error){
@@ -665,9 +682,15 @@ public final class PatPatVelocity {
             active.decrementAndGet();return;
         }
         final SkinCatalog.Skin style=skin(player.getUniqueId());
-        final int duration=(int)number("hand-duration-ticks",6,2,40);
-        final double depth=number("hand-depth",0.425,0,2);
-        final double offset=number("hand-offset-y",0.15,-2,2)+style.offsetY();
+        final MapFrames images=mapFrames;
+        final double displayMs=number("duration-ms",0,0,10000);
+        final int duration=Math.max(2,Math.min(40,(int)Math.ceil(
+            (displayMs>0?displayMs:style.durationMs())/50.0)));
+        final int strokeDuration=Math.max(2,Math.min(40,(int)Math.ceil(
+            number("hand-motion-duration-ms",240,50,5000)/50.0)));
+        final boolean motion=enabled("hand-motion-enabled",true);
+        final double depth=number("hand-motion-depth",
+            number("hand-depth",0.425,0,2),0,2);
         final Tracked trackedTarget=view.find(targetId);
         final int targetEntityId=trackedTarget!=null?trackedTarget.id:
             targetId.equals(view.player)?view.selfEntityId:0;
@@ -679,12 +702,12 @@ public final class PatPatVelocity {
         final int id=entitySequence.getAndIncrement();
         final int[] fakeIds={id};
         try {
-            Vector3d pos=targetPosition(view,targetId,offset,0);
+            Vector3d pos=targetPosition(view,targetId,style);
             if(pos==null) {
                 if(squash)view.squishing.remove(targetEntityId);
                 active.decrementAndGet();return;
             }
-            if(!sendMap(view,style,0,0))throw new IllegalStateException("Play state ended");
+            if(!sendMap(view,style,0,0,images))throw new IllegalStateException("Play state ended");
             int face=faceTowardViewer(pos,view.self);
             // Invisible item frame: the map is visible, its background frame is not.
             // Unlike the old six-BlockDisplay hand, this renders at map resolution.
@@ -692,7 +715,7 @@ public final class PatPatVelocity {
                 EntityTypes.ITEM_FRAME,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),
                 0,face,null)))throw new IllegalStateException("Play state ended");
             if(!sendPlay(view,new WrapperPlayServerEntityMetadata(id,
-                ItemFrameMetadata.onSpawn(mapItem(view.user,mapFrames.mapId(style,0,0))))))
+                ItemFrameMetadata.onSpawn(mapItem(view.user,images.mapId(style,0,0))))))
                 throw new IllegalStateException("Play state ended");
         } catch(Exception ex) {
             cleanup(view,fakeIds);
@@ -717,16 +740,16 @@ public final class PatPatVelocity {
                         finish();return;
                     }
                     double t=(double)tick/duration;
-                    if(targetPosition(view,targetId,offset,0)==null){finish();return;}
+                    if(targetPosition(view,targetId,style)==null){finish();return;}
                     // Minecraft 26.3 item frames are BlockAttachedEntity: sub-block
                     // teleports snap to a block, so shift the map's pixels instead.
                     int frame=style.at(tick,duration);
-                    int pose=MapMotion.poseAt(tick,duration,depth);
+                    int pose=motion?MapMotion.poseAt(tick,strokeDuration,depth):0;
                     if(frame!=sentFrame || pose!=sentPose){
-                        if(!sendMap(view,style,frame,pose) ||
+                        if(!sendMap(view,style,frame,pose,images) ||
                                 !sendPlay(view,new WrapperPlayServerEntityMetadata(id,
                                     List.of(ItemFrameMetadata.mapItem(
-                                        mapItem(view.user,mapFrames.mapId(style,frame,pose))))))){
+                                        mapItem(view.user,images.mapId(style,frame,pose))))))){
                             finish();return;
                         }
                         sentFrame=frame;
@@ -754,17 +777,30 @@ public final class PatPatVelocity {
         }).repeat(50,TimeUnit.MILLISECONDS).schedule();
         job.set(task);
     }
-    private Vector3d targetPosition(View view,UUID targetId,double extraY,double down) {
+    /** Passenger positions are often not transmitted separately from the vehicle. */
+    private Vector3d targetFeet(View view,Tracked target) {
+        if(target==null)return null;
+        Tracked vehicle=target.vehicleId<0?null:view.byId.get(target.vehicleId);
+        return HandAnchor.feet(target.pos,
+            vehicle==null?null:vehicle.pos,vehicle==null?"":vehicle.type);
+    }
+    private Vector3d targetPosition(View view,UUID targetId,SkinCatalog.Skin style) {
         Tracked target=view.find(targetId);
-        if(target!=null) {
-            String type=target.type.toLowerCase(java.util.Locale.ROOT);
-            double height=type.contains("player")?1.8:
-                type.contains("chicken")||type.contains("rabbit")||type.contains("cat")?0.9:
-                type.contains("cow")||type.contains("horse")?1.5:1.6;
-            return add(target.pos,0,height+extraY-down,0);
-        }
-        if(view.player.equals(targetId) && view.self!=null)return add(view.self,0,1.8+extraY-down,0);
-        return null;
+        Vector3d feet;
+        double height,sitting=0;
+        if(target!=null){
+            feet=targetFeet(view,target);
+            height=HandAnchor.height(target.type);
+            if(target.vehicleId>=0 && target.type.toLowerCase(java.util.Locale.ROOT).contains("player"))
+                sitting=number("sitting-offset-y",0.2,-2,2);
+        }else if(view.player.equals(targetId) && view.self!=null){
+            feet=view.self;height=HandAnchor.height("player");
+        }else return null;
+        return HandAnchor.anchor(feet,height,view.self,
+            number("offset-x",0.5,-8,8)+style.offsetX(),
+            number("offset-y",0,-8,8)+style.offsetY(),
+            number("offset-z",0,-8,8)+style.offsetZ(),
+            !text("offset-space","view").equalsIgnoreCase("world"),sitting);
     }
     private void cleanup(View view,int[] ids) {
         if(!canSendPlay(view))return;
@@ -784,7 +820,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.5 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.6 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
