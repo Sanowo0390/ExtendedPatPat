@@ -15,7 +15,8 @@ class TogglePreferencesTest {
         UUID other=UUID.randomUUID();
         var preferences=new PatPreferences(file);
         assertTrue(preferences.enabled(player));
-        assertTrue(preferences.setEnabled(player,false));
+        // setEnabled returns the resulting state, not a success flag.
+        assertFalse(preferences.setEnabled(player,false));
         assertFalse(preferences.enabled(player));
         assertTrue(preferences.enabled(other));
 
