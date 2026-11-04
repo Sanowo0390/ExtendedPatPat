@@ -11,7 +11,7 @@ Install the JAR from the **Build PatPatVanilla Paper** GitHub Actions artifact i
 
 **Limitations:** this is **not pixel-identical** to PatPat's client 2D PNG/GIF renderer. Client-side keybindings, shaders/mixins, and exact player/mob squish/camera transforms cannot be recreated by a pure vanilla server plugin. This variant does not import the original PatPat's source or assets. Not tested with Folia. Bedrock visuals are managed independently by PatPatGeyserExtension; test carefully if both addons handle Bedrock interactions, to avoid duplicated effects.
 
-Requires Java 25 and Paper or Purpur 26.3. To build: `mvn -B -ntp -f paper-standalone/pom.xml package`. Output: target/PatPatVanilla-0.2.0.jar.
+Requires Java 25 and Paper or Purpur 26.3. To build: `mvn -B -ntp -f paper-standalone/pom.xml package`. Output: target/PatPatVanilla-0.3.0.jar.
 
 
 ## Animated Java hand (v0.2.0)
@@ -25,3 +25,16 @@ animation:
 
 The original six-block hand remains selectable via `renderer: voxel`.
 **Paper-only edition does not currently reproduce the squish effect**; changing a real entity scale would also alter gameplay hitboxes. Use Velocity 0.2.0 for client-only uniform squash. Never run both Paper and Velocity implementations simultaneously.
+
+
+## Independent per-viewer skin choice (v0.3.0)
+
+Paper now embeds the same generated \`patpat-skins.properties\` registry
+as Velocity. Add ZIP/GIF/PNG skins under \`resourcepack/skins/\` before
+running [Build All](../resourcepack/README.md).
+
+Use \`/ppv skin list\` and \`/ppv skin <id>\` to select the Java-side hand.
+Selections are saved under \`selected-skins\` in the plugin config. Each nearby
+Java viewer receives a separate ItemDisplay hidden from all other viewers
+with their selected frame sequence and optional sound. That is heavier than
+one shared display, so check \`animation.max-active\` and \`view-range\`.

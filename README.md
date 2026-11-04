@@ -6,9 +6,9 @@
 
 | コンポーネント | 最新版 | 導入先 | 役割 | GitHub Actions |
 |---|---|---|---|---|
-| **PatPatVelocity** | 0.2.0 | `Velocity/plugins/` | Java版の操作検出、仮想手、Java↔統合版中継 | [Velocity版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-velocity.yml) |
+| **PatPatVelocity** | 0.3.0 | `Velocity/plugins/` | Java版の操作検出、仮想手、Java↔統合版中継 | [Velocity版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-velocity.yml) |
 | **PatPatGeyserExtension** | 0.12.0 | `Velocity/plugins/Geyser-Velocity/extensions/` | 統合版の手画像・効果音・モーション | [Geyser版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) |
-| **PatPatVanilla** | 0.2.0 | `Paper/plugins/` | Paper/Purpur単体向けJava版の手アニメーション | [Paper版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-paper.yml) |
+| **PatPatVanilla** | 0.3.0 | `Paper/plugins/` | Paper/Purpur単体向けJava版の手アニメーション | [Paper版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-paper.yml) |
 
 ### どちらの構成を使う？
 
@@ -21,6 +21,12 @@
 ビルドはリポジトリの `main` で実行し、ActionsのArtifactsから対応するJARを取得してください。Geyser版はGeyser 2.12.1系のb1280および最新ビルドに対して検証されます。なお、GitHub Actionsの成功はゲーム内動作の保証ではありません。
 
 ---
+
+## 一括ビルド・スキン選択
+
+[**Build All PatPat（統合GitHub Actions）**](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-all.yml) を使うと、**Geyser拡張・Velocity版・Paper版の3つのJARと、対応するJava版リソースパック**を1回の実行でビルドし、最終的に `PatPat-Complete` からまとめてダウンロードできます。
+
+Mod向けのPatPat画像パック（ZIP）、横並びPNG、GIFを `resourcepack/skins/` に入れてビルドすると、すべてがJava版リソースパックに統合されます。Java版プレイヤーごとに `/ppv skin list` と `/ppv skin <ID>` で手を選択でき、選択を保存します。詳しくは [カスタムスキンの導入方法](resourcepack/README.md) を確認してください。
 
 ## Java版リソースパック（26.3）
 

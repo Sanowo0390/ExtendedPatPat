@@ -1,13 +1,5 @@
 name: Build PatPatVanilla Paper
 on:
-  push:
-    paths:
-      - 'paper-standalone/**'
-      - '.github/workflows/build-paper.yml'
-  pull_request:
-    paths:
-      - 'paper-standalone/**'
-      - '.github/workflows/build-paper.yml'
   workflow_dispatch:
 jobs:
   build:

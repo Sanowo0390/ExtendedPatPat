@@ -1,9 +1,5 @@
 name: Build PatPatVelocity
 on:
-  push:
-    paths: ['velocity-standalone/**','.github/workflows/build-velocity.yml','src/main/java/jp/mintymc/patpat/extension/**']
-  pull_request:
-    paths: ['velocity-standalone/**','.github/workflows/build-velocity.yml','src/main/java/jp/mintymc/patpat/extension/**']
   workflow_dispatch:
 jobs:
   build:

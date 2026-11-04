@@ -1,15 +1,5 @@
 name: Build Java PatPat Resource Pack
 on:
-  push:
-    paths:
-      - 'src/main/resources/default-hand.png'
-      - 'resourcepack/**'
-      - '.github/workflows/build-java-pack.yml'
-  pull_request:
-    paths:
-      - 'src/main/resources/default-hand.png'
-      - 'resourcepack/**'
-      - '.github/workflows/build-java-pack.yml'
   workflow_dispatch:
 jobs:
   pack:

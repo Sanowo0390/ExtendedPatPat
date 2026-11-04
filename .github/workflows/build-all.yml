@@ -1,0 +1,138 @@
+name: Build All PatPat (Velocity, Geyser, Paper, Resource Pack)
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 6'
+permissions:
+  contents: read
+jobs:
+  resource-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install skin import dependencies
+        run: python -m pip install Pillow==11.3.0 json5==0.12.0
+      - name: Import PatPat skins and build Java pack
+        run: python resourcepack/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PatPat-Java-Pack
+          path: |
+            resourcepack/dist/PatPatJava-26.3.zip
+            resourcepack/dist/PatPatJava-26.3.zip.sha1
+            resourcepack/dist/patpat-skins.properties
+          if-no-files-found: error
+  velocity:
+    needs: resource-pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: velocity-standalone/pom.xml
+      - uses: actions/download-artifact@v4
+        with:
+          name: PatPat-Java-Pack
+          path: resourcepack/dist
+      - name: Build Velocity plugin and test
+        run: mvn -B -ntp -f velocity-standalone/pom.xml verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PatPat-Velocity
+          path: velocity-standalone/target/PatPatVelocity-*.jar
+          if-no-files-found: error
+  paper:
+    needs: resource-pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: paper-standalone/pom.xml
+      - uses: actions/download-artifact@v4
+        with:
+          name: PatPat-Java-Pack
+          path: resourcepack/dist
+      - name: Build Paper plugin
+        run: mvn -B -ntp -f paper-standalone/pom.xml verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PatPat-Paper
+          path: paper-standalone/target/PatPatVanilla-*.jar
+          if-no-files-found: error
+  geyser:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        geyser-build: ['1280','latest']
+    env:
+      GEYSER_VERSION: '2.12.1'
+      GEYSER_BUILD: ${{ matrix.geyser-build }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify upstream Geyser SHA-256
+        run: python scripts/prepare_build.py
+      - name: Build Geyser extension
+        run: mvn -B -ntp verify
+      - uses: actions/upload-artifact@v4
+        if: matrix.geyser-build == 'latest'
+        with:
+          name: PatPat-Geyser
+          path: target/PatPatGeyserExtension-*.jar
+          if-no-files-found: error
+  bundle:
+    needs: [resource-pack,velocity,paper,geyser]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: PatPat-*
+          path: out
+          merge-multiple: true
+      - name: Verify and assemble all three JARs and client pack
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          root=Path('out')
+          jars=list(root.glob('*.jar'))
+          pack=root/'PatPatJava-26.3.zip'
+          sha=root/'PatPatJava-26.3.zip.sha1'
+          assert len(jars)==3, f'Expected three JARs, got: {jars}'
+          assert pack.is_file() and sha.is_file()
+          assert {p.name.split('-')[0] for p in jars} == {'PatPatVelocity','PatPatVanilla','PatPatGeyserExtension'}
+          with ZipFile(pack) as check: assert check.testzip() is None
+          readme='PatPat complete bundle: choose either Velocity+Geyser for crossplay or Paper alone.\nInstall PatPatJava-26.3.zip on Java clients (or host it and configure a resource-pack URL).\nDo not install both PatPatVelocity and PatPatVanilla on one backend.\n'
+          directory=Path('bundle'); directory.mkdir(exist_ok=True)
+          with ZipFile(directory/'PatPat-Complete.zip','w',ZIP_DEFLATED,compresslevel=9) as z:
+              for file in sorted(jars+[pack,sha],key=lambda p:p.name): z.write(file,file.name)
+              z.writestr('INSTALL.txt',readme)
+          print('Bundle:',(directory/'PatPat-Complete.zip').stat().st_size,'bytes')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PatPat-Complete
+          path: bundle/PatPat-Complete.zip
+          if-no-files-found: error

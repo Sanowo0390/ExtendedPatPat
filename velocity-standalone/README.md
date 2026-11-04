@@ -6,7 +6,7 @@ This repository provides two pieces that run in the same Velocity JVM:
 
 | Component | Install directory | Responsibility |
 |---|---|---|
-| PatPatVelocity 0.2.0 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
+| PatPatVelocity 0.3.0 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
 | PatPatGeyserExtension 0.12.0 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
 
 Requirements: Velocity 3.5, **PacketEvents 2.14.0 for Velocity**, and **Geyser-Velocity 2.12.1系** (required Geyser internals are checked at startup). The normal Geyser-Velocity plugin is also in \`Velocity/plugins/\`.
@@ -24,7 +24,7 @@ No official PatPat Plugin and no server-side Paper plugin are necessary.
 ## Install
 
 1. Install **PacketEvents 2.14.0 Velocity** and **Geyser-Velocity 2.12.1系** in \`Velocity/plugins/\` as normal Velocity plugins.
-2. Put the **PatPatVelocity-0.2.0.jar** from the **Build PatPatVelocity** GitHub Action in \`Velocity/plugins/\`.
+2. Put the **PatPatVelocity-0.3.0.jar** from the **Build PatPatVelocity** GitHub Action in \`Velocity/plugins/\`.
 3. Put **PatPatGeyserExtension-0.12.0.jar** from the **Build Extension** GitHub Action in \`Velocity/plugins/Geyser-Velocity/extensions/\`. **Remove older copies** of this extension first.
 4. Restart Velocity. Run \`/ppv status\`; the default mode is **standalone**, and Geyser bridge should be \`true\`.
 5. Java: sneak + right-click a mob or another player; Bedrock: use the configured Geyser gesture. Other people on the same backend should see it.
@@ -87,3 +87,21 @@ If `resource-pack-url` is provided, Velocity offers the pack to Java clients aut
 `squish-enabled=true` sends temporary Java clientbound `minecraft:scale` attribute packets and restores the most recent server scale afterward. This is **uniform size scaling**, not the Mod's true per-axis squash. It does not modify server attributes or hitboxes. Live Java/Bedrock client tests are required.
 
 Minecraft **26.3** resource pack format is **97.1**. Older clients need separately compatible packs and are not guaranteed.
+
+
+## Per-client PatPat skins (v0.3.0)
+
+Place custom PatPat Mod ZIPs, PNG sprite strips or GIFs in
+\`resourcepack/skins/\`, then run [Build All](../resourcepack/README.md)
+to rebuild **both the Java resource pack and the matching plugin JARs**.
+
+\`/ppv skin list\` shows the styles in the combined pack.
+\`/ppv skin <id>\` selects one for this Java viewer, and
+\`/ppv skin default\` resets it. Each user's choice is persisted in
+\`plugins/patpatvelocity/player-skins.properties\`.
+
+The viewer's selected style drives item model frames, duration, transforms,
+and optional sound. Importing \`Bonk Bonk Animation.zip\` as
+\`resourcepack/skins/Bonk Bonk Animation.zip\` makes it available under
+\`bonk_bonk_animation\` with six frames. The resource pack ZIP must also be
+installed/accepted by Java clients; commands do not transmit textures.
