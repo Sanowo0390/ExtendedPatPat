@@ -22,7 +22,7 @@ class HeadTileFramesTest {
         assertFalse(frames.ready(SkinCatalog.load().get("default")));
         assertTrue(HeadTileFrames.supported(ClientVersion.V_26_3));
         assertTrue(HeadTileFrames.supported(ClientVersion.V_1_21_9));
-        assertFalse(HeadTileFrames.supported(ClientVersion.V_1_21_8));
+        assertFalse(HeadTileFrames.supported(ClientVersion.V_1_19_4));
     }
 
     @Test void cachedSignedHeadsRenderAsNativeObjectComponents() throws Exception {
