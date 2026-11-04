@@ -6,9 +6,9 @@
 
 | コンポーネント | 最新版 | 導入先 | 役割 | GitHub Actions |
 |---|---|---|---|---|
-| **PatPatVelocity** | 0.1.2 | `Velocity/plugins/` | Java版の操作検出、仮想手、Java↔統合版中継 | [Velocity版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-velocity.yml) |
+| **PatPatVelocity** | 0.2.0 | `Velocity/plugins/` | Java版の操作検出、仮想手、Java↔統合版中継 | [Velocity版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-velocity.yml) |
 | **PatPatGeyserExtension** | 0.12.0 | `Velocity/plugins/Geyser-Velocity/extensions/` | 統合版の手画像・効果音・モーション | [Geyser版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) |
-| **PatPatVanilla** | 0.1.0 | `Paper/plugins/` | Paper/Purpur単体向けJava版の手アニメーション | [Paper版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-paper.yml) |
+| **PatPatVanilla** | 0.2.0 | `Paper/plugins/` | Paper/Purpur単体向けJava版の手アニメーション | [Paper版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-paper.yml) |
 
 ### どちらの構成を使う？
 
@@ -16,11 +16,21 @@
 
 **Paper/Purpur単体**でJava版クライアントにPat演出を追加したい場合は、PatPatVanillaだけを導入してください。詳細は [Paper版README](paper-standalone/README.md)。Paper版は独立実装で、**Velocity版のJava↔統合版ブリッジ機能は含まれていません**。
 
-**同一サーバーにPaper版とVelocity版を同時導入しないでください。** 演出の重複を招きます。また、Java版のブロック製の手は元のPatPatクライアントModの2D画像とは異なります。
+**同一サーバーにPaper版とVelocity版を同時導入しないでください。** 演出の重複を招きます。Java版は共通のリソースパックによって5コマの画像手を表示します。リソースパックを使用しない場合はブロック製の手へ切り替え可能です。
 
 ビルドはリポジトリの `main` で実行し、ActionsのArtifactsから対応するJARを取得してください。Geyser版はGeyser 2.12.1系のb1280および最新ビルドに対して検証されます。なお、GitHub Actionsの成功はゲーム内動作の保証ではありません。
 
 ---
+
+## Java版リソースパック（26.3）
+
+- <https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-java-pack.yml> の成功したActionsから `PatPatJava-26.3.zip` を取得できます（ArtifactsのZIPを展開すると、適用用ZIPが入っています）。
+- Java版プレイヤーがパックを導入するか、ZIPをHTTPSで配布してVelocityの `resource-pack-url` やPaperの `resource-pack` に指定します。
+- **手のアニメーション**：送っていただいた5コマのPNGを利用して、5個のモデルを1tickずつ切り替えます。
+- **凹み**：Velocity版は周囲のJavaプレイヤーに送る表示用パケットで一瞬だけ全体のスケールを小さくします。実際の当たり判定やサーバー側のスケールは変えません。縦方向だけ潰すMod版と完全には同じではありません。Paper単体版の凹み処理は未実装です。
+- **リソースパックなし**：Voxel表示へ切替できます（Velocity: `hand-renderer=voxel`、Paper: `animation.renderer=voxel`）。
+
+生成方法・配置方法：[resourcepack/README.md](resourcepack/README.md)。
 
 ## Geyser拡張の詳細
 

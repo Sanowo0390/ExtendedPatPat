@@ -6,7 +6,7 @@ This repository provides two pieces that run in the same Velocity JVM:
 
 | Component | Install directory | Responsibility |
 |---|---|---|
-| PatPatVelocity 0.1.2 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
+| PatPatVelocity 0.2.0 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
 | PatPatGeyserExtension 0.12.0 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
 
 Requirements: Velocity 3.5, **PacketEvents 2.14.0 for Velocity**, and **Geyser-Velocity 2.12.1系** (required Geyser internals are checked at startup). The normal Geyser-Velocity plugin is also in \`Velocity/plugins/\`.
@@ -24,7 +24,7 @@ No official PatPat Plugin and no server-side Paper plugin are necessary.
 ## Install
 
 1. Install **PacketEvents 2.14.0 Velocity** and **Geyser-Velocity 2.12.1系** in \`Velocity/plugins/\` as normal Velocity plugins.
-2. Put the **PatPatVelocity-0.1.2.jar** from the **Build PatPatVelocity** GitHub Action in \`Velocity/plugins/\`.
+2. Put the **PatPatVelocity-0.2.0.jar** from the **Build PatPatVelocity** GitHub Action in \`Velocity/plugins/\`.
 3. Put **PatPatGeyserExtension-0.12.0.jar** from the **Build Extension** GitHub Action in \`Velocity/plugins/Geyser-Velocity/extensions/\`. **Remove older copies** of this extension first.
 4. Restart Velocity. Run \`/ppv status\`; the default mode is **standalone**, and Geyser bridge should be \`true\`.
 5. Java: sneak + right-click a mob or another player; Bedrock: use the configured Geyser gesture. Other people on the same backend should see it.
@@ -65,3 +65,25 @@ mvn -B -ntp verify
 \`\`\`
 
 Geyser builds are verified by SHA-256 from its official download API, and the extension CI runs both the b1280 baseline and the newest 2.12.1 build. New untested builds should still be validated in-game before production deployment.
+
+
+## Java sprite pack & client-only squish (v0.2.0)
+
+Build/download **PatPatJava-26.3.zip** from the [resourcepack workflow](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-java-pack.yml), and install it into each Java client's resourcepacks or host it on HTTPS. This repo's source image contains five frames; the server advances `patpat:hand_0` through `patpat:hand_4` in one virtual ItemDisplay, using the per-frame `minecraft:item_model` data component. These are **client-only fake entities**; no world mutation.
+
+New Velocity settings:
+
+```properties
+hand-renderer=resourcepack
+resource-pack-url=
+resource-pack-sha1=
+resource-pack-assume-installed=false
+squish-enabled=true
+squish-min-scale=0.86
+```
+
+If `resource-pack-url` is provided, Velocity offers the pack to Java clients automatically; set `resource-pack-sha1` to the 40-character SHA-1 in `PatPatJava-26.3.zip.sha1`. Packs must be available via direct HTTP(S) download (GitHub Actions artifact pages are **not** direct URLs). `hand-renderer=auto` selects the sprite only for viewers whose pack download is confirmed successful and uses voxel otherwise; for manually installed packs set `resource-pack-assume-installed=true`. `hand-renderer=resourcepack` always shows the sprite and will show a missing model on clients lacking the pack.
+
+`squish-enabled=true` sends temporary Java clientbound `minecraft:scale` attribute packets and restores the most recent server scale afterward. This is **uniform size scaling**, not the Mod's true per-axis squash. It does not modify server attributes or hitboxes. Live Java/Bedrock client tests are required.
+
+Minecraft **26.3** resource pack format is **97.1**. Older clients need separately compatible packs and are not guaranteed.
