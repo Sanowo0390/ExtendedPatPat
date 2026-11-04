@@ -176,8 +176,10 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0 || args[0].equalsIgnoreCase("status")) {
-            sender.sendMessage("§aExtendedPatPat Paper §7v0.5.0 | active animations: " + animations.size()
-                + (sender instanceof Player p?" | skin="+skin(p).id():""));
+            sender.sendMessage("§aExtendedPatPat Paper §7v0.6.0 | active animations: " + animations.size()
+                + (sender instanceof Player p?
+                    " | personal="+(disabled.contains(p.getUniqueId())?"OFF":"ON")
+                    +" | skin="+skin(p).id():""));
             return true;
         }
         if (args[0].equalsIgnoreCase("reload")) {
@@ -205,12 +207,22 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             return true;
         }
         if (args[0].equalsIgnoreCase("toggle")) {
-            if (!(sender instanceof Player player)) { sender.sendMessage("§cPlayers only."); return true; }
-            boolean enabled = args.length > 1 ? args[1].equalsIgnoreCase("on") : disabled.contains(player.getUniqueId());
-            if (enabled) disabled.remove(player.getUniqueId()); else disabled.add(player.getUniqueId());
-            getConfig().set("disabled-players", disabled.stream().map(UUID::toString).sorted().toList());
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");return true;
+            }
+            if(args.length>2 || (args.length==2 &&
+                    !args[1].equalsIgnoreCase("on") && !args[1].equalsIgnoreCase("off"))) {
+                sender.sendMessage("§e/extendedpatpat toggle [on|off]");return true;
+            }
+            UUID uuid=player.getUniqueId();
+            boolean enabled=args.length==2?args[1].equalsIgnoreCase("on"):disabled.contains(uuid);
+            if(enabled)disabled.remove(uuid);else disabled.add(uuid);
+            getConfig().set("disabled-players",disabled.stream().map(UUID::toString).sorted().toList());
             saveConfig();
-            sender.sendMessage("§aExtendedPatPat Paper: " + (enabled ? "§aON" : "§cOFF"));
+            if(!enabled)for(Animation animation:List.copyOf(animations))
+                animation.hideViewer(uuid);
+            sender.sendMessage("§aExtendedPatPat Paper: "+(enabled?"§aON":"§cOFF")
+                +" §7(送受信ともに切り替えました)");
             return true;
         }
         sender.sendMessage("§e/" + label + " <status|skin [list|id]|toggle [on|off]|reload>");
@@ -274,6 +286,15 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                 (dz>=0?BlockFace.SOUTH:BlockFace.NORTH);
         }
         boolean hasViewers(){return !sprites.isEmpty();}
+        void hideViewer(UUID viewerId){
+            for(var iterator=sprites.iterator();iterator.hasNext();){
+                ViewerSprite sprite=iterator.next();
+                if(!sprite.viewer().getUniqueId().equals(viewerId))continue;
+                if(sprite.frame().isValid())sprite.frame().remove();
+                iterator.remove();
+            }
+            if(sprites.isEmpty())finish();
+        }
         private Location position(double down){
             return target.getLocation().add(0,target.getHeight()+offsetY-down,0);
         }
@@ -282,9 +303,14 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             double t=(double)tick/ticks;
             double eased=1-(1-t)*(1-t);
             Location position=position(depth*Math.sin(Math.PI*eased));
-            for(ViewerSprite view:sprites){
+            for(var iterator=sprites.iterator();iterator.hasNext();){
+                ViewerSprite view=iterator.next();
                 ItemFrame frame=view.frame();
-                if(!frame.isValid())continue;
+                if(!frame.isValid() || !view.viewer().isOnline() ||
+                        disabled.contains(view.viewer().getUniqueId())){
+                    if(frame.isValid())frame.remove();
+                    iterator.remove();continue;
+                }
                 frame.teleport(position.clone().add(view.skin().offsetX(),view.skin().offsetY(),
                     view.skin().offsetZ()));
                 int index=view.skin().at(tick,ticks+1);
@@ -293,6 +319,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                     view.lastFrame(index);
                 }
             }
+            if(sprites.isEmpty()){finish();return;}
             tick++;
         }
         private void finish(){
