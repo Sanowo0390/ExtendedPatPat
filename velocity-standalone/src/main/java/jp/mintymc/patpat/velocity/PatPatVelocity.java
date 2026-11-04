@@ -78,7 +78,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.2",
+    version="0.6.3",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -559,19 +559,17 @@ public final class PatPatVelocity {
         return ItemStack.builder().user(user).type(ItemTypes.FILLED_MAP).amount(1)
             .component(ComponentTypes.MAP_ID,id).build();
     }
-    private void provideMaps(View view,SkinCatalog.Skin skin){
-        // IDs are stable per skin and per frame. Each client's map cache is
-        // populated at most once per session, not on every Pat animation tick.
-        for(int i=0;i<skin.frames();i++){
-            int id=mapFrames.mapId(skin,i,skinCatalog);
-            if(!view.sentMaps.add(id))continue;
-            try{
-                view.user.sendPacketSilently(new WrapperPlayServerMapData(id,
-                    (byte)0,false,true,List.of(),128,128,0,0,mapFrames.frame(skin,i)));
-            }catch(RuntimeException error){
-                view.sentMaps.remove(id);
-                throw error;
-            }
+    private void sendMap(View view,SkinCatalog.Skin style,int sprite,int pose){
+        int id=mapFrames.mapId(style,sprite,pose);
+        // Send each 16KiB map only on first use for this connection.
+        if(!view.sentMaps.add(id))return;
+        try{
+            view.user.sendPacketSilently(new WrapperPlayServerMapData(id,
+                (byte)0,false,true,List.of(),128,128,0,0,
+                mapFrames.frame(style,sprite,pose)));
+        }catch(RuntimeException error){
+            view.sentMaps.remove(id);
+            throw error;
         }
     }
     private static int faceTowardViewer(Vector3d position,Vector3d viewer){
@@ -600,7 +598,7 @@ public final class PatPatVelocity {
             active.decrementAndGet();return;
         }
         final SkinCatalog.Skin style=skin(player.getUniqueId());
-        final int duration=Math.max(2,Math.min(40,(int)Math.ceil(style.durationMs()/50.0)));
+        final int duration=(int)number("hand-duration-ticks",6,2,40);
         final double depth=number("hand-depth",0.425,0,2);
         final double offset=number("hand-offset-y",0.15,-2,2)+style.offsetY();
         final Tracked trackedTarget=view.find(targetId);
@@ -619,7 +617,7 @@ public final class PatPatVelocity {
                 if(squash)view.squishing.remove(targetEntityId);
                 active.decrementAndGet();return;
             }
-            provideMaps(view,style);
+            sendMap(view,style,0,0);
             int face=faceTowardViewer(pos,view.self);
             // Invisible item frame: the map is visible, its background frame is not.
             // Unlike the old six-BlockDisplay hand, this renders at map resolution.
@@ -627,7 +625,7 @@ public final class PatPatVelocity {
                 EntityTypes.ITEM_FRAME,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),
                 0,face,null));
             view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,
-                ItemFrameMetadata.onSpawn(mapItem(view.user,mapFrames.mapId(style,0,skinCatalog)))));
+                ItemFrameMetadata.onSpawn(mapItem(view.user,mapFrames.mapId(style,0,0)))));
         } catch(Exception ex) {
             cleanup(view,fakeIds);
             if(squash)view.squishing.remove(targetEntityId);
@@ -639,6 +637,7 @@ public final class PatPatVelocity {
         ScheduledTask task=proxy.getScheduler().buildTask(this,new Runnable() {
             int tick=0;
             int sentFrame=0;
+            int sentPose=0;
             private boolean finished;
             @Override public void run() {
                 try {
@@ -649,17 +648,18 @@ public final class PatPatVelocity {
                         finish();return;
                     }
                     double t=(double)tick/duration;
-                    double eased=1-(1-t)*(1-t);
-                    double down=depth*Math.sin(Math.PI*eased);
-                    Vector3d p=targetPosition(view,targetId,offset,down);
-                    if(p==null){finish();return;}
-                    view.user.sendPacketSilently(new WrapperPlayServerEntityTeleport(id,p,0,0,false));
+                    if(targetPosition(view,targetId,offset,0)==null){finish();return;}
+                    // Minecraft 26.3 item frames are BlockAttachedEntity: sub-block
+                    // teleports snap to a block, so shift the map's pixels instead.
                     int frame=style.at(tick,duration);
-                    if(frame!=sentFrame){
+                    int pose=MapMotion.poseAt(tick,duration,depth);
+                    if(frame!=sentFrame || pose!=sentPose){
+                        sendMap(view,style,frame,pose);
                         view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,
                             List.of(ItemFrameMetadata.mapItem(
-                                mapItem(view.user,mapFrames.mapId(style,frame,skinCatalog))))));
+                                mapItem(view.user,mapFrames.mapId(style,frame,pose))))));
                         sentFrame=frame;
+                        sentPose=pose;
                     }
                     if(squash){
                         double pressure=Math.sin(Math.PI*t);
@@ -712,7 +712,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.2 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.3 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
