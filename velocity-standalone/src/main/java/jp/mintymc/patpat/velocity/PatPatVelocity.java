@@ -83,7 +83,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.7.0",
+    version="0.7.1",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -377,6 +377,14 @@ public final class PatPatVelocity {
             view.user.getEncoderState());
     }
 
+    /** Check that queued work still belongs to the original active PLAY connection. */
+    private boolean stillAtOrigin(UUID actor,View origin,String backend) {
+        Player player=proxy.getPlayer(actor).orElse(null);
+        return player!=null && origin!=null && canSendPlay(origin) &&
+            PatRelayPolicy.sameOrigin(backend,serverOf(player),
+                views.get(actor)==origin,origin.switching);
+    }
+
     private boolean sendPlay(View view,PacketWrapper<?> packet) {
         if(!canSendPlay(view))return false;
         view.user.sendPacketSilently(packet);
@@ -462,13 +470,28 @@ public final class PatPatVelocity {
                 if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client.PLUGIN_MESSAGE) {
                     // A real PatPat client already negotiates and renders the official
                     // protocol. Never register a second version or draw duplicate hands.
-                    String channel=new WrapperPlayClientPluginMessage(event).getChannelName();
+                    var message=new WrapperPlayClientPluginMessage(event);
+                    String channel=message.getChannelName();
                     if(PatPatProtocol.HELLO_C2S.equals(channel) || PatPatProtocol.PAT_C2S.equals(channel))
                         view.realMod=true;
                     else if(REGISTER_CHANNEL.equals(channel)) {
-                        byte[] data=new WrapperPlayClientPluginMessage(event).getData();
-                        if(new String(data,StandardCharsets.UTF_8).contains(PatPatProtocol.HELLO_S2C))
+                        byte[] data=message.getData();
+                        if(new String(data,StandardCharsets.UTF_8).contains(PatPatProtocol.HELLO_S2C)){
                             view.realMod=true;
+                            if(!enabled("official-integration-enabled",false))
+                                sendPlay(view,new WrapperPlayServerPluginMessage(
+                                    PatPatProtocol.HELLO_S2C,PatPatProtocol.hello()));
+                        }
+                    }
+                    if(PatPatProtocol.PAT_C2S.equals(channel)
+                            && !enabled("official-integration-enabled",false)
+                            && enabled("enabled",true) && !isBedrock(uuid)
+                            && personalEnabled(uuid)) {
+                        // Native PatPat clients need a v2 proxy receiver when
+                        // no backend PatPat plugin is used. Do not relay unvalidated
+                        // entity IDs or requests from a different backend.
+                        if(handleNativeRequest(view,uuid,message.getData()))
+                            event.setCancelled(true);
                     }
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client.PLAYER_POSITION) {
                     view.self=new WrapperPlayClientPlayerPosition(event).getPosition();
@@ -498,10 +521,10 @@ public final class PatPatVelocity {
                     boolean official=mode==PatModePolicy.Mode.OFFICIAL_BACKEND;
                     long cooldown=(long)number("cooldown-ms",250,0,10000)*1_000_000L;
                     if(now-view.lastPat<cooldown)return;
-                    view.lastPat=now;
-                    if(enabled("cancel-interaction",false))event.setCancelled(true);
                     UUID targetUuid=target.uuid;
                     if(!personalEnabled(targetUuid))return;
+                    view.lastPat=now;
+                    if(enabled("cancel-interaction",false))event.setCancelled(true);
                     if(official) {
                         // Upstream validates: permission, rate limit, whitelist/blacklist,
                         // living target/range, and cancellable PatPacketReceiveEvent.
@@ -513,14 +536,17 @@ public final class PatPatVelocity {
                                 ()->renderToJavaViewer(actor,view,targetUuid,uuid)).schedule();
                         return;
                     }
+                    final String backendAtClick=view.backend;
                     proxy.getScheduler().buildTask(PatPatVelocity.this,()->{
-                        // NPC server-select interactions can initiate a backend switch
-                        // immediately after this packet. Allow PreConnect to cancel
-                        // the visual effect before creating any client-only entities.
-                        if(!personalEnabled(uuid) || !personalEnabled(targetUuid))return;
+                        // NPC server transfers can begin immediately after the
+                        // interact packet. Never show this pat on the NEXT backend.
+                        if(!stillAtOrigin(uuid,view,backendAtClick)
+                                || view.find(targetUuid)!=target
+                                || !personalEnabled(uuid) || !personalEnabled(targetUuid))return;
                         renderToJava(uuid,targetUuid);
-                        if(enabled("bridge-enabled",true) &&
-                                personalEnabled(uuid) && personalEnabled(targetUuid))
+                        if(enabled("bridge-enabled",true)
+                                && stillAtOrigin(uuid,view,backendAtClick)
+                                && personalEnabled(uuid) && personalEnabled(targetUuid))
                             sendToBedrock(uuid,targetUuid);
                     }).delay(75L,TimeUnit.MILLISECONDS).schedule();
                 }
@@ -528,7 +554,46 @@ public final class PatPatVelocity {
         }
     }
 
-    /** Only trust an official serverbound approval notification for Java viewers. */
+    /**
+     * Native PatPat client C2S. The official backend path remains authoritative
+     * when integration is enabled; standalone mode handles only strict requests.
+     */
+    private boolean handleNativeRequest(View view,UUID actorId,byte[] payload) {
+        int entityId;
+        try{entityId=PatPatProtocol.readRequest(payload);}
+        catch(IllegalArgumentException invalid){return false;}
+        if(!canSendPlay(view) || !personalEnabled(actorId))return false;
+        Tracked target=view.byId.get(entityId);
+        if(target==null || target.uuid.equals(actorId) || !looksLiving(target.type)
+                || !personalEnabled(target.uuid))return false;
+        Player actor=proxy.getPlayer(actorId).orElse(null);
+        if(actor==null)return false;
+        String permission=text("required-permission","");
+        if(!permission.isBlank() && !actor.hasPermission(permission))return false;
+        Vector3d feet=targetFeet(view,target);
+        if(view.self==null || feet==null ||
+                squared(view.self,feet)>Math.pow(number("max-distance",4,1,6),2))
+            return false;
+        long now=System.nanoTime();
+        long cooldown=(long)number("cooldown-ms",250,0,10000)*1_000_000L;
+        if(now-view.lastPat<cooldown)return true; // Consume duplicate native requests.
+        view.lastPat=now;
+        final String backendAtClick=view.backend;
+        final UUID targetId=target.uuid;
+        proxy.getScheduler().buildTask(this,()->{
+            if(!stillAtOrigin(actorId,view,backendAtClick)
+                    || view.find(targetId)!=target
+                    || !personalEnabled(actorId) || !personalEnabled(targetId))return;
+            renderToJava(actorId,targetId);
+            if(enabled("bridge-enabled",true)
+                    && stillAtOrigin(actorId,view,backendAtClick)
+                    && personalEnabled(actorId) && personalEnabled(targetId))
+                sendToBedrock(actorId,targetId);
+        }).delay(75L,TimeUnit.MILLISECONDS).schedule();
+        return true;
+    }
+
+    /** Only trust an official backend approval notification for Java viewers. */
     private void onBackendMessage(UUID viewerId,View view,WrapperPlayServerPluginMessage message) {
         if(!enabled("enabled",true) || !enabled("official-integration-enabled",false)
                 || isBedrock(viewerId))return;
@@ -601,11 +666,24 @@ public final class PatPatVelocity {
     }
     private void receiveBedrockPat(Object[] payload) {
         if(payload==null || payload.length!=2 || !(payload[0] instanceof UUID actor)
-                || !(payload[1] instanceof UUID target))return;
+                || !(payload[1] instanceof UUID target) || actor.equals(target))return;
         if(!enabled("enabled",true) || !enabled("bridge-enabled",true)
-                || !personalEnabled(actor) || !personalEnabled(target))return;
+                || !isBedrock(actor) || !personalEnabled(actor) || !personalEnabled(target))return;
+        Player actorPlayer=proxy.getPlayer(actor).orElse(null);
+        if(actorPlayer==null)return;
+        String originBackend=serverOf(actorPlayer);
+        View originView=views.get(actor);
+        if(originBackend==null)return;
         proxy.getScheduler().buildTask(this,()->{
-            if(personalEnabled(actor) && personalEnabled(target))renderToJava(actor,target);
+            // Keep the source backend and connection lease; a player might
+            // switch servers between the Geyser callback and this async task.
+            Player current=proxy.getPlayer(actor).orElse(null);
+            if(current==null || !PatRelayPolicy.sameOrigin(originBackend,serverOf(current),
+                    originView==null || originView==views.get(actor),
+                    originView!=null && originView.switching)
+                    || !isBedrock(actor) || !personalEnabled(actor)
+                    || !personalEnabled(target))return;
+            renderToJava(actor,target);
         }).schedule();
     }
 
@@ -625,7 +703,7 @@ public final class PatPatVelocity {
     private void renderToJavaViewer(Player player,View view,UUID targetId,UUID actorId) {
         if(!canSendPlay(view) || !player.isActive() || isBedrock(player.getUniqueId()) ||
             !personalEnabled(player.getUniqueId()) || !personalEnabled(targetId) ||
-            (actorId!=null && !personalEnabled(actorId)) || view.realMod ||
+            (actorId!=null && !personalEnabled(actorId)) ||
             !enabled("hand-enabled",true))return;
         // Item frames and maps are supported by old Java clients and ViaVersion.
         if(player.getProtocolVersion().getProtocol()<393)return;
@@ -633,6 +711,21 @@ public final class PatPatVelocity {
         Vector3d pos=target==null && targetId.equals(player.getUniqueId()) ? view.self
             : target==null?null:targetFeet(view,target);
         if(pos==null || (view.self!=null && squared(view.self,pos)>256))return;
+        if(view.realMod){
+            // Native clients already render their own hand. Deliver the same
+            // PatPat v2 event instead of layering an invisible item frame.
+            if(actorId==null || (enabled("official-integration-enabled",false)
+                    && view.officialHello))return;
+            Tracked source=view.find(actorId);
+            int sourceId=source!=null?source.id:
+                actorId.equals(view.player)?view.selfEntityId:0;
+            int targetIdInView=target!=null?target.id:
+                targetId.equals(view.player)?view.selfEntityId:0;
+            if(sourceId<=0 || targetIdInView<=0)return;
+            sendPlay(view,new WrapperPlayServerPluginMessage(PatPatProtocol.PAT_S2C,
+                PatPatProtocol.notification(targetIdInView,sourceId)));
+            return;
+        }
         startHand(view,player,targetId,actorId);
         if(enabled("sound-enabled",true)) {
             try {
@@ -958,7 +1051,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.7.0 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.7.1 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
