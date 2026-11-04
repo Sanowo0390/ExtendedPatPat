@@ -7,3 +7,7 @@ Velocity／Paper版の手は、**画像を128×128のMinecraft地図色に変換
 公開GitHub Actionsでは`PATPAT_DEFAULT_ONLY=1`のため、デフォルトの画像のみを内包します。Bonkなど例示素材は追加していません。ActionsはVelocity、Paper、Geyserの3種類のJARのみを配布します。
 
 Java版の各プレイヤーは`/extendedpatpat skin list`と`/extendedpatpat skin <ID>`で切り替えられます。地図は128×128、有限の色パレット、4方向の額縁表示という制限があります。カスタムOGGはリソースパックなしでは追加配信できないため、Java版での音はバニラ音源です。画像や音声の再配布には権利者の許諾・ライセンスを確認してください。
+
+## Velocityの手の上下アニメーション
+
+`resourcepack/build.py` は各スプライトに対して `0_0.bin` ～ `0_4.bin` のように5段階の上下位置を生成します（元の `0.bin` はPaper版用として残します）。Velocityは1つの透明額縁に表示するマップを切り替えて、手を下げて戻す動きを実現します。地図データは同じ接続先に対して一度だけ送信されます。

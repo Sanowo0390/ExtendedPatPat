@@ -42,6 +42,13 @@ jobs:
                   assert len(pixels)==16384
                   assert any(pixel!=0 for pixel in pixels)
                   assert pixels[0]==0, 'Transparent corners must remain transparent'
+              # Velocity must include five pre-rendered Y positions for each sprite.
+              for frame in range(5):
+                  for pose in range(5):
+                      pixels=z.read(f'maps/default/{frame}_{pose}.bin')
+                      assert len(pixels)==16384
+                      assert pixels[0]==0, 'Motion map must retain transparent corners'
+              assert z.read('maps/default/0_0.bin') != z.read('maps/default/0_4.bin')
               assert 'PatPatJava-26.3.zip' not in z.namelist()
               assert b'skins=default' in z.read('patpat-skins.properties')
           PY

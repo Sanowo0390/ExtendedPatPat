@@ -4,7 +4,7 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.2.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.3.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
@@ -12,13 +12,13 @@ Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPa
 
 ## マップ表示
 
-デフォルト手画像はビルド時に128×128の地図色へ変換し、JARに内包されます。各プレイヤーのクライアントへ最初のPat時に必要なマップ画像を送信し、以降は透明額縁のアイテムを切り替えてアニメーションします。スキンID単位でマップIDを固定し、同じデータの再送信を抑えます。
+デフォルト手画像はビルド時に128×128の地図色へ変換し、JARに内包されます。各プレイヤーのクライアントへ初めて使うマップ画像を一度だけ送信し、透明額縁の地図IDを切り替えてアニメーションします。**上下動は額縁本体の移動ではなく、5段階の地図画像の中で手を下げて戻す方式**です。スキンID単位でマップIDを固定し、同じデータの再送信を抑えます。
 
 地図は透過に対応しますが、色数と角度が制限されます。額縁はカメラ追従のBillboardではなく、視聴者に近い4方向のいずれかを向きます。ViaVersion経由の表示はバージョン別に検証してください。元のブロック製の手・Java追加リソースパック配信は廃止しています。
 
 ## よく使う設定
 
-`enabled`、`require-sneaking`、`cooldown-ms`、`hand-offset-y`、`hand-depth`、`max-active`、`sound-*`、`required-permission`。オプションの公式PatPat Plugin連携は`official-integration-enabled`で切り替えます。
+`enabled`、`require-sneaking`、`cooldown-ms`、`hand-offset-y`、`hand-depth`、`hand-duration-ticks`、`max-active`、`sound-*`、`required-permission`。オプションの公式PatPat Plugin連携は`official-integration-enabled`で切り替えます。
 
 `/extendedpatpat skin list`と`/extendedpatpat skin <ID>`で自分が見るマップ画像を選択できます。標準配布にBonkなどのサンプル素材は含まれません。カスタム素材の追加：[resourcepack/README.md](../resourcepack/README.md)。
 
@@ -27,3 +27,7 @@ Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPa
 ## 個人のON/OFF
 
 `/extendedpatpat toggle [on|off]` は送信と受信の両方を制御し、OFFのプレイヤーは他人のPat対象にもなりません。Geyser-Velocity併用時は統合版プレイヤーの設定をGeyserと共通化します。`/extendedpatpat status` に個人のON/OFFが表示されます。
+
+### 手の上下動
+
+`hand-depth=0.425` が標準の上下動（約28マップピクセル）で、`0` にすると静止します。`hand-duration-ticks=6` で約0.3秒の「下げる→戻す」を実行します。地図の128×128サイズ内に収めるため、元画像は必要な場合のみ縮小されます。額縁自体はブロック座標に固定されるため、座標移動による上下動は行いません。
