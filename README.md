@@ -1,291 +1,65 @@
-# ExtendedPatPat — 非公式のJava版・統合版向け撫でる演出
+# ExtendedPatPat 🐾
 
-> **このプロジェクトはLopyMine氏による公式「PatPat Mod」「PatPat Plugin」ではありません。公式開発者の承認・提携・サポートを受けたものではなく、独立して開発している関連機能の実装です。**
->
-> **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
->
-> 開発・配布：本リポジトリのコントリビューター。問い合わせ：[本リポジトリのIssues](https://github.com/Sanowo0390/ExtendedPatPat/issues)。
-
-## オリジナルのPatPatについて（重要）
-
-本プロジェクトの「撫でる」操作、手のアニメーション、Squish（凹み）、通信互換のコンセプトは、先行する以下のプロジェクトに基づいています。**オリジナルの存在と開発者へのクレジットを明示します。**
-
-| 元のプロジェクト | 原作者・リンク | 主な役割 | ライセンス |
-|---|---|---|---|
-| **PatPat Mod** | LopyMine / [GitHub](https://github.com/LopyMine/PatPat) / [Modrinth](https://modrinth.com/mod/patpat) | クライアントでの撫でる操作・画像アニメーション、Mod同士での共有など | **LGPL-3.0** |
-| **PatPat Plugin** | LopyMine / [GitHub](https://github.com/LopyMine/PatPat-Plugin) | Bukkit/Spigot/Paper向けにPatPat Modのパケット共有を支援 | **LGPL-3.0** |
-
-オリジナルの **PatPat Plugin単体は、元のREADMEによるとPatPatクライアントModが必要**です。一方このリポジトリのVelocity版・Paper版は、ModのないJava版クライアントに表示用パケットを送る独立実装です。**元のMod／Pluginを必須としないのは設計の違いであり、公式版・後継版・正規移植版を名乗るものではありません。** オリジナルのPatPat Modを利用したい人は、上記の公式配布先も確認してください。
-
-### 著作権・ライセンスの取り扱い
-
-- 本リポジトリの [MIT LICENSE](LICENSE) は、**本プロジェクト独自のコードに関する表示**です。**第三者のコード・画像・音声にMITを再付与するものではありません。**
-- **元のPatPat Mod由来の素材が存在します。** `src/main/resources/pat.ogg` / `pat1.ogg` / `pat2.ogg` は上流リポジトリの同名ファイルとバイナリが一致します。また `src/main/resources/default-hand.png` は、オリジナルの `assets/patpat/textures/default/patpat.png` と視覚的に同じ手画像を再エンコードしたものです。`default-hand.gif` を含む関連画像素材の由来も確認が必要です。
-- これら上流由来の素材は**独自のMIT素材として扱わず、オリジナルのLGPL-3.0に基づく配布・表示義務に従う必要があります**。原著作権者の権利は原著作権者に留保されます。[第三者著作物の通知](THIRD_PARTY_NOTICES.md)と [LGPL-3.0ライセンス文](LICENSES/LGPL-3.0.txt)を参照してください。
-- もしオリジナルのソースコードを複製・改変した部分がある場合は、**LGPLに基づく表示・ソース公開・改変箇所の表示等を別途確認**してください。現状の「MIT」だけで上流の義務が満たされるとは断定できません。公開・再配布前にコードと素材の来歴を確認することを推奨します。
-- ユーザーが持ち込む外部のPatPatアニメーションZIP／画像／効果音も、**その作者が許可した条件の範囲でのみ**利用・再配布してください。例として示されたBonkアニメーションは標準JARに含めていません。
-- Minecraftの名称・配布については [Minecraft Usage Guidelines](https://www.minecraft.net/en-us/usage-guidelines) に従ってください。
-
-## 提供する3つのプラグイン
-
-開発・ビルドの正規ブランチは [`main`](https://github.com/Sanowo0390/ExtendedPatPat/tree/main) です。
-
-| GitHub Actionsの配布名 | バージョン | 導入先 | 機能 |
-|---|---|---|---|
-| **ExtendedPatPat Velocity** | 0.5.0 | Velocityの `plugins/` | ModなしJava版の操作検出・画像の手・Geyserとの共有 |
-| **ExtendedPatPat Geyser** | 0.13.0 | Geyser-Velocityの `extensions/` | 統合版のPNG/GIF手・音・Squish |
-| **ExtendedPatPat Paper** | 0.5.0 | Paper/Purpurの `plugins/` | ModなしJava版への描画・独立動作 |
-
-**[3種類を同時ビルドするGitHub Actions](https://github.com/Sanowo0390/ExtendedPatPat/actions/workflows/build-all.yml)**
-
-Velocity構成は **ExtendedPatPat Velocity＋PacketEvents（Velocity用）＋Geyser-Velocity＋ExtendedPatPat Geyser** です。Paper/PurpurのバックエンドにPatPat Pluginを導入しなくても動きます。**Paper単体版を同じネットワークに重複導入すると二重演出になるため、Velocity版と併用しないでください。** Java版・統合版との橋渡しはPaper単体版にはありません。
-
-Actionsの配布物は上記の**3種類だけ**です。`Complete`、Java版パック単体Artifact、Bonkサンプルを含みません。デフォルトJava画像パックはVelocity版とPaper版のJARに内包され、Geyser側の統合版素材は拡張に内包されています。
-
-## Java版の追加リソースパック・互換性
-
-**Vanilla Java版クライアントに新規テクスチャをネットワーク経由で配布する場合、原理的にパックのダウンロード先URLが必要です。** JAR内包だけではクライアントへ転送されません。Minecraft 1.20.3以降は複数のサーバーリソースパックを別々に積み重ねられるため、PatPat専用のパックを通常のサーバーパックに追加することはできます。
-
-ただし、**外部のパックホスティングサービスは必須ではありません**。本プラグインは起動時に内包ZIPを自動抽出し、任意で**読み取り専用HTTP配信**を起動できます。クライアント側から接続できるIP/ホスト名・ポートの公開と、プラグインへのURL設定は引き続き必要です。Velocityなら `resource-pack-url`、Paperなら `pack.url` を設定します。内蔵Webサーバーは既定で停止しており、`pack-http-enabled=true`（Paperは `pack.http-enabled=true`）で有効化します。
-
-URLを用意できない場合の現在実装済みの選択肢は、Java版クライアント自身がZIPを手動で導入するか、リソースパック不要の **Voxel手アニメーション**に切り替えることです。**別方式として、地図（Map）ピクセルをパケットで送ればURLなしでPNG/GIF風の絵を見せる実装も技術的には可能**ですが、地図の色数・解像度・四角い表示面の制約があり、元の手の透過画像をそのまま表示する方式とは異なります。**この地図ベースの描画はまだ実装していません。** **GeyserのBedrock版パックはGeyserの仕組みで配れるため、Java版のHTTP配布制限とは別**です。
-
-## ViaVersionと描画の制限
-
-| Javaクライアント | 目標とする描画 | 補足 |
-|---|---|---|
-| 1.21.4以降 | パック受諾後、画像の手 | ItemDisplayのカスタムモデル機能を利用 |
-| 1.19.4～1.21.3 | Voxel（BlockDisplay） | 画像の手に必要な機能が不足 |
-| 1.19.3以前 | Display演出なし | 古いクライアントへ非対応パケットを送らない |
-
-Velocity版ではクライアントのプロトコルバージョンを見て切り替えます。Paper版はViaVersionがPaper側にある場合に検出できますが、**Viaがプロキシにしかない場合は正しい元バージョンを検出できない可能性があります**。この対応表は設計上の目標であり、全バージョンのゲーム内動作を保証しません。
-
-## Java版コマンド・注意事項
-
-- `/ppv status`：状態表示
-- `/ppv pack`：PatPat専用の追加パックを再提示（URL設定時）
-- `/ppv skin list` / `/ppv skin default`：内包したスタイルの確認・切替。標準配布にはデフォルトのみ
-- `/ppv toggle`：個人の演出をON/OFF
-- `/ppv reload`：設定の再読み込み（管理者権限）
-
-詳しい設定は [Velocity版README](velocity-standalone/README.md)、[Paper版README](paper-standalone/README.md)、[パック生成仕様](resourcepack/README.md) を参照してください。Java版の「凹み」はクライアントに一時的な均一スケールを送る近似で、オリジナルの軸別Squishとは異なります。Paper単体版は現在Squish未実装です。**CIビルド・単体テストの成功は実機での表示や全互換性を保証しません。**
-
----
-
-## Geyser拡張の詳細
-
-Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**向けのPatPat拡張機能です。しゃがみながら空のメインハンドでモブやプレイヤーを操作すると、対象の頭上に手のPNGスプライトシート／GIFアニメーションを表示し、**手が下がって戻るモーション**と効果音を再生します。さらに統合版側では対象のモデルが一瞬むにゅっと縮む「Squish」演出にも対応します。
-
-サーバー側のPatPatプラグインがなくても動作します。Velocity版を併用するとJava版との演出共有に対応します。公式PatPat Pluginとの通信は任意で有効化できます。
-
-## 必要環境
-
-- **Geyser-Velocity 2.12.1系**（b1280～現在のb1284でコンパイル・単体テスト成功）
-- Java 21以上
-- PatPat Plugin 1.2.5以上：**任意**（Java版Modとの演出連携が必要な場合）
-- Paper / Purpur側に専用のPatPatGeyserAddonを入れる必要はありません。
+**Minecraft Java版・統合版で、モブやプレイヤーを撫でられる非公式プラグイン。** 手のアニメーション、効果音、凹み演出に対応し、元のPatPat Mod／Pluginを導入しなくても動作します。
 
 > [!IMPORTANT]
-> Geyserの内部パケットAPIを使用するため、更新時の完全互換は保証できません。起動時に必要なAPIを検査し、互換性がない場合は安全に拡張機能を停止します。Bedrock用表示パックの適用が必要です。
+> [LopyMine氏のPatPat Mod](https://github.com/LopyMine/PatPat)・[PatPat Plugin](https://github.com/LopyMine/PatPat-Plugin) に着想を得た**非公式の独立プロジェクト**です。原作者との提携・承認関係はありません。Minecraftの公式製品でもなく、Mojang／Microsoftとは無関係です。
 
-## 導入
+## 配布物・導入
 
-1. [GitHub Actions](https://github.com/Sanowo0390/ExtendedPatPat/actions/workflows/build-all.yml) の成功したビルドから `ExtendedPatPat-Geyser-0.13.0.jar` を取得します。
-2. JARをVelocityの `plugins/Geyser-Velocity/extensions/` に配置し、古い同拡張のJARを取り除きます。
-3. Velocityを再起動すると `extensions/patpatbedrock/` に設定・画像・音声ファイルとリソースパックが生成されます。
-4. 統合版プレイヤーで再接続し、配布されるリソースパックを適用します。必要に応じてGeyser側の `force-resource-packs: true` を使用してください。
-5. `/patpatbedrock status` で動作状況を確認し、対象に照準を合わせて `/patpatbedrock test` を実行します。
+[**GitHub Actionsからダウンロード**](https://github.com/Sanowo0390/ExtendedPatPat/actions/workflows/build-all.yml) — 1回のビルドで次の**3つのJARのみ**を配布します。
 
-**基本操作：** 空のメインハンドでしゃがみながら対象を右クリック（統合版の「使う」操作）します。既定の最大距離は3ブロックです。
-
-## コマンドと権限
-
-| コマンド | 説明 | 権限 |
+| 配布物 | 導入先 | 用途 |
 |---|---|---|
-| `/patpatbedrock status` | 接続状態、PatPat本体との通信、個人のON/OFFを確認 | 追加権限なし |
-| `/patpatbedrock test` | **現在照準を合わせた対象**に自分だけ表示テスト | `required-permission` 設定時はその権限 |
-| `/patpatbedrock test text` | 画像ではなくテキストを使った表示テスト | 同上 |
-| `/patpatbedrock pat` | 照準先を撫でる（しゃがみは不要） | 同上 |
-| `/patpatbedrock toggle` | 自分のPat送受信をON/OFF切り替え | 追加権限なし |
-| `/patpatbedrock toggle on` / `off` | 個人設定を明示的に切り替え | 追加権限なし |
-| `/patpatbedrock stats` | 自分のPat回数（拡張で受け付けた操作）を表示 | 追加権限なし |
-| `/patpatbedrock reload` | 設定を再読み込み | `patpatbedrock.admin` |
+| **ExtendedPatPat-Velocity** (0.5.0) | `Velocity/plugins/` | Java版の操作検出・画像の手・統合版との連携 |
+| **ExtendedPatPat-Geyser** (0.13.0) | `Velocity/plugins/Geyser-Velocity/extensions/` | 統合版の手画像・GIF・効果音・凹み演出 |
+| **ExtendedPatPat-Paper** (0.5.0) | `Paper/plugins/` | Paper/Purpur単体で動作するJava版 |
 
-通常は権限プラグイン不要です。`required-permission=patpatbedrock.use` などを設定すると `pat` と `test` だけをその権限で制限できます。付与する場合は**Velocity側**の権限プラグインを使用してください。`toggle` は演出の拒否にも使うため、利用権限設定に関係なく実行できます。
+**Java版＋統合版で遊ぶ場合：** Velocity 3.5、[PacketEvents](https://github.com/retrooper/packetevents) 2.14.0（Velocity版）、Geyser-Velocity 2.12.1系を導入し、**Velocity版＋Geyser版**のJARを配置して再起動します。Paper/PurpurバックエンドへのPatPat追加は不要です。
 
-`toggle off` は**自分のPat操作と自分が見るPat演出だけ**を無効にします。他プレイヤーの設定は変更しません。ON/OFFの設定は `extensions/patpatbedrock/disabled-players.txt` にUUID単位で保存され、再接続・再起動後も保持されます。既定では全員ONです。
+**Paper単体の場合：** Paper/Purpur 26.3（Java 25）に**Paper版のみ**を導入します。Velocity版とPaper版の併用は二重演出の原因になるため避けてください。
 
-## 既定の設定
+詳細：[Velocity版](velocity-standalone/README.md) ／ [Paper版](paper-standalone/README.md) ／ [Geyser設定](src/main/resources/config.properties)
 
-編集先：`plugins/Geyser-Velocity/extensions/patpatbedrock/config.properties`
+## 機能
 
-```properties
-enabled=true
-required-permission=
-auto-pack=true
-require-sneaking=true
-standalone-mode=true
-require-empty-hand=true
-allow-players=true
-ignored-entity-types=
-ignored-player-uuids=
-swing-hand-enabled=true
-camera-shake-enabled=false
-camera-shake-intensity=0.06
-max-distance=3.0
-cooldown-ms=100
-duration-ms=0
-frame-ms=100
-renderer=image
-image-file=images/hand.png
-image-sprite-columns=5
-image-sprite-frame-ms=50
-image-scale=0.5
-image-loop=true
-offset-x=0.5
-offset-space=view
-offset-y=0.0
-offset-z=0.0
-sitting-offset-y=0.2
-max-active-per-viewer=32
-local-preview=true
-frames=\uE2A0,\uE2A1,\uE2A2,\uE2A3
-squish-enabled=true
-hand-motion-enabled=true
-hand-motion-depth=0.425
-hand-motion-duration-ms=240
-sound-enabled=true
-sound-event=patpatbedrock.pat
-sound-volume=1.0
-sound-pitch=1.0
-```
+- **しゃがみ＋対象への操作**でPat。画像の手が上下に動き、効果音を再生
+- **Java版・統合版の相互表示**（Velocity＋Geyser構成）
+- **Squish（凹み）演出**：統合版に対応。VelocityのJava版ではスケール変更で近似。Paper単体版は未対応
+- **PNG／GIF・位置・サイズ・音のカスタマイズ**（Geyser版）。Java版はリソースパックの画像を使用
+- **個人ごとのON／OFF、クールダウン、権限設定**
+- **ViaVersion接続への配慮**：Java 1.21.4以降は画像表示、1.19.4～1.21.3はブロック手、それ以前はDisplay演出を送信しない設計（実機での全バージョン動作は未確認）
 
-**主要な設定**：`image-scale` は画像のサイズ、`offset-x` は見る人の方向への距離、`offset-y` は上下、`offset-z` は見る人から見て左右の位置調整です。`sitting-offset-y` は座っているプレイヤーに対する追加の高さ補正です。`cooldown-ms` は連打の最小間隔です。`standalone-mode=true` ならバックエンド本体がなくても統合版でPatできます。
+### Java版のリソースパック
 
-`/patpatbedrock reload` で位置・サイズ・表示時間などを再読み込みできます。**既存の設定ファイルは更新時に上書きしません。** 旧設定に `cooldown-ms=600` などが残っている場合は、必要に応じて手動で変更してください。
+標準の手画像パックは**Velocity版・Paper版のJARに内包**されています。通常のサーバーパックとは**別の追加パック**として送信可能です。ただし、クライアントへの自動配布には**取得可能なHTTP(S) URLが必要**です。内蔵HTTP配信機能も使用できます。
 
-## デフォルトの手画像（v0.11.0）
+URLを用意しない場合はプレイヤーによる手動導入、またはリソースパック不要のブロック手を利用してください。デフォルト以外の例示素材（Bonkなど）は配布物に含みません。
 
-送っていただいた **560×112px の5コマ横並び透過PNG** をデフォルト画像に変更しました。GIFへ変換せず、そのまま `images/hand.png` として配置し、112×112pxずつ左から右へ切り出してアニメーションします。
+パック設定・独自スキン：[リソースパックの説明](resourcepack/README.md)
 
-```properties
-image-file=images/hand.png
-image-sprite-columns=5
-image-sprite-frame-ms=50
-```
+## コマンド
 
-5コマ×50ms＝約250msで1サイクル（従来の手の上下運動240msとほぼ同じ）です。画像自体はPNGですが静止画像ではなく、スプライトシートのコマ送りで手の開閉を表現します。
+| Java版（Velocity／Paper） | 内容 |
+|---|---|
+| `/ppv status` | 状態を表示 |
+| `/ppv toggle` | 自分の演出をON／OFF |
+| `/ppv pack` | 追加パックを再送信（URL設定時） |
+| `/ppv skin list` / `/ppv skin default` | 利用できる手画像の確認／選択 |
+| `/ppv reload` | 設定再読み込み（管理者） |
 
-- PNGが `幅 = 高さ × image-sprite-columns` に一致する場合だけ分割します。普通の正方形PNGは従来どおり静止画です。
-- **GIFは従来どおり直接読み込めます。** カスタムGIFを使う場合、スプライト設定は無視されます。
-- 以前のデフォルト `images/hand.gif` が**未変更の同梱ファイル**だった場合のみ、自動で新しいPNGを使用します。既に差し替えたカスタムGIFは維持します。
-- デフォルト画像ファイルは既存の `images/hand.png` を上書きしません。
-- 画像やコマ数・コマ速度を変更した場合はVelocityを再起動し、統合版で再接続してください（リソースパックが再生成されます）。
+統合版：`/patpatbedrock status`、`test`、`pat`、`toggle`、`stats`、`reload`。詳細は[Geyser拡張の設定](src/main/resources/config.properties)を参照してください。
 
-## 手の表示位置と腕振り
+## 更新時の注意
 
-手の座標は `offset-x` / `offset-y` / `offset-z` の設定に従います。v0.9.0で導入した**モブの当たり判定に合わせて手を手前に動かす自動補正は撤回しました**。旧設定の `hand-avoid-occlusion` / `hand-front-clearance` がファイルに残っていても無視されます。
+旧JAR（PatPatVelocity／PatPatGeyserExtension／PatpatPaper）は**削除してから**新しいJARを配置してください。従来の `/ppv`、`/patpatbedrock` や内部IDは互換性のため維持し、Java版では `/extendedpatpat`（`/epp`）も使用できます。Paper版は旧 `plugins/PatpatPaper/config.yml` を初回起動時に新フォルダーへコピーします。
 
-- `swing-hand-enabled=true`：Pat成功時に左クリックと同じ腕振りアニメーションを再生（攻撃・ダメージなし）
-- `camera-shake-enabled=false`：**他の人から撫でられた統合版プレイヤー本人だけ**に軽い上下視点モーションを適用（既定OFF）。撫でた側・周囲の観客・モブには適用しません
+Geyserの内部APIに依存するため、更新後は互換性の確認を推奨します。**GitHub Actionsでのビルド・単体テスト成功はMinecraft実機での動作保証ではありません。**
 
-## 撫でられた時の上下カメラモーション
+## クレジット・ライセンス
 
-Bedrock標準のランダムなスクリーンシェイクは使用しません。代わりに、撫でられたプレイヤー本人の**カメラ位置だけ**を約240msかけて軽く下げて戻す動きにしました（X/Z方向の揺れやプレイヤーの座標変更はありません）。
+原作：[**PatPat Mod**](https://github.com/LopyMine/PatPat) ／ [**PatPat Plugin**](https://github.com/LopyMine/PatPat-Plugin)（LopyMine氏、**LGPL-3.0**）。
 
-```properties
-# 自分が撫でられたときだけ
-camera-shake-enabled=true
-# 最大上下幅（ブロック）
-camera-shake-intensity=0.06
-```
+本リポジトリの独自コードは [MIT License](LICENSE) 表記ですが、**元のPatPatに由来する手画像・効果音はMITとして再ライセンスされません**。上流と一致する音声や、上流の手画像に由来する素材を含みます。配布条件・素材の来歴については [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) と [LGPL-3.0](LICENSES/LGPL-3.0.txt) を参照してください。第三者素材の再配布には各作者の権利・ライセンスを確認してください。
 
-- **他の人から撫でられたときだけ**再生。自分からPatした場合は再生しません。
-- バックエンドPatPat連携時と `standalone-mode=true` の両方に対応。自分がJava版でログインしている場合はこのGeyser拡張のカメラ演出対象外です。
-- 標準の `CameraShakePacket` では軸指定ができないため、一時的にBedrockのフリーカメラを使い、最後に必ず通常の視点へ戻します。**他のカメラ制御がGeyser上で有効な場合や観戦中は適用しません。**
-- 一時的なカメラ切り替えのため、シネマティック系の他プラグインと競合する場合があります。動作に問題がある場合は `camera-shake-enabled=false` にしてください。
-- カメラ演出は既定でOFFです。変更後、`/patpatbedrock reload` で反映できます。
-
-## Configのレイアウト
-
-`config.properties` を**日本語の説明付き・9カテゴリー構成**へ変更しました。全36項目を用途別に並べ、単位と再起動が必要な設定を明示しています。
-
-v0.9.1以前の設定ファイルは、初回起動時に**設定値と独自キーを保持**したまま新しい配置に整形します。変更前のファイルは `config.properties.backup-before-layout-v2` に原文のまま保存します（旧ファイル中の独自コメントは新レイアウトに移動しないので、必要ならバックアップを参照してください）。その後は自動で書き換えません。
-
-## 除外リストとPat回数
-
-`ignored-entity-types` にカンマ区切りで対象のBedrockエンティティ識別子を設定すると、該当モブへのPatを禁止できます。`minecraft:` は省略可能です。
-
-```properties
-ignored-entity-types=minecraft:creeper,minecraft:warden
-ignored-player-uuids=
-```
-
-`ignored-player-uuids` は除外したいプレイヤーのUUIDをカンマ区切りで指定します。設定変更後は `/patpatbedrock reload` を実行してください。
-
-`/patpatbedrock stats` で、自分がこの拡張で受け付けられたPatの回数を確認できます。カウンターは `pat-stats.properties` に保存されます。元のFabric Modが独自に記録した回数とは同期せず、バックエンドで拒否された未確認の要求を含む場合があります。
-
-## 手の上下アニメーション（PatPat Java版に準拠）
-
-PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240msかけて一度下がり、滑らかに元の位置へ戻ります**。Java版と同様、単純な等速移動ではなく、`1-(1-t)^2` で加速した進捗に `sin(π・進捗)` を適用した動きです。
-
-| 設定 | 既定値 | 内容 |
-|---|---:|---|
-| `hand-motion-enabled` | `true` | 手の上下移動をON/OFF |
-| `hand-motion-depth` | `0.425` | 手を下げる最大量（ブロック単位） |
-| `hand-motion-duration-ms` | `240` | 1回の上下移動にかける時間（ミリ秒） |
-
-通常の位置設定 `offset-x` / `offset-y` / `offset-z` は**基準位置**として維持され、上下移動はY方向にだけ加算されます。GIFやPNGのサイズ、各フレームの表示時間には影響しません。文字だけの `test text` は移動させません。
-
-**画像/GIF表示では、手の上下動をリソースパック内のBedrockアニメーションで再生**します。従来の20msごとのサーバー位置更新は手の上下動に使いません。そのため、手の動きはエンティティが表示された時点から開始され、Squishと同じ約240msのカーブで動きます。文字表示モードでは従来のサーバー側移動処理を使用します。
-
-`hand-motion-enabled`、`hand-motion-depth`、`hand-motion-duration-ms`、`image-scale` を変更した場合は、**リソースパックの再生成が必要なのでVelocityを再起動し、統合版で再接続してください**（`reload`だけでは適用できません）。手のモーション時間を240ms以外に変更した場合、Squishは240msのままなので完全には同期しません。
-
-## Squish（潰れる演出）
-
-`squish-enabled=true`（既定）でPat時に約0.24秒間、対象のモデルを縦に縮めてから元に戻すBedrockアニメーションを再生します。GeyserからBedrockへ直接アニメーションパケットを送るため、バックエンドのPatPatプラグインは不要です。
-
-- **統合版プレイヤーの画面だけ**に適用します。Java版には影響しません。
-- 標準的なモブの主要なボーンに合わせた演出を使用します。独自モデルや一部のモブは、ボーン名が一致せず変化しない場合があります。
-- 既存のPat用リソースパックにアニメーション定義を含めています。**v0.9.0への更新後はProxy再起動と統合版の再接続が必要**です。
-- `squish-enabled=false` で無効化できます。このON/OFF設定は `/patpatbedrock reload` で反映できます。
-- サーバー側のエンティティのサイズ・当たり判定は変更しません。あくまでクライアント側の見た目の演出です。
-- 実機の描画結果は端末・Minecraftバージョン・他のリソースパックによって変わる可能性があります。
-
-## 画像・GIF・効果音の変更
-
-- `extensions/patpatbedrock/images/` にPNGまたはGIFを配置し、`image-file=images/ファイル名.png` などを設定します（GIFは最大128フレーム、画像サイズ最大16MiB）。
-- `extensions/patpatbedrock/sounds/` 内の小文字英数字・`_`・`-` の名前のOGGファイルを効果音候補として使います。既定で `pat.ogg`、`pat1.ogg`、`pat2.ogg` をランダム再生します。
-- 固定音にしたい場合は例として `sound-event=patpatbedrock.sound.pat1` と指定できます。`sound-enabled=false` で音を無効化できます。
-- **画像・GIF・音声そのものを変更した場合はVelocity再起動と統合版プレイヤーの再接続が必要**です。位置・サイズや音量などの設定変更だけなら `reload` で反映できます。
-
-## 動作モードと制限
-
-- **バックエンドPatPatあり**：本体とのV2通信を利用。PatPat本体の権限・制限に従い、Java版Modからの演出も統合版に届きます。
-- **バックエンドPatPatなし**：Geyserが統合版への演出を直接表示します。ExtendedPatPat Velocityを併用すると、同じVelocityインスタンスのJava版へも演出を中継できます。ExtendedPatPat Velocityを導入していない場合は、Java版への中継はありません。
-- `/patpatbedrock test` は照準先の対象が見つからないと表示しません。自分の頭上に自動表示する仕様ではありません。
-- 本機能はGeyserのパケット・エンティティ情報に依存します。端末ごとの操作や他プラグインとの組合せは実際のサーバーで確認してください。
-
-## ライセンスと原作者へのクレジット
-
-本プロジェクト独自コード：[MIT License](LICENSE)。上流PatPat Mod/Pluginと元の画像・音声：[LGPL-3.0](LICENSES/LGPL-3.0.txt)、[第三者著作物の通知](THIRD_PARTY_NOTICES.md)。プロジェクト全体を一律MITとは扱いません。
-
-
-## Geyserのビルド更新への対応
-
-Geyserのビルド番号やコミットSHAの固定判定を撤廃しました。起動時には利用中のGeyserに必要なクラス・メソッドが存在するかを確認します。互換性があれば新しいビルドでも有効化します。互換性がなければ不足したAPI名をログに表示して停止します。カメラの内部APIのみ非対応の場合は、カメラ演出を無効化し、他のPat演出を維持します。
-
-GitHub Actionsは **Geyser 2.12.1-b1280と2.12.1系の最新ビルド** を別々にコンパイル・単体テストします。公式ダウンロードAPIが返すSHA-256でJARを検証しており、GitHubのデフォルトブランチ上では週1回の互換性チェックが実行されます。
-
-ローカルでビルドを固定する場合は `GEYSER_BUILD=1284 python scripts/prepare_build.py`、最新を使う場合は `python scripts/prepare_build.py` とします。
-
-**注意:** 単体テストの成功は、実際の統合版クライアントで描画・通信できることを保証しません。Geyserの内部APIで戻り値型やパケットの意味が変更された場合、追加対応が必要になる可能性があります。
-
-
-
-## 名前とアップグレードの互換性
-
-以前のリポジトリ名 `PatPatGeyserExtension` から **`ExtendedPatPat`** へ変更しました。GitHub Actionsの3つの成果物とJARの表示名も `ExtendedPatPat-` 接頭辞に統一しています。
-
-旧JARは更新時に必ず削除してください。**Velocityの内部プラグインID `patpatvelocity`、Geyser拡張ID `patpatbedrock`、既存の `/ppv`、`/patpatbedrock` コマンド、権限ノード、内部パケット名は互換性のため変更していません。** Java版では `/extendedpatpat`（`/epp`）も利用できます。
-Paperは表示プラグイン名が `ExtendedPatPatPaper` に変わるためデータフォルダーが `plugins/ExtendedPatPatPaper/` になります。旧 `plugins/PatpatPaper/config.yml` が存在する場合は初回起動時に新しいフォルダーへコピーします。元ファイルは削除しません。
+不具合・要望：[GitHub Issues](https://github.com/Sanowo0390/ExtendedPatPat/issues)。
