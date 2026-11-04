@@ -125,6 +125,7 @@ final class PatSession extends SessionAdapter {
                 || entity.getFlag(EntityFlag.INVISIBLE) || session.getGameMode()==GameMode.SPECTATOR
                 || session.getPlayerEntity().getHealth()<=0 || !cfg.allows(session)) return false;
         if(!cfg.players() && entity instanceof PlayerEntity) return false;
+        if(entity instanceof PlayerEntity && !owner.targetAllowsPat(entity))return false;
         String entityType=entity.bedrockDefinition()!=null && entity.bedrockDefinition().identifier()!=null
                 ? entity.bedrockDefinition().identifier().toString() : "";
         if(cfg.ignoredEntityTypes().contains(entityType))return false;
@@ -241,6 +242,13 @@ final class PatSession extends SessionAdapter {
         }catch(java.io.IOException e) {
             session.sendMessage("Pat設定の保存に失敗しました: "+e.getMessage());
         }
+    }
+    void hideTarget(UUID uuid){
+        if(uuid==null || session.isClosed())return;
+        Entity entity=session.getPlayerEntity()!=null &&
+            uuid.equals(session.getPlayerEntity().uuid())
+            ?session.getPlayerEntity():session.getEntityCache().getEntityByUuid(uuid);
+        if(entity!=null)renderer.hideTarget(entity.javaId());
     }
     void clear(){renderer.clear();camera.stop();}
     void close() {

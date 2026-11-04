@@ -132,6 +132,10 @@ final class HandRenderer {
         if(hands.isEmpty())ticking=false;
         else schedule();
     }
+    void hideTarget(int javaId){
+        Hand previous=hands.remove(javaId);
+        if(previous!=null && !session.isClosed())remove(previous.id);
+    }
     void clear(){
         if(!session.isClosed())hands.values().forEach(h->remove(h.id));
         hands.clear();
