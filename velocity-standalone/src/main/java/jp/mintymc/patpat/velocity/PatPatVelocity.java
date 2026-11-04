@@ -6,6 +6,12 @@ import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
+import com.github.retrooper.packetevents.protocol.attribute.Attributes;
+import com.github.retrooper.packetevents.protocol.component.ComponentTypes;
+import com.github.retrooper.packetevents.protocol.component.builtin.item.ItemModel;
+import com.github.retrooper.packetevents.protocol.item.ItemStack;
+import com.github.retrooper.packetevents.protocol.item.type.ItemTypes;
+import com.github.retrooper.packetevents.resources.ResourceLocation;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.player.InteractionHand;
 import com.github.retrooper.packetevents.protocol.player.User;
@@ -19,6 +25,7 @@ import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPl
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerPositionAndRotation;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerUpdateAttributes;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityPositionSync;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRelativeMove;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityRelativeMoveAndRotation;
@@ -31,6 +38,7 @@ import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.player.ServerConnectedEvent;
+import com.velocitypowered.api.event.player.PlayerResourcePackStatusEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Dependency;
@@ -50,6 +58,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -67,7 +76,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="patpatvelocity",
     name="PatPatVelocity",
-    version="0.1.2",
+    version="0.2.0",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -78,6 +87,11 @@ public final class PatPatVelocity {
     private static final String PREFER_STANDALONE="jp.mintymc.patpat.bridge.v1.prefer-standalone";
     // These names and packet formats are defined by the upstream LopyMine/PatPat-Plugin.
     private static final String REGISTER_CHANNEL="minecraft:register";
+    // A stable ID allows us to identify our own pack status event among other server packs.
+    private static final UUID RESOURCE_PACK_ID=
+        UUID.fromString("cc05eb6d-9c58-5b4d-9d29-6bd46f1344cc");
+    private final Set<UUID> packReady=ConcurrentHashMap.newKeySet();
+    private final Set<UUID> packOffered=ConcurrentHashMap.newKeySet();
     private final ProxyServer proxy;
     private final Logger log;
     private final Path folder;
@@ -113,7 +127,46 @@ public final class PatPatVelocity {
             System.getProperties().remove(BEDROCK_TO_JAVA);
         if(System.getProperties().get(PREFER_STANDALONE)==standalonePreference)
             System.getProperties().remove(PREFER_STANDALONE);
-        views.clear();
+        views.clear();packReady.clear();packOffered.clear();
+    }
+
+    @Subscribe
+    public void packStatus(PlayerResourcePackStatusEvent event) {
+        if(!RESOURCE_PACK_ID.equals(event.getPackId()))return;
+        UUID id=event.getPlayer().getUniqueId();
+        if(event.getStatus()==PlayerResourcePackStatusEvent.Status.SUCCESSFUL) {
+            packReady.add(id);
+        } else if(!event.getStatus().isIntermediate()) {
+            packReady.remove(id);
+            packOffered.remove(id);
+        }
+    }
+
+    private void offerPack(Player player) {
+        String url=text("resource-pack-url","");
+        if(url.isBlank() || isBedrock(player.getUniqueId()) ||
+                !packOffered.add(player.getUniqueId()))return;
+        if(!url.startsWith("https://") && !url.startsWith("http://")) {
+            log.warn("Ignored invalid resource-pack-url; expected HTTP(S)");
+            packOffered.remove(player.getUniqueId());
+            return;
+        }
+        try {
+            var builder=proxy.createResourcePackBuilder(url)
+                .setId(RESOURCE_PACK_ID)
+                .setShouldForce(false)
+                .setPrompt(Component.text("PatPatの手アニメーション用リソースパック"));
+            String hex=text("resource-pack-sha1","");
+            if(!hex.isBlank()) {
+                byte[] hash=HexFormat.of().parseHex(hex);
+                if(hash.length!=20)throw new IllegalArgumentException("SHA-1 must contain 40 hex chars");
+                builder.setHash(hash);
+            }
+            player.sendResourcePackOffer(builder.build());
+        } catch(Exception ex) {
+            packOffered.remove(player.getUniqueId());
+            log.warn("Unable to offer Java resource pack: {}",ex.getMessage());
+        }
     }
 
     @Subscribe
@@ -125,6 +178,7 @@ public final class PatPatVelocity {
         View replacement=new View(uuid,null);
         replacement.backend=serverOf(player);
         views.put(uuid,replacement);
+        offerPack(player);
         if(!enabled("official-integration-enabled",false) || isBedrock(uuid))return;
         // The official Paper plugin sends HELLO only after the client has registered
         // its incoming channels (PlayerRegisterChannelEvent). The proxy does this for vanilla.
@@ -152,6 +206,8 @@ public final class PatPatVelocity {
     @Subscribe
     public void disconnect(DisconnectEvent event) {
         views.remove(event.getPlayer().getUniqueId());
+        packReady.remove(event.getPlayer().getUniqueId());
+        packOffered.remove(event.getPlayer().getUniqueId());
     }
 
     private void reload() {
@@ -195,6 +251,7 @@ public final class PatPatVelocity {
         final UUID uuid;
         final String type;
         volatile Vector3d pos;
+        volatile WrapperPlayServerUpdateAttributes.Property originalScale;
         Tracked(int id,UUID uuid,String type,Vector3d pos) {
             this.id=id;this.uuid=uuid;this.type=type;this.pos=pos;
         }
@@ -205,6 +262,7 @@ public final class PatPatVelocity {
         volatile Vector3d self;
         final Map<Integer,Tracked> byId=new ConcurrentHashMap<>();
         final Map<UUID,Tracked> byUuid=new ConcurrentHashMap<>();
+        final Set<Integer> squishing=ConcurrentHashMap.newKeySet();
         volatile long lastPat;
         final long connectedAt=System.nanoTime();
         volatile String backend;
@@ -244,6 +302,13 @@ public final class PatPatVelocity {
                     Optional<UUID> uuid=packet.getUUID();
                     if(uuid.isPresent())view.track(new Tracked(packet.getEntityId(),uuid.get(),
                         packet.getEntityType().getName().toString(),packet.getPosition()));
+                } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.UPDATE_ATTRIBUTES) {
+                    var packet=new WrapperPlayServerUpdateAttributes(event);
+                    Tracked tracked=view.byId.get(packet.getEntityID());
+                    if(tracked!=null)for(var property:packet.getProperties()) {
+                        if(Attributes.SCALE.equals(property.getAttribute()))
+                            tracked.originalScale=property;
+                    }
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.ENTITY_TELEPORT) {
                     var packet=new WrapperPlayServerEntityTeleport(event);
                     Tracked old=view.byId.get(packet.getEntityId());
@@ -266,7 +331,7 @@ public final class PatPatVelocity {
                     for(int id:new WrapperPlayServerDestroyEntities(event).getEntityIds())view.remove(id);
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.RESPAWN
                     || type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.JOIN_GAME) {
-                    view.byId.clear();view.byUuid.clear();view.self=null;
+                    view.byId.clear();view.byUuid.clear();view.squishing.clear();view.self=null;
                     if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.JOIN_GAME)
                         view.selfEntityId=new WrapperPlayServerJoinGame(event).getEntityId();
                 }
@@ -456,36 +521,93 @@ public final class PatPatVelocity {
             } catch(Exception ex) {log.debug("Sound is not available",ex);}
         }
     }
+    private boolean usesItemHand(UUID viewer) {
+        String mode=text("hand-renderer","resourcepack");
+        if(mode.equalsIgnoreCase("voxel"))return false;
+        if(mode.equalsIgnoreCase("resourcepack"))return true;
+        // Auto: require confirmed download if offering a pack; otherwise assume
+        // the client has the pack installed manually, as an optional setting.
+        return packReady.contains(viewer) || (text("resource-pack-url","").isBlank()
+            && enabled("resource-pack-assume-installed",false));
+    }
+    private ItemStack handItem(User user,int frame) {
+        int index=Math.max(0,Math.min(4,frame));
+        return ItemStack.builder().user(user).type(ItemTypes.PAPER).amount(1)
+            .component(ComponentTypes.ITEM_MODEL,
+                new ItemModel(new ResourceLocation("patpat:hand_"+index))).build();
+    }
+    private static final int HAND_FRAMES=5;
+    private void sendSquish(View view,int id,WrapperPlayServerUpdateAttributes.Property baseline,double multiplier) {
+        double original=baseline==null?1.0:baseline.getValue();
+        double modified=Math.max(1.0/16,original*multiplier);
+        view.user.sendPacketSilently(new WrapperPlayServerUpdateAttributes(id,List.of(
+            new WrapperPlayServerUpdateAttributes.Property(Attributes.SCALE,modified,List.of()))));
+    }
+    private void restoreSquish(View view,int id,Tracked tracked) {
+        if(id<=0)return;
+        try {
+            WrapperPlayServerUpdateAttributes.Property original=
+                tracked!=null?tracked.originalScale:null;
+            view.user.sendPacketSilently(new WrapperPlayServerUpdateAttributes(id,List.of(
+                original!=null?original:
+                new WrapperPlayServerUpdateAttributes.Property(Attributes.SCALE,1.0,List.of()))));
+        } catch(Exception ex) {log.debug("Could not restore viewer-only squash",ex);}
+    }
     private void startHand(View view,Player player,UUID targetId) {
         if(active.incrementAndGet()>(int)number("max-active",24,1,128)){active.decrementAndGet();return;}
         final int duration=(int)number("hand-duration-ticks",6,2,40);
         final double depth=number("hand-depth",0.425,0,2);
         final double offset=number("hand-offset-y",0.15,-2,2);
         final float size=(float)number("hand-size",1,0.1,4);
-        final int[] fakeIds=new int[HAND.length];
+        final boolean useSprite=usesItemHand(player.getUniqueId());
+        final int[] fakeIds=new int[useSprite?1:HAND.length];
+        final Tracked trackedTarget=view.find(targetId);
+        final int targetEntityId=trackedTarget!=null?trackedTarget.id:targetId.equals(view.player)?view.selfEntityId:0;
+        final boolean squash=enabled("squish-enabled",true) && trackedTarget!=null &&
+            targetEntityId>0 && view.squishing.add(targetEntityId);
+        final double minScale=number("squish-min-scale",0.86,0.5,1.0);
         try {
-            int block=WrappedBlockState.getByString(view.user.getClientVersion(),
-                text("hand-material","minecraft:pink_terracotta")).getGlobalId();
             Vector3d pos=targetPosition(view,targetId,offset,0);
-            if(pos==null){active.decrementAndGet();return;}
-            for(int i=0;i<HAND.length;i++) {
+            if(pos==null) {
+                if(squash)view.squishing.remove(targetEntityId);
+                active.decrementAndGet();return;
+            }
+            if(useSprite) {
                 int id=entitySequence.getAndIncrement();
-                fakeIds[i]=id;
+                fakeIds[0]=id;
                 view.user.sendPacketSilently(new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
-                    EntityTypes.BLOCK_DISPLAY,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),0,0,null));
-                float[] part=HAND[i];
+                    EntityTypes.ITEM_DISPLAY,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),0,0,null));
                 view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,List.of(
-                    new EntityData<>(11,EntityDataTypes.VECTOR3F,new Vector3f(part[0]*size,part[1]*size,0)),
-                    new EntityData<>(12,EntityDataTypes.VECTOR3F,new Vector3f(part[2]*size,part[3]*size,0.06f)),
+                    new EntityData<>(11,EntityDataTypes.VECTOR3F,new Vector3f(-size*0.5f,-size*0.5f,0f)),
+                    new EntityData<>(12,EntityDataTypes.VECTOR3F,new Vector3f(size,size,0.04f)),
                     new EntityData<>(15,EntityDataTypes.BYTE,(byte)3),
                     new EntityData<>(17,EntityDataTypes.FLOAT,16.0f),
-                    new EntityData<>(23,EntityDataTypes.BLOCK_STATE,block)
+                    new EntityData<>(23,EntityDataTypes.ITEMSTACK,handItem(view.user,0)),
+                    new EntityData<>(24,EntityDataTypes.BYTE,(byte)8)
                 )));
+            } else {
+                int block=WrappedBlockState.getByString(view.user.getClientVersion(),
+                    text("hand-material","minecraft:pink_terracotta")).getGlobalId();
+                for(int i=0;i<HAND.length;i++) {
+                    int id=entitySequence.getAndIncrement();
+                    fakeIds[i]=id;
+                    view.user.sendPacketSilently(new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
+                        EntityTypes.BLOCK_DISPLAY,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),0,0,null));
+                    float[] part=HAND[i];
+                    view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,List.of(
+                        new EntityData<>(11,EntityDataTypes.VECTOR3F,new Vector3f(part[0]*size,part[1]*size,0)),
+                        new EntityData<>(12,EntityDataTypes.VECTOR3F,new Vector3f(part[2]*size,part[3]*size,0.06f)),
+                        new EntityData<>(15,EntityDataTypes.BYTE,(byte)3),
+                        new EntityData<>(17,EntityDataTypes.FLOAT,16.0f),
+                        new EntityData<>(23,EntityDataTypes.BLOCK_STATE,block)
+                    )));
+                }
             }
         } catch(Exception ex) {
             cleanup(view,fakeIds);
+            if(squash)view.squishing.remove(targetEntityId);
             active.decrementAndGet();
-            log.warn("Unable to spawn vanilla hand: {}",ex.getMessage());
+            log.warn("Unable to spawn Java Pat hand: {}",ex.getMessage());
             return;
         }
         final AtomicReference<ScheduledTask> job=new AtomicReference<>();
@@ -502,6 +624,16 @@ public final class PatPatVelocity {
                     if(p==null){finish();return;}
                     for(int id:fakeIds)if(id>0)
                         view.user.sendPacketSilently(new WrapperPlayServerEntityTeleport(id,p,0,0,false));
+                    if(useSprite && fakeIds[0]>0) {
+                        int frame=Math.min(HAND_FRAMES-1,(int)Math.floor(t*HAND_FRAMES));
+                        view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(fakeIds[0],
+                            List.of(new EntityData<>(23,EntityDataTypes.ITEMSTACK,handItem(view.user,frame)))));
+                    }
+                    if(squash) {
+                        double pressure=Math.sin(Math.PI*t);
+                        sendSquish(view,targetEntityId,
+                            trackedTarget.originalScale,1.0-(1.0-minScale)*pressure);
+                    }
                 } catch(Exception ex) {finish();}
             }
             private boolean finished;
@@ -509,6 +641,11 @@ public final class PatPatVelocity {
                 if(finished)return;
                 finished=true;
                 cleanup(view,fakeIds);
+                if(squash) {
+                    if(views.get(player.getUniqueId())==view)
+                        restoreSquish(view,targetEntityId,trackedTarget);
+                    view.squishing.remove(targetEntityId);
+                }
                 active.decrementAndGet();
                 ScheduledTask scheduled=job.get();
                 if(scheduled!=null)scheduled.cancel();
@@ -545,7 +682,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("PatPatVelocity v0.1.2 | mode="+state
+                sender.sendMessage(Component.text("PatPatVelocity v0.2.0 | mode="+state
                     +" | active="+active.get()
                     +" | Geyser bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
                 return;
