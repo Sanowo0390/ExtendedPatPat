@@ -29,8 +29,14 @@ class TextFramesTest {
         assertTrue(content.contains("█"),content);
         assertFalse(content.contains("⠀"),"Braille pseudo-blank must never leak into rendered text");
         assertTrue(content.contains("  "),"Transparent pixels must use invisible ASCII spaces");
-        assertTrue(content.contains("bold=set_by_true"),"Opaque cells should cover horizontal gaps");
-        assertTrue(content.contains("underlined=set_by_true"),"Opaque cells should cover row gaps");
+        assertTrue(art.children().stream().anyMatch(c ->
+            c.decoration(net.kyori.adventure.text.format.TextDecoration.BOLD)
+                == net.kyori.adventure.text.format.TextDecoration.State.TRUE),
+            "Opaque glyphs should fill horizontal gaps");
+        assertTrue(art.children().stream().anyMatch(c ->
+            c.decoration(net.kyori.adventure.text.format.TextDecoration.UNDERLINED)
+                == net.kyori.adventure.text.format.TextDecoration.State.TRUE),
+            "Opaque glyphs should fill row gaps");
         assertTrue(content.contains("#FF0000"),content);
         assertTrue(content.contains("#00FF00"),content);
     }
