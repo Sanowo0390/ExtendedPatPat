@@ -81,7 +81,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.3",
+    version="0.6.4",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -147,7 +147,9 @@ public final class PatPatVelocity {
     public void switchingServer(ServerPreConnectEvent event) {
         // Fired before Velocity begins switching the backend. Cancel any
         // queued/active fake PLAY packets while the client moves into CONFIGURATION.
-        if(event.getPreviousServer()==null)return;
+        if(event.getPreviousServer()==null || !event.getResult().isAllowed() ||
+                event.getResult().getServer().filter(
+                    target->target.equals(event.getPreviousServer())).isPresent())return;
         View previous=views.get(event.getPlayer().getUniqueId());
         if(previous!=null)previous.switching=true;
     }
@@ -349,6 +351,7 @@ public final class PatPatVelocity {
 
     private final class Listener extends PacketListenerAbstract {
         @Override public void onPacketSend(PacketSendEvent event) {
+            if(event.getConnectionState()!=ConnectionState.PLAY)return;
             UUID userId=event.getUser().getUUID();
             if(userId==null) return;
             var type=event.getPacketType();
@@ -467,12 +470,15 @@ public final class PatPatVelocity {
                         return;
                     }
                     proxy.getScheduler().buildTask(PatPatVelocity.this,()->{
+                        // NPC server-select interactions can initiate a backend switch
+                        // immediately after this packet. Allow PreConnect to cancel
+                        // the visual effect before creating any client-only entities.
                         if(!personalEnabled(uuid) || !personalEnabled(targetUuid))return;
                         renderToJava(uuid,targetUuid);
                         if(enabled("bridge-enabled",true) &&
                                 personalEnabled(uuid) && personalEnabled(targetUuid))
                             sendToBedrock(uuid,targetUuid);
-                    }).schedule();
+                    }).delay(75L,TimeUnit.MILLISECONDS).schedule();
                 }
             } catch(Exception ex) {log.debug("Ignored malformed interaction",ex);}
         }
@@ -759,7 +765,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.3 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.4 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
