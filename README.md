@@ -6,17 +6,17 @@ Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**�
 
 ## 必要環境
 
-- **Geyser-Velocity 2.12.1 build 1280**（commit `64bb3993b4beef6743af0ab76ee5dfc8e67a0d21`）専用
+- **Geyser-Velocity 2.12.1系**（b1280～現在のb1284でコンパイル・単体テスト成功）
 - Java 21以上
 - PatPat Plugin 1.2.5以上：**任意**（Java版Modとの演出連携が必要な場合）
 - Paper / Purpur側に専用のPatPatGeyserAddonを入れる必要はありません。
 
 > [!IMPORTANT]
-> Geyserの内部パケットAPIに依存するため、**指定外のGeyserビルドでは動作を停止**します。Bedrock用の表示パックをクライアントが読み込む必要があります。
+> Geyserの内部パケットAPIを使用するため、更新時の完全互換は保証できません。起動時に必要なAPIを検査し、互換性がない場合は安全に拡張機能を停止します。Bedrock用表示パックの適用が必要です。
 
 ## 導入
 
-1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.11.0.jar` を取得します。
+1. [GitHub Actions](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) の成功したビルドから `PatPatGeyserExtension-0.12.0.jar` を取得します。
 2. JARをVelocityの `plugins/Geyser-Velocity/extensions/` に配置し、古い同拡張のJARを取り除きます。
 3. Velocityを再起動すると `extensions/patpatbedrock/` に設定・画像・音声ファイルとリソースパックが生成されます。
 4. 統合版プレイヤーで再接続し、配布されるリソースパックを適用します。必要に応じてGeyser側の `force-resource-packs: true` を使用してください。
@@ -195,3 +195,14 @@ PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240ms
 ## ライセンス
 
 [MIT License](LICENSE)
+
+
+## Geyserのビルド更新への対応（v0.12.0）
+
+Geyserのビルド番号やコミットSHAの固定判定を撤廃しました。起動時には利用中のGeyserに必要なクラス・メソッドが存在するかを確認します。互換性があれば新しいビルドでも有効化します。互換性がなければ不足したAPI名をログに表示して停止します。カメラの内部APIのみ非対応の場合は、カメラ演出を無効化し、他のPat演出を維持します。
+
+GitHub Actionsは **Geyser 2.12.1-b1280と2.12.1系の最新ビルド** を別々にコンパイル・単体テストします。公式ダウンロードAPIが返すSHA-256でJARを検証しており、mainへマージ後は週1回の互換性チェックが動きます。
+
+ローカルでビルドを固定する場合は `GEYSER_BUILD=1284 python scripts/prepare_build.py`、最新を使う場合は `python scripts/prepare_build.py` とします。
+
+**注意:** 単体テストの成功は、実際の統合版クライアントで描画・通信できることを保証しません。Geyserの内部APIで戻り値型やパケットの意味が変更された場合、追加対応が必要になる可能性があります。

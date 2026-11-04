@@ -1,0 +1,28 @@
+name: Build PatPatVelocity
+on:
+  push:
+    paths: ['velocity-standalone/**','.github/workflows/build-velocity.yml','src/main/java/jp/mintymc/patpat/extension/**']
+  pull_request:
+    paths: ['velocity-standalone/**','.github/workflows/build-velocity.yml','src/main/java/jp/mintymc/patpat/extension/**']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: velocity-standalone/pom.xml
+      - name: Build Velocity plugin
+        run: mvn -B -ntp -f velocity-standalone/pom.xml package
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: PatPatVelocity
+          path: velocity-standalone/target/PatPatVelocity-*.jar
+          if-no-files-found: error

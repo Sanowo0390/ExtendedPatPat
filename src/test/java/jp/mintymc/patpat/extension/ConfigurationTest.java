@@ -9,11 +9,9 @@ class ConfigurationTest {
         assertEquals(0,cfg.duration());assertEquals(3,cfg.distance());assertEquals(4,cfg.frames().size());
         p.setProperty("frames","A,B");assertEquals(2,Settings.from(p).frames().size());
     }
-    @Test void requiresExactRuntimeBuildAndCommit() {
-        String sha="64bb3993b4beef6743af0ab76ee5dfc8e67a0d21";
-        assertTrue(PatPatExtension.compatible("1280",sha));
-        assertFalse(PatPatExtension.compatible("1281",sha));
-        assertFalse(PatPatExtension.compatible("1280","different"));
+    @Test void discoversRequiredGeyserCapabilitiesWithoutPinningBuildHash() {
+        GeyserCompatibility.Report report=GeyserCompatibility.inspect();
+        assertTrue(report.supported(),()->"Incompatible Geyser internals: "+report.missing());
     }
     @Test void standaloneAndSeatedOffsetDefaultsAreAppliedWithoutOverridingCustomValues() {
         Properties fresh=new Properties();

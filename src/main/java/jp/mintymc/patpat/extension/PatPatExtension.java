@@ -1,7 +1,6 @@
 package jp.mintymc.patpat.extension;
 
 import org.geysermc.event.subscribe.Subscribe;
-import org.geysermc.geyser.GeyserImpl;
 import org.geysermc.geyser.api.command.*;
 import org.geysermc.geyser.api.event.bedrock.*;
 import org.geysermc.geyser.api.event.lifecycle.*;
@@ -22,9 +21,26 @@ public final class PatPatExtension implements Extension {
     private volatile PatStatistics statistics;
     private final Map<GeyserSession,PatSession> sessions=new ConcurrentHashMap<>();
     private volatile boolean compatible;
+    private volatile boolean cameraSupported=true;
+    boolean cameraSupported() {return cameraSupported;}
+    // Shared JDK-only bridge; no classloading dependency between Velocity and Geyser.
+    private static final String PROXY_TO_BEDROCK="jp.mintymc.patpat.bridge.v1.java-to-bedrock";
+    private static final String BEDROCK_TO_PROXY="jp.mintymc.patpat.bridge.v1.bedrock-to-java";
+    private static final String BEDROCK_USERS="jp.mintymc.patpat.bridge.v1.bedrock-users";
+    private static final String PROXY_PREFER_STANDALONE="jp.mintymc.patpat.bridge.v1.prefer-standalone";
+    private final Set<UUID> bridgedBedrockUsers=ConcurrentHashMap.newKeySet();
+    private final java.util.function.Consumer<Object[]> proxyBridge=this::receiveJavaPat;
+
     private ImageAnimation animation;
     private Path generatedPack;
     Settings settings() { return settings; }
+    /** Use the Java proxy's standalone choice across both client editions.
+     * The callback is a JDK interface, so separate plugin classloaders work.
+     */
+    boolean preferProxyStandalone() {
+        Object pref=System.getProperties().get(PROXY_PREFER_STANDALONE);
+        return pref instanceof java.util.function.BooleanSupplier supplier && supplier.getAsBoolean();
+    }
     boolean patEnabled(GeyserSession session) {
         PatPreferences store=preferences;
         return store==null || store.enabled(session.getPlayerEntity().uuid());
@@ -141,27 +157,51 @@ public final class PatPatExtension implements Extension {
         event.register("patpatbedrock.admin",TriState.NOT_SET);
     }
     @Subscribe public void post(GeyserPostInitializeEvent event) {
-        // Internal packet/session APIs are pinned. Fail closed before installing any hooks.
-        String running="unknown";
-        try {
-            // Reflection is intentional: javac would inline Geyser's static final build strings.
-            String build=(String)GeyserImpl.class.getField("BUILD_NUMBER").get(null);
-            String commit=(String)GeyserImpl.class.getField("COMMIT").get(null);
-            running=(String)GeyserImpl.class.getField("VERSION").get(null);
-            compatible=compatible(build,commit);
-        } catch(ReflectiveOperationException | LinkageError e) {compatible=false;}
-        if(!compatible) { logger().error("This build targets Geyser 2.12.1-b1280 (64bb399). Running "+running+". Bridge disabled to avoid incompatible packet hooks.");return; }
-        logger().info("PatPat extension ready for Geyser b1280. Paper addon is NOT needed. Backend PatPat Plugin 1.2.5+ is optional; standalone Bedrock fallback is available.");
-        geyserApi().onlineConnections().forEach(c->{ if(c instanceof GeyserSession s) attach(s); });
+        // Geyser build hashes change every release. Probe runtime internals and
+        // enable this extension if the methods actually used still exist.
+        GeyserCompatibility.Report report=GeyserCompatibility.inspect();
+        compatible=report.supported();
+        cameraSupported=report.optionalMissing().isEmpty();
+        String running=GeyserCompatibility.runtimeVersion();
+        if(!compatible) {
+            logger().error("PatPat disabled for Geyser "+running+
+                ": unsupported internal API: "+String.join(", ",report.missing()));
+            return;
+        }
+        if(!report.optionalMissing().isEmpty())
+            logger().warning("Optional Geyser APIs missing on "+running+": "+
+                String.join(", ",report.optionalMissing()));
+        System.getProperties().put(PROXY_TO_BEDROCK,proxyBridge);
+        System.getProperties().put(BEDROCK_USERS,bridgedBedrockUsers);
+        logger().info("PatPat ready on Geyser "+running+
+            " (runtime ABI check passed, no build or commit pin).");
+        geyserApi().onlineConnections().forEach(c->{
+            if(c instanceof GeyserSession session) safeAttach(session);
+        });
     }
-    static boolean compatible(String build,String commit) {
-        return "1280".equals(build) && "64bb3993b4beef6743af0ab76ee5dfc8e67a0d21".equals(commit);
+    private void safeAttach(GeyserSession session) {
+        try {attach(session);}
+        catch(LinkageError | RuntimeException incompatibleApi) {
+            compatible=false;
+            logger().error("Incompatible Geyser runtime during PatPat session attach; bridge disabled",incompatibleApi);
+            if(System.getProperties().get(PROXY_TO_BEDROCK)==proxyBridge)
+                System.getProperties().remove(PROXY_TO_BEDROCK);
+            if(System.getProperties().get(BEDROCK_USERS)==bridgedBedrockUsers)
+                System.getProperties().remove(BEDROCK_USERS);
+            sessions.values().forEach(state->{
+                try {state.close();}catch(LinkageError | RuntimeException ignored) {}
+            });
+            sessions.clear();
+            bridgedBedrockUsers.clear();
+        }
     }
-    @Subscribe public void join(SessionJoinEvent event) { if(compatible && event.connection() instanceof GeyserSession s) attach(s); }
+    @Subscribe public void join(SessionJoinEvent event) { if(compatible && event.connection() instanceof GeyserSession s) safeAttach(s); }
     private void attach(GeyserSession session) {
         if(session.getDownstream()==null || sessions.containsKey(session)) return;
         PatSession state=new PatSession(this,session);
         if(sessions.putIfAbsent(session,state)!=null) return;
+        if(session.getPlayerEntity()!=null && session.getPlayerEntity().uuid()!=null)
+            bridgedBedrockUsers.add(session.getPlayerEntity().uuid());
         session.getDownstream().getSession().addListener(state);
         session.executeInEventLoop(state::beginHandshake);
     }
@@ -219,14 +259,55 @@ public final class PatPatExtension implements Extension {
         });
     }
     @Subscribe public void quit(SessionDisconnectEvent event) {
-        if(event.connection() instanceof GeyserSession s) { PatSession state=sessions.remove(s);if(state!=null)state.close(); }
+        if(event.connection() instanceof GeyserSession s) {
+            if(s.getPlayerEntity()!=null) bridgedBedrockUsers.remove(s.getPlayerEntity().uuid());
+            PatSession state=sessions.remove(s);if(state!=null)state.close();
+        }
     }
-    @Subscribe public void shutdown(GeyserShutdownEvent event) { flushStatistics();sessions.values().forEach(PatSession::close);sessions.clear(); }
+    @Subscribe public void shutdown(GeyserShutdownEvent event) {
+        if(System.getProperties().get(PROXY_TO_BEDROCK)==proxyBridge)
+            System.getProperties().remove(PROXY_TO_BEDROCK);
+        if(System.getProperties().get(BEDROCK_USERS)==bridgedBedrockUsers)
+            System.getProperties().remove(BEDROCK_USERS);
+        bridgedBedrockUsers.clear();
+        flushStatistics();sessions.values().forEach(PatSession::close);sessions.clear();
+    }
+
+    /** Bedrock-origin Pat events are forwarded only to Java viewers by the optional Velocity plugin. */
+    void relayToJava(PatSession sender,Entity target) {
+        if(!compatible || target==null || target.uuid()==null
+                || sender.session().getPlayerEntity()==null)return;
+        Object callback=System.getProperties().get(BEDROCK_TO_PROXY);
+        if(callback instanceof java.util.function.Consumer<?> raw) {
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<Object[]> bridge=(java.util.function.Consumer<Object[]>)raw;
+            try {bridge.accept(new Object[]{sender.session().getPlayerEntity().uuid(),target.uuid()});}
+            catch(RuntimeException exception) {logger().warning("Java bridge refused Bedrock Pat: "+exception.getMessage());}
+        }
+    }
+
+    /** Java-origin Pat events: resolve UUID in each Bedrock viewer's own cache. */
+    private void receiveJavaPat(Object[] message) {
+        if(!compatible || !settings.enabled() || message==null || message.length!=2
+                || !(message[0] instanceof UUID actor) || !(message[1] instanceof UUID target))return;
+        sessions.values().forEach(viewer->{
+            GeyserSession s=viewer.session();
+            s.executeInEventLoop(()->{
+                if(viewer.closed() || s.isClosed() || !patEnabled(s))return;
+                Entity entity=s.getPlayerEntity()!=null && target.equals(s.getPlayerEntity().uuid())
+                    ? s.getPlayerEntity():s.getEntityCache().getEntityByUuid(target);
+                if(entity==null || !entity.isValid())return;
+                viewer.showStandalone(entity.javaId());
+                if(target.equals(s.getPlayerEntity().uuid()) && !actor.equals(target))
+                    viewer.receivePatFeedback();
+            });
+        });
+    }
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.11.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
-            else source.sendMessage("PatPatExtension 0.11.0 / compatible="+compatible+" / sessions="+sessions.size());
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("PatPatExtension 0.12.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / renderer="+settings.renderer()+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            else source.sendMessage("PatPatExtension 0.12.0 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,s->s.test(args.length>0 && args[0].equalsIgnoreCase("text"))));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
