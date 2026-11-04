@@ -31,6 +31,10 @@ public final class PatPatExtension implements Extension {
     private static final String TOGGLE_WRITE="jp.mintymc.patpat.bridge.v1.toggle-write";
     private static final String JAVA_TOGGLE_READ="jp.mintymc.patpat.bridge.v1.java-toggle-read";
     private final Set<UUID> bridgedBedrockUsers=ConcurrentHashMap.newKeySet();
+    // Bedrock UUID may not exist at SessionJoin; stale quits must not
+    // remove the UUID of a newer session for the same player.
+    private final Map<GeyserSession,UUID> bedrockSessionIds=new ConcurrentHashMap<>();
+    private final Map<UUID,GeyserSession> bedrockOwners=new ConcurrentHashMap<>();
     private final java.util.function.Consumer<Object[]> proxyBridge=this::receiveJavaPat;
     // Share one Bedrock preference store with /extendedpatpat on Velocity.
     private final java.util.function.Function<UUID,Boolean> toggleRead=this::patEnabled;
@@ -47,7 +51,24 @@ public final class PatPatExtension implements Extension {
         return pref instanceof java.util.function.BooleanSupplier supplier && supplier.getAsBoolean();
     }
     boolean patEnabled(GeyserSession session) {
-        return session.getPlayerEntity()!=null && patEnabled(session.getPlayerEntity().uuid());
+        if(session.getPlayerEntity()==null || session.getPlayerEntity().uuid()==null)return false;
+        rememberBedrock(session);
+        return patEnabled(session.getPlayerEntity().uuid());
+    }
+    void rememberBedrock(GeyserSession session) {
+        if(session.getPlayerEntity()==null)return;
+        UUID uuid=session.getPlayerEntity().uuid();
+        if(uuid==null)return;
+        UUID old=bedrockSessionIds.put(session,uuid);
+        if(old!=null && !old.equals(uuid) && bedrockOwners.remove(old,session))
+            bridgedBedrockUsers.remove(old);
+        bedrockOwners.put(uuid,session);
+        bridgedBedrockUsers.add(uuid);
+    }
+    private void forgetBedrock(GeyserSession session) {
+        UUID uuid=bedrockSessionIds.remove(session);
+        if(uuid!=null && bedrockOwners.remove(uuid,session))
+            bridgedBedrockUsers.remove(uuid);
     }
     private boolean patEnabled(UUID uuid) {
         PatPreferences store=preferences;
@@ -193,6 +214,8 @@ public final class PatPatExtension implements Extension {
                 try {state.close();}catch(LinkageError | RuntimeException ignored) {}
             });
             sessions.clear();
+            bedrockSessionIds.clear();
+            bedrockOwners.clear();
             bridgedBedrockUsers.clear();
         }
     }
@@ -201,8 +224,7 @@ public final class PatPatExtension implements Extension {
         if(session.getDownstream()==null || sessions.containsKey(session)) return;
         PatSession state=new PatSession(this,session);
         if(sessions.putIfAbsent(session,state)!=null) return;
-        if(session.getPlayerEntity()!=null && session.getPlayerEntity().uuid()!=null)
-            bridgedBedrockUsers.add(session.getPlayerEntity().uuid());
+        rememberBedrock(session);
         session.getDownstream().getSession().addListener(state);
         session.executeInEventLoop(state::beginHandshake);
     }
@@ -265,7 +287,7 @@ public final class PatPatExtension implements Extension {
     }
     @Subscribe public void quit(SessionDisconnectEvent event) {
         if(event.connection() instanceof GeyserSession s) {
-            if(s.getPlayerEntity()!=null) bridgedBedrockUsers.remove(s.getPlayerEntity().uuid());
+            forgetBedrock(s);
             PatSession state=sessions.remove(s);if(state!=null)state.close();
         }
     }
@@ -282,14 +304,17 @@ public final class PatPatExtension implements Extension {
         if(System.getProperties().get(BEDROCK_USERS)==bridgedBedrockUsers)
             System.getProperties().remove(BEDROCK_USERS);
         bridgedBedrockUsers.clear();
+        bedrockOwners.clear();
+        bedrockSessionIds.clear();
         sessions.values().forEach(PatSession::close);sessions.clear();
     }
 
     /** Bedrock-origin Pat events are forwarded only to Java viewers by the optional Velocity plugin. */
     void relayToJava(PatSession sender,Entity target) {
-        if(!patEnabled(sender.session()) || !targetAllowsPat(target) ||
-                !compatible || target==null || target.uuid()==null
-                || sender.session().getPlayerEntity()==null)return;
+        if(!compatible || !settings.enabled() || sender.closed() || sender.session().isClosed()
+                || target==null || target.uuid()==null || !target.isValid()
+                || sender.session().getPlayerEntity()==null
+                || !patEnabled(sender.session()) || !targetAllowsPat(target))return;
         Object callback=System.getProperties().get(BEDROCK_TO_PROXY);
         if(callback instanceof java.util.function.Consumer<?> raw) {
             @SuppressWarnings("unchecked")
@@ -307,20 +332,32 @@ public final class PatPatExtension implements Extension {
             GeyserSession s=viewer.session();
             s.executeInEventLoop(()->{
                 if(viewer.closed() || s.isClosed() || !patEnabled(s))return;
-                Entity entity=s.getPlayerEntity()!=null && target.equals(s.getPlayerEntity().uuid())
-                    ? s.getPlayerEntity():s.getEntityCache().getEntityByUuid(target);
-                if(entity==null || !entity.isValid() || !targetAllowsPat(entity))return;
+                // A target UUID alone cannot prove the patter is in this
+                // viewer's world. Require the Java actor and target in the SAME
+                // recipient entity cache, near each other.
+                Entity actorEntity=s.getEntityCache().getEntityByUuid(actor);
+                if(!(actorEntity instanceof org.geysermc.geyser.entity.type.player.PlayerEntity)
+                        || !actorEntity.isValid() || !actor.equals(actorEntity.uuid())
+                        || !targetAllowsPat(actorEntity) || actorEntity.position()==null)return;
+                boolean recipientIsTarget=s.getPlayerEntity()!=null
+                    && target.equals(s.getPlayerEntity().uuid());
+                Entity entity=recipientIsTarget?s.getPlayerEntity()
+                    :s.getEntityCache().getEntityByUuid(target);
+                if(entity==null || !entity.isValid() || !target.equals(entity.uuid())
+                        || !targetAllowsPat(entity) || entity.position()==null)return;
+                if(!PatBridgePolicy.sameWorldRange(actor,target,
+                        actorEntity.position().distanceSquared(entity.position()),
+                        settings.distance()))return;
                 viewer.showStandalone(entity.javaId());
-                if(target.equals(s.getPlayerEntity().uuid()) && !actor.equals(target))
-                    viewer.receivePatFeedback();
+                if(recipientIsTarget)viewer.receivePatFeedback();
             });
         });
     }
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("ExtendedPatPat Geyser 0.13.1 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
-            else source.sendMessage("ExtendedPatPat Geyser 0.13.1 / compatible="+compatible+" / sessions="+sessions.size());
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("ExtendedPatPat Geyser 0.13.2 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            else source.sendMessage("ExtendedPatPat Geyser 0.13.2 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,PatSession::test));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));

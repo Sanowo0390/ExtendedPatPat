@@ -42,6 +42,7 @@ final class PatSession extends SessionAdapter {
     boolean closed(){return closed;}
     int active(){return renderer.size();}
     void beginHandshake() {
+        owner.rememberBedrock(session);
         ready=false;nextPat=0;generation++;renderer.clear();camera.stop();
         if(!closed && owner.settings().enabled() && !owner.preferProxyStandalone())
             handshake(generation,0);

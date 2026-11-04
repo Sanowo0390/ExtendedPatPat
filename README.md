@@ -12,7 +12,7 @@
 | JAR | 動作環境 |
 |---|---|
 | **ExtendedPatPat-Velocity** (0.7.0) | Velocity 3.5 + PacketEvents 2.14.0 |
-| **ExtendedPatPat-Geyser** (0.13.1) | Geyser-Velocity 2.12.1系 |
+| **ExtendedPatPat-Geyser** (0.13.2) | Geyser-Velocity 2.12.1系 |
 | **ExtendedPatPat-Paper** (0.6.1) | Paper/Purpur 26.3（Java 25） |
 
 - **Java・統合版のクロスプレイ**：Velocity版を`plugins/`に、Geyser版をGeyserの`extensions/`に配置。Paperバックエンド用PatPatは不要です。
