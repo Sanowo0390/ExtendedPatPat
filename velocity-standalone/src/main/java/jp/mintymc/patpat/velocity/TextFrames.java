@@ -21,11 +21,16 @@ import java.util.Map;
 /**
  * Experimental pack-free viewer-facing hand renderer.
  * RGBA PNGs are bundled in Velocity's JAR, never sent to the player.
- * Unicode full blocks approximate pixels; braille blanks represent alpha.
+ * Unicode full blocks approximate pixels, regular spaces preserve transparent cells.
+ * Bold glyphs and underlines fill much of the vanilla font's built-in spacing.
  */
 final class TextFrames {
     private static final Key FONT=Key.key("minecraft:uniform");
-    private static final char FILLED='\u2588', EMPTY='\u2800';
+    private static final char FILLED='\u2588';
+    // Java uniform font advances full blocks by ~10 pixels when bold;
+    // vanilla ASCII spaces have a reliable invisible width of 4 pixels.
+    private static final int BOLD_CELL_ADVANCE=10;
+    private static final int SPACE_ADVANCE=4;
     private final int resolution;
     private final Map<String,Component[]> frames=new HashMap<>();
 
@@ -75,14 +80,30 @@ final class TextFrames {
             while(x<n){
                 int color=color(small.getRGB(x,y)),end=x+1;
                 while(end<n && color(small.getRGB(end,y))==color)end++;
-                char c=color<0?EMPTY:FILLED;
-                Component glyph=Component.text(String.valueOf(c).repeat(end-x)).font(FONT);
-                if(color>=0)glyph=glyph.color(TextColor.color(color));
-                result.append(glyph);
+                if(color<0){
+                    // U+2800 BRAILLE PATTERN BLANK was drawn as tiny dots / a
+                    // missing glyph on real clients. Plain spaces render no ink.
+                    result.append(Component.text(transparentRun(end-x)).font(FONT));
+                }else{
+                    // Bold extends every solid block toward its neighbour.
+                    // Underline covers the built-in line gap beneath solid cells.
+                    // Neither format is applied to transparent space segments.
+                    Component glyph=Component.text(String.valueOf(FILLED).repeat(end-x))
+                        .font(FONT).color(TextColor.color(color))
+                        .bold(true).underlined(true);
+                    result.append(glyph);
+                }
                 x=end;
             }
         }
         return result.build();
+    }
+
+    /** Best-effort invisible spacing: 2 or 3 ASCII spaces per transparent pixel. */
+    static String transparentRun(int cells){
+        if(cells<0 || cells>32)throw new IllegalArgumentException("Invalid transparent run");
+        int spaces=(cells*BOLD_CELL_ADVANCE+SPACE_ADVANCE/2)/SPACE_ADVANCE;
+        return " ".repeat(spaces);
     }
 
     private static int color(int argb){return (argb>>>24)<128?-1:argb&0xFFFFFF;}
@@ -95,8 +116,8 @@ final class TextFrames {
         return new EntityData<>(23,EntityDataTypes.ADV_COMPONENT,value);
     }
     static List<EntityData<?>> spawnMetadata(Component value,double imageSize,int resolution){
-        // Vanilla text: 1/40 block per glyph pixel; uniform cell ~9x10 px.
-        float width=(float)(imageSize*40/(resolution*9));
+        // Vanilla text: 1/40 block per glyph pixel; bold uniform cell ~10x10 px.
+        float width=(float)(imageSize*40/(resolution*BOLD_CELL_ADVANCE));
         float height=(float)(imageSize*40/(resolution*10));
         return List.of(
             new EntityData<>(12,EntityDataTypes.VECTOR3F,new Vector3f(width,height,1f)),

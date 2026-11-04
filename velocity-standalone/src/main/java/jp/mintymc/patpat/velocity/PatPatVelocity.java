@@ -82,7 +82,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.8",
+    version="0.6.9",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -859,7 +859,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.8 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.9 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")

@@ -4,7 +4,7 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.8.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.9.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
@@ -17,6 +17,10 @@ Velocity版の `plugins/extendedpatpatvelocity/config.properties` で `hand-rend
 `text_display` はJava版1.19.4以降のみ対応し、それ以前のクライアントには従来方式を自動使用します。RGBA画像を24×24程度の色付きブロック文字に変換して1体のText Displayで表示します。`billboard=center` によってプレイヤーの視線に正対し、240msの上下動はDisplayエンティティの位置を更新します。
 
 `text-display-resolution=24`（8〜32）を上げると精細になりますが、1フレームあたりの色コンポーネント数と通信量が増えます。標準の額縁より描画負荷が高くなる可能性があります。バニラフォントの字形・行間・透明セルの制約によって隙間やズレが出る可能性があるため、**実機で試すための実験的レンダラー**です。
+
+### Text Displayの見た目改善（0.6.9）
+
+透明部分で点状に見えていたBraille空白（U+2800）を、描画されない通常の空白に変更しました。着色部分には太字＋下線を用いて、標準フォントの字間・行間による格子を軽減します。ただし、**フォント方式のため完全に継ぎ目のない画像にはできません**。文字間隔やフォントの違いで多少の段差が出る場合があります。高画質優先なら `hand-renderer=item_frame` に戻してください。
 
 ## マップ表示
 

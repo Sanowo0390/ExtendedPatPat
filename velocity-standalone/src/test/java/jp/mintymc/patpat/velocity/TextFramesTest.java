@@ -19,7 +19,7 @@ class TextFramesTest {
         assertFalse(TextFrames.useText("text_display",ClientVersion.V_1_19_3));
     }
 
-    @Test void pixelArtUsesUniformFontAndTransparentCell(){
+    @Test void pixelArtUsesUniformFontWithoutBrailleArtifacts(){
         BufferedImage image=new BufferedImage(8,8,BufferedImage.TYPE_INT_ARGB);
         image.setRGB(1,1,0xFFFF0000);
         image.setRGB(2,1,0xFF00FF00);
@@ -27,9 +27,32 @@ class TextFramesTest {
         assertTrue(art instanceof TextComponent);
         String content=art.children().toString();
         assertTrue(content.contains("█"),content);
-        assertTrue(content.contains("⠀"),content);
+        assertFalse(content.contains("⠀"),"Braille pseudo-blank must never leak into rendered text");
+        assertTrue(content.contains("  "),"Transparent pixels must use invisible ASCII spaces");
+        assertTrue(content.contains("bold=set_by_true"),"Opaque cells should cover horizontal gaps");
+        assertTrue(content.contains("underlined=set_by_true"),"Opaque cells should cover row gaps");
         assertTrue(content.contains("#FF0000"),content);
         assertTrue(content.contains("#00FF00"),content);
+    }
+
+    @Test void transparentRunUsesOnlyAsciiSpacesAndPredictableAdvance() {
+        assertEquals("",TextFrames.transparentRun(0));
+        for(int length=1;length<=32;length++){
+            String blank=TextFrames.transparentRun(length);
+            assertTrue(blank.chars().allMatch(c->c==' '));
+            assertTrue(Math.abs(blank.length()*4-length*10)<=2);
+        }
+        assertThrows(IllegalArgumentException.class,()->TextFrames.transparentRun(-1));
+        assertThrows(IllegalArgumentException.class,()->TextFrames.transparentRun(33));
+    }
+
+    @Test void blankFrameContainsNoVisiblePlaceholderCharacters() {
+        BufferedImage blank=new BufferedImage(8,8,BufferedImage.TYPE_INT_ARGB);
+        Component result=TextFrames.render(blank,8);
+        String content=result.children().toString();
+        assertFalse(content.contains("█"));
+        assertFalse(content.contains("⠀"));
+        assertFalse(content.contains("TextColorImpl"));
     }
 
     @Test void centerBillboardMetadataDoesNotRegress() throws Exception {
