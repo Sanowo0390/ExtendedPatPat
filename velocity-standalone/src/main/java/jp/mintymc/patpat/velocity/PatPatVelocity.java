@@ -304,7 +304,7 @@ public final class PatPatVelocity {
                         packet.getEntityType().getName().toString(),packet.getPosition()));
                 } else if(type==com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Server.UPDATE_ATTRIBUTES) {
                     var packet=new WrapperPlayServerUpdateAttributes(event);
-                    Tracked tracked=view.byId.get(packet.getEntityID());
+                    Tracked tracked=view.byId.get(packet.getEntityId());
                     if(tracked!=null)for(var property:packet.getProperties()) {
                         if(Attributes.SCALE.equals(property.getAttribute()))
                             tracked.originalScale=property;
