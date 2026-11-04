@@ -4,7 +4,7 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.1.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.2.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
