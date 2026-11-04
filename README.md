@@ -11,7 +11,7 @@
 
 | JAR | 動作環境 |
 |---|---|
-| **ExtendedPatPat-Velocity** (0.6.9) | Velocity 3.5 + PacketEvents 2.14.0 |
+| **ExtendedPatPat-Velocity** (0.7.0) | Velocity 3.5 + PacketEvents 2.14.0 |
 | **ExtendedPatPat-Geyser** (0.13.1) | Geyser-Velocity 2.12.1系 |
 | **ExtendedPatPat-Paper** (0.6.1) | Paper/Purpur 26.3（Java 25） |
 
@@ -21,13 +21,13 @@
 ## 主な機能
 
 - しゃがみ＋対象への操作でPat。手のアニメーション・効果音・クールダウン
-- Java版：**128×128の地図画像を透明額縁に表示（標準）／Text Displayのカメラ追従を選択可**。Geyserの表示を参考に、Java版に合わせて調整した画像スケールと視聴者方向のX/Zオフセットを使用し、地図画像内の手が上下に動きます。画像データは各地図につき初回のみ転送
+- Java版：**地図＋透明額縁（標準）／文字式Text Display／1.21.9以降のスキン画像タイル式Billboardを選択可**。Geyserの表示を参考に、Java版に合わせて調整した画像スケールと視聴者方向のX/Zオフセットを使用し、地図画像内の手が上下に動きます。画像データは各地図につき初回のみ転送
 - 統合版：PNG/GIF、手の上下動、Squish（凹み）、音、任意のカメラ演出
 - Velocity＋Geyser：Java⇔統合版の相互演出
 - 個人ごとのON/OFF、権限設定、Java版スキン切替（地図画像に変換して同梱可能）
 - Java版Squish：Velocityでスケール変更による近似。Paper版には未実装
 
-**Java版にURLもリソースパックも不要です。** 既定の地図方式には128×128解像度・額縁4方向の制約があります。Velocity 0.6.8以降は `hand-renderer=text_display` で実験的なカメラ追従表示も選択できます（画質は疑似画像）。ViaVersion経由は接続元プロトコルに配慮していますが、各バージョンの実機互換性は未検証です。
+**Java版にURLもリソースパックも不要です。** 既定の地図方式には128×128解像度・額縁4方向の制約があります。Velocity 0.7.0以降は `hand-renderer=head_tiles` で、MineSkinに事前登録・キャッシュした8×8プレイヤーヘッド画像をカメラ追従で表示できます。MineSkin APIキーが初回生成に必要です。未生成時は額縁へフォールバックします。ViaVersion経由は接続元プロトコルに配慮していますが、各バージョンの実機互換性は未検証です。
 
 ## コマンド
 

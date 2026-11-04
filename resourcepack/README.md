@@ -15,3 +15,7 @@ Java版の各プレイヤーは`/extendedpatpat skin list`と`/extendedpatpat sk
 ## Velocity: Text Display表示（リソースパック不要）
 
 `resourcepack/build.py` は元のRGBA画像を `resourcepack/dist/text-art/<ID>/<FRAME>.png` にも変換し、Velocity JARに含めます。画像ファイル自体をクライアントへ配信せず、起動時に色付き文字コンポーネントへ変換します。`hand-renderer=text_display` を選ぶと、`billboard=center` の疑似画像と仮想エンティティの上下移動を使用します。デフォルトの額縁＋地図方式は維持されます。
+
+## 1.21.9+のプレイヤーヘッド画像タイル方式
+
+Velocity 0.7.0では`hand-renderer=head_tiles`を追加しました。ビルド時に含めたRGBAフレームをサーバー側で24×24等に縮小して8×8のタイルへ分割し、MineSkin APIで署名を取得します。`/extendedpatpat tiles generate default`はそれを非同期で実行し、`plugins/extendedpatpatvelocity/head-tiles/`にキャッシュします。タイルはテキストのobject/playerコンポーネントとして送信され、各行を別々のText Displayエンティティで表示するため、文字方式の行間を回避します。詳しい準備は[VelocityのREADME](../velocity-standalone/README.md)を参照してください。

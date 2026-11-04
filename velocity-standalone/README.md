@@ -4,7 +4,7 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.9.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.7.0.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
@@ -21,6 +21,25 @@ Velocity版の `plugins/extendedpatpatvelocity/config.properties` で `hand-rend
 ### Text Displayの見た目改善（0.6.9）
 
 透明部分で点状に見えていたBraille空白（U+2800）を、描画されない通常の空白に変更しました。着色部分には太字＋下線を用いて、標準フォントの字間・行間による格子を軽減します。ただし、**フォント方式のため完全に継ぎ目のない画像にはできません**。文字間隔やフォントの違いで多少の段差が出る場合があります。高画質優先なら `hand-renderer=item_frame` に戻してください。
+
+## スキン画像タイルによるカメラ追従（0.7.0・実験的）
+
+`hand-renderer=head_tiles` を追加しました。Minecraft Java版 **1.21.9以降**のテキスト内プレイヤーヘッド画像（object/player）を、透明背景の `TEXT_DISPLAY` で表示します。**リソースパック不要**。8×8の画像タイルを各行1体のBillboardに並べるため、以前の文字方式の字間・行間の格子を避けられます。Geyser版には影響しません。
+
+ただし、これは**実機での表示・透過をまだ保証できない実験的方式**です。プレイヤースキンの仕様により、特に半透明ピクセルが不透明化する可能性があります。実機で崩れる場合は `hand-renderer=item_frame` に戻してください。
+
+### 初回セットアップ（MineSkin）
+
+この方式は署名済みのプレイヤースキンが必要なので、最初の1回だけMineSkin APIで画像タイルを生成し、Velocityサーバーにキャッシュします。ゲームプレイ中は外部APIを呼びません。
+
+1. <https://account.mineskin.org/keys> でMineSkin APIキーを発行し、Velocity側で環境変数 `MINESKIN_API_KEY` にセットするか、`plugins/extendedpatpatvelocity/config.properties` の `mineskin-api-key=` に指定します。**APIキーをGitHubや公開ログに貼り付けないでください。**
+2. `head-tile-resolution=24`（16/24/32に対応、既定24）を確認し、`/extendedpatpat reload` を実行。
+3. 権限 `extendedpatpat.admin` で `/extendedpatpat tiles generate default` を実行。生成はVelocityの非同期タスクで実行し、MineSkinのジョブ数・レート制限により完了まで時間がかかる場合があります。進捗はVelocityログに出ます。
+4. `/extendedpatpat tiles` でキャッシュ状況を確認し、`hand-renderer=head_tiles` に変更して `/extendedpatpat reload` を実行します。
+
+生成データは `plugins/extendedpatpatvelocity/head-tiles/` に保存され、次回起動後も再利用します。カスタムスキンも `/extendedpatpat tiles generate <skin-id>` で生成できます。透明なタイルは署名生成をスキップし、同じタイルはSHA-256で重複排除します。
+
+古いJavaクライアント、キャッシュ未生成、または生成失敗のときは**従来のitem_frame方式に自動フォールバック**します。 `text_display` も引き続き選択できます。Minecraft 1.21.9以降を含むサーバーバージョン間のViaVersion変換・実機の透過は要検証です。
 
 ## マップ表示
 
