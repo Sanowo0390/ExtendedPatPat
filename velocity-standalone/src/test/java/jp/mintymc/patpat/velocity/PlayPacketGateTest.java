@@ -42,6 +42,10 @@ class PlayPacketGateTest {
             "No PacketEvents callbacks in configuration should rebuild a play-only view");
         assertTrue(source.contains("PatRelayPolicy.sameOrigin"),
             "Deferred Pats must retain their source backend lease");
+        assertTrue(source.contains("replacement.realMod=previous!=null && previous.realMod"),
+            "Native mod detection must survive a Velocity backend switch");
+        assertTrue(source.contains("sendStandaloneHello(replacement)"),
+            "Modded clients should be re-handshaken after switching backends");
         assertTrue(source.contains("PatPatProtocol.notification(targetIdInView,sourceId)"),
             "Modded Java viewers must receive native v2 notifications");
         assertTrue(source.contains("handleNativeRequest(view,uuid,message.getData())"),
