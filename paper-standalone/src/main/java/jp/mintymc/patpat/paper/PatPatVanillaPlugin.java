@@ -57,17 +57,40 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     private DefaultPackHost defaultPack;
     private final SkinCatalog skinCatalog=SkinCatalog.load();
     private final Map<UUID,String> selectedSkins=new HashMap<>();
-    private record ViewerSprite(Player viewer,ItemDisplay display,SkinCatalog.Skin skin) {}
+    private static final class ViewerSprite {
+        private final Player viewer;
+        private final ItemDisplay display;
+        private final SkinCatalog.Skin skin;
+        private int lastFrame;
+        ViewerSprite(Player viewer,ItemDisplay display,SkinCatalog.Skin skin) {
+            this.viewer=viewer;this.display=display;this.skin=skin;
+        }
+        Player viewer(){return viewer;}
+        ItemDisplay display(){return display;}
+        SkinCatalog.Skin skin(){return skin;}
+        int lastFrame(){return lastFrame;}
+        void lastFrame(int frame){lastFrame=frame;}
+    }
+    /** Built once per style. Paper's ItemDisplay receives a clone to avoid
+     * constructing metadata and resource identifiers every animation tick.
+     */
+    private final Map<String,ItemStack[]> framesBySkin=new HashMap<>();
     private SkinCatalog.Skin skin(Player viewer) {
         return skinCatalog.get(selectedSkins.getOrDefault(viewer.getUniqueId(),"default"));
     }
     private ItemStack handFrame(SkinCatalog.Skin skin,int index) {
-        ItemStack item=new ItemStack(Material.PAPER);
-        var meta=item.getItemMeta();
-        meta.setItemModel(new NamespacedKey("patpat","hand_"+skin.id()+"_"+
-            Math.min(skin.frames()-1,Math.max(0,index))));
-        item.setItemMeta(meta);
-        return item;
+        ItemStack[] cached=framesBySkin.computeIfAbsent(skin.id(),id->{
+            ItemStack[] built=new ItemStack[skin.frames()];
+            for(int i=0;i<built.length;i++){
+                ItemStack item=new ItemStack(Material.PAPER);
+                var meta=item.getItemMeta();
+                meta.setItemModel(new NamespacedKey("patpat","hand_"+id+"_"+i));
+                item.setItemMeta(meta);
+                built[i]=item;
+            }
+            return built;
+        });
+        return cached[Math.max(0,Math.min(index,cached.length-1))].clone();
     }
     private boolean useResourcePack() {
         return getConfig().getString("animation.renderer","resourcepack").equalsIgnoreCase("resourcepack");
@@ -226,9 +249,11 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                 viewer.playSound(target.getLocation(),id,SoundCategory.PLAYERS,volume,pitch);
             }
         }
-        if (getConfig().getBoolean("animation.enabled", true) &&
-                animations.size() < Math.max(1, getConfig().getInt("animation.max-active",24)))
-            new Animation(target).runTaskTimer(this,0L,1L);
+        if(getConfig().getBoolean("animation.enabled",true) &&
+                animations.size()<Math.max(1,getConfig().getInt("animation.max-active",24))) {
+            Animation animation=new Animation(target);
+            if(animation.hasViewers())animation.runTaskTimer(this,0L,1L);
+        }
     }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -372,8 +397,9 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                 for(Player viewer:voxelViewers)viewer.showEntity(PatPatVanillaPlugin.this,block);
                 blocks.add(block);
             }
-            animations.add(this);
+            if(hasViewers())animations.add(this);
         }
+        boolean hasViewers(){return !blocks.isEmpty() || !sprites.isEmpty();}
 
         private Location position(double down) {
             return target.getLocation().add(0,target.getHeight()+offsetY-down,0);
@@ -389,7 +415,11 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                 if(!display.isValid())continue;
                 SkinCatalog.Skin style=entry.skin();
                 display.teleport(p.clone().add(style.offsetX(),style.offsetY(),style.offsetZ()));
-                display.setItemStack(handFrame(style,style.at(frame,ticks+1)));
+                int nextFrame=style.at(frame,ticks+1);
+                if(nextFrame!=entry.lastFrame()) {
+                    display.setItemStack(handFrame(style,nextFrame));
+                    entry.lastFrame(nextFrame);
+                }
             }
             frame++;
         }

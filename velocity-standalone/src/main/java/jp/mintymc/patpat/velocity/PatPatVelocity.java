@@ -674,6 +674,7 @@ public final class PatPatVelocity {
         final AtomicReference<ScheduledTask> job=new AtomicReference<>();
         ScheduledTask task=proxy.getScheduler().buildTask(this,new Runnable() {
             int tick=0;
+            int sentFrame=0;
             @Override public void run() {
                 try {
                     if(tick++>=duration || views.get(player.getUniqueId())!=view
@@ -687,9 +688,12 @@ public final class PatPatVelocity {
                         view.user.sendPacketSilently(new WrapperPlayServerEntityTeleport(id,p,0,0,false));
                     if(useSprite && fakeIds[0]>0) {
                         int frame=style.at(tick,duration);
-                        view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(fakeIds[0],
-                            List.of(new EntityData<>(23,EntityDataTypes.ITEMSTACK,
-                                handItem(view.user,style,frame)))));
+                        if(frame!=sentFrame) {
+                            view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(fakeIds[0],
+                                List.of(new EntityData<>(23,EntityDataTypes.ITEMSTACK,
+                                    handItem(view.user,style,frame)))));
+                            sentFrame=frame;
+                        }
                     }
                     if(squash) {
                         double pressure=Math.sin(Math.PI*t);
