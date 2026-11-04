@@ -14,13 +14,14 @@ import java.util.regex.*;
  * take precedence. A full verbatim backup is made before any rewrite.
  */
 final class ConfigLayout {
-    static final String MARKER = "PatPatGeyserExtension | Config Layout v2";
+    static final String MARKER = "ExtendedPatPat Geyser | Config Layout v2";
+    private static final String LEGACY_MARKER = "PatPatGeyserExtension | Config Layout v2";
     private static final Pattern KEY=Pattern.compile("^\\s*([a-zA-Z][a-zA-Z0-9_.-]*)\\s*[=:].*$");
     private ConfigLayout() {}
 
     static boolean formatIfLegacy(Path file) throws IOException {
         String existing=Files.readString(file,StandardCharsets.UTF_8);
-        if(existing.contains(MARKER))return false;
+        if(existing.contains(MARKER) || existing.contains(LEGACY_MARKER))return false;
 
         String template;
         try(InputStream in=ConfigLayout.class.getResourceAsStream("/config.properties")) {
