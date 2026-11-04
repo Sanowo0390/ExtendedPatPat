@@ -11,7 +11,7 @@
 
 | JAR | 動作環境 |
 |---|---|
-| **ExtendedPatPat-Velocity** (0.6.5) | Velocity 3.5 + PacketEvents 2.14.0 |
+| **ExtendedPatPat-Velocity** (0.6.6) | Velocity 3.5 + PacketEvents 2.14.0 |
 | **ExtendedPatPat-Geyser** (0.13.1) | Geyser-Velocity 2.12.1系 |
 | **ExtendedPatPat-Paper** (0.6.1) | Paper/Purpur 26.3（Java 25） |
 
@@ -21,7 +21,7 @@
 ## 主な機能
 
 - しゃがみ＋対象への操作でPat。手のアニメーション・効果音・クールダウン
-- Java版：**128×128の地図画像を透明な額縁で表示**。Velocity版では地図画像内の手が上下に動きます。画像データは各地図につき初回のみ転送
+- Java版：**128×128の地図画像を透明な額縁で表示**。Geyserと共通の画像スケール・視聴者方向のX/Zオフセットを使用し、地図画像内の手が上下に動きます。画像データは各地図につき初回のみ転送
 - 統合版：PNG/GIF、手の上下動、Squish（凹み）、音、任意のカメラ演出
 - Velocity＋Geyser：Java⇔統合版の相互演出
 - 個人ごとのON/OFF、権限設定、Java版スキン切替（地図画像に変換して同梱可能）
