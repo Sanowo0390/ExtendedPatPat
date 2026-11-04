@@ -27,8 +27,13 @@ public final class PatPatExtension implements Extension {
     private static final String BEDROCK_TO_PROXY="jp.mintymc.patpat.bridge.v1.bedrock-to-java";
     private static final String BEDROCK_USERS="jp.mintymc.patpat.bridge.v1.bedrock-users";
     private static final String PROXY_PREFER_STANDALONE="jp.mintymc.patpat.bridge.v1.prefer-standalone";
+    private static final String TOGGLE_READ="jp.mintymc.patpat.bridge.v1.toggle-read";
+    private static final String TOGGLE_WRITE="jp.mintymc.patpat.bridge.v1.toggle-write";
     private final Set<UUID> bridgedBedrockUsers=ConcurrentHashMap.newKeySet();
     private final java.util.function.Consumer<Object[]> proxyBridge=this::receiveJavaPat;
+    // Share one Bedrock preference store with /extendedpatpat on Velocity.
+    private final java.util.function.Function<UUID,Boolean> toggleRead=this::patEnabled;
+    private final java.util.function.Function<Object[],Boolean> toggleWrite=this::toggleFromProxy;
 
     private ImageAnimation animation;
     private Path generatedPack;
@@ -41,13 +46,39 @@ public final class PatPatExtension implements Extension {
         return pref instanceof java.util.function.BooleanSupplier supplier && supplier.getAsBoolean();
     }
     boolean patEnabled(GeyserSession session) {
+        return session.getPlayerEntity()!=null && patEnabled(session.getPlayerEntity().uuid());
+    }
+    private boolean patEnabled(UUID uuid) {
         PatPreferences store=preferences;
-        return store==null || store.enabled(session.getPlayerEntity().uuid());
+        return store!=null && store.enabled(uuid);
     }
     boolean setPatEnabled(GeyserSession session,boolean enabled) throws IOException {
+        if(session.getPlayerEntity()==null)throw new IOException("Player is not ready");
+        return setPatEnabled(session.getPlayerEntity().uuid(),enabled);
+    }
+    private boolean setPatEnabled(UUID uuid,boolean enabled) throws IOException {
         PatPreferences store=preferences;
         if(store==null)throw new IOException("Pat preferences have not been initialized");
-        return store.setEnabled(session.getPlayerEntity().uuid(),enabled);
+        boolean updated=store.setEnabled(uuid,enabled);
+        if(!updated)return false;
+        if(!enabled) {
+            sessions.values().forEach(state->{
+                GeyserSession current=state.session();
+                if(current.getPlayerEntity()!=null && uuid.equals(current.getPlayerEntity().uuid()))
+                    current.executeInEventLoop(state::clear);
+            });
+        }
+        return true;
+    }
+    private Boolean toggleFromProxy(Object[] values) {
+        if(values==null || values.length!=2 ||
+                !(values[0] instanceof UUID uuid) ||
+                !(values[1] instanceof Boolean enabled))return false;
+        try {return setPatEnabled(uuid,enabled);}
+        catch(IOException ex) {
+            logger().error("Unable to save Bedrock Pat toggle from Velocity",ex);
+            return false;
+        }
     }
     ImageAnimation animation() { return animation; }
     @Subscribe public void pre(GeyserPreInitializeEvent event) {
@@ -114,6 +145,8 @@ public final class PatPatExtension implements Extension {
                 String.join(", ",report.optionalMissing()));
         System.getProperties().put(PROXY_TO_BEDROCK,proxyBridge);
         System.getProperties().put(BEDROCK_USERS,bridgedBedrockUsers);
+        System.getProperties().put(TOGGLE_READ,toggleRead);
+        System.getProperties().put(TOGGLE_WRITE,toggleWrite);
         logger().info("PatPat ready on Geyser "+running+
             " (runtime ABI check passed, no build or commit pin).");
         geyserApi().onlineConnections().forEach(c->{
@@ -129,6 +162,7 @@ public final class PatPatExtension implements Extension {
                 System.getProperties().remove(PROXY_TO_BEDROCK);
             if(System.getProperties().get(BEDROCK_USERS)==bridgedBedrockUsers)
                 System.getProperties().remove(BEDROCK_USERS);
+            unregisterToggleBridge();
             sessions.values().forEach(state->{
                 try {state.close();}catch(LinkageError | RuntimeException ignored) {}
             });
@@ -152,6 +186,7 @@ public final class PatPatExtension implements Extension {
      * Java entity ID: IDs may be reused on another Velocity backend.
      */
     void relayStandalone(PatSession sender,Entity target) {
+        if(!patEnabled(sender.session()))return;
         UUID targetUuid=target.uuid();
         if(targetUuid==null)return; // Actor has already received its own preview.
         GeyserSession actor=sender.session();
@@ -164,6 +199,7 @@ public final class PatPatExtension implements Extension {
             GeyserSession other=viewer.session();
             other.executeInEventLoop(()->{
                 if(viewer.closed() || other.isClosed() || !settings.enabled()
+                        || !patEnabled(sender.session()) || !patEnabled(other)
                         || !Objects.equals(world,other.getWorldName())
                         || !Objects.equals(remote,other.remoteServer()))return;
                 // The recipient's own player is not always present in Geyser's
@@ -181,6 +217,7 @@ public final class PatPatExtension implements Extension {
     }
     /** Mirror the harmless hand swing to other Bedrock viewers in the same world. */
     void relaySwing(PatSession sender) {
+        if(!patEnabled(sender.session()))return;
         GeyserSession actor=sender.session();
         if(actor.getPlayerEntity()==null || actor.getPlayerEntity().uuid()==null)return;
         UUID actorUuid=actor.getPlayerEntity().uuid();
@@ -192,6 +229,7 @@ public final class PatPatExtension implements Extension {
             GeyserSession other=viewer.session();
             other.executeInEventLoop(()->{
                 if(viewer.closed() || other.isClosed() || !settings.enabled()
+                        || !patEnabled(sender.session()) || !patEnabled(other)
                         || !Objects.equals(world,other.getWorldName())
                         || !Objects.equals(remote,other.remoteServer()))return;
                 Entity otherActor=other.getEntityCache().getEntityByUuid(actorUuid);
@@ -205,7 +243,14 @@ public final class PatPatExtension implements Extension {
             PatSession state=sessions.remove(s);if(state!=null)state.close();
         }
     }
+    private void unregisterToggleBridge() {
+        if(System.getProperties().get(TOGGLE_READ)==toggleRead)
+            System.getProperties().remove(TOGGLE_READ);
+        if(System.getProperties().get(TOGGLE_WRITE)==toggleWrite)
+            System.getProperties().remove(TOGGLE_WRITE);
+    }
     @Subscribe public void shutdown(GeyserShutdownEvent event) {
+        unregisterToggleBridge();
         if(System.getProperties().get(PROXY_TO_BEDROCK)==proxyBridge)
             System.getProperties().remove(PROXY_TO_BEDROCK);
         if(System.getProperties().get(BEDROCK_USERS)==bridgedBedrockUsers)
@@ -216,7 +261,7 @@ public final class PatPatExtension implements Extension {
 
     /** Bedrock-origin Pat events are forwarded only to Java viewers by the optional Velocity plugin. */
     void relayToJava(PatSession sender,Entity target) {
-        if(!compatible || target==null || target.uuid()==null
+        if(!patEnabled(sender.session()) || !compatible || target==null || target.uuid()==null
                 || sender.session().getPlayerEntity()==null)return;
         Object callback=System.getProperties().get(BEDROCK_TO_PROXY);
         if(callback instanceof java.util.function.Consumer<?> raw) {
