@@ -181,13 +181,23 @@ public final class PatPatVelocity {
         // negotiated with the previous backend (but not the persistent opt-out).
         Player player=event.getPlayer();
         UUID uuid=player.getUniqueId();
-        View replacement=new View(uuid,null);
+        View previous=views.get(uuid);
+        // Native PatPat Mod presence belongs to the CLIENT, not the backend.
+        // Keep it across a server switch while resetting all entity mappings.
+        View replacement=new View(uuid,previous==null?null:previous.user);
+        replacement.realMod=previous!=null && previous.realMod;
         // ServerConnectedEvent runs before Player#getCurrentServer() is reliably set.
         // Read the authoritative destination from the event itself; otherwise
         // backend stays null and canSendPlay() rejects EVERY Pat animation.
         replacement.backend=event.getServer().getServerInfo().getName();
         views.put(uuid,replacement);
-        if(!enabled("official-integration-enabled",false) || isBedrock(uuid))return;
+        if(!enabled("official-integration-enabled",false)) {
+            if(replacement.realMod && !isBedrock(uuid))
+                proxy.getScheduler().buildTask(this,()->sendStandaloneHello(replacement))
+                    .delay(250L,TimeUnit.MILLISECONDS).schedule();
+            return;
+        }
+        if(isBedrock(uuid))return;
         // The official Paper plugin sends HELLO only after the client has registered
         // its incoming channels (PlayerRegisterChannelEvent). The proxy does this for vanilla.
         for(int attempt=0;attempt<3;attempt++) {
@@ -378,6 +388,13 @@ public final class PatPatVelocity {
     }
 
     /** Check that queued work still belongs to the original active PLAY connection. */
+    private void sendStandaloneHello(View view) {
+        if(view.realMod && !isBedrock(view.player) && enabled("enabled",true)
+                && !enabled("official-integration-enabled",false))
+            sendPlay(view,new WrapperPlayServerPluginMessage(
+                PatPatProtocol.HELLO_S2C,PatPatProtocol.hello()));
+    }
+
     private boolean stillAtOrigin(UUID actor,View origin,String backend) {
         Player player=proxy.getPlayer(actor).orElse(null);
         return player!=null && origin!=null && canSendPlay(origin) &&
@@ -472,15 +489,16 @@ public final class PatPatVelocity {
                     // protocol. Never register a second version or draw duplicate hands.
                     var message=new WrapperPlayClientPluginMessage(event);
                     String channel=message.getChannelName();
-                    if(PatPatProtocol.HELLO_C2S.equals(channel) || PatPatProtocol.PAT_C2S.equals(channel))
+                    if(PatPatProtocol.HELLO_C2S.equals(channel) || PatPatProtocol.PAT_C2S.equals(channel)){
                         view.realMod=true;
+                        if(PatPatProtocol.HELLO_C2S.equals(channel))
+                            sendStandaloneHello(view);
+                    }
                     else if(REGISTER_CHANNEL.equals(channel)) {
                         byte[] data=message.getData();
                         if(new String(data,StandardCharsets.UTF_8).contains(PatPatProtocol.HELLO_S2C)){
                             view.realMod=true;
-                            if(!enabled("official-integration-enabled",false))
-                                sendPlay(view,new WrapperPlayServerPluginMessage(
-                                    PatPatProtocol.HELLO_S2C,PatPatProtocol.hello()));
+                            sendStandaloneHello(view);
                         }
                     }
                     if(PatPatProtocol.PAT_C2S.equals(channel)
