@@ -150,8 +150,24 @@ public final class PatPatVelocity {
         if(event.getPreviousServer()==null || !event.getResult().isAllowed() ||
                 event.getResult().getServer().filter(
                     target->target.equals(event.getPreviousServer())).isPresent())return;
-        View previous=views.get(event.getPlayer().getUniqueId());
-        if(previous!=null)previous.switching=true;
+        Player player=event.getPlayer();
+        View previous=views.get(player.getUniqueId());
+        if(previous==null)return;
+        previous.switching=true;
+        // A failed backend connection never fires ServerConnectedEvent. Without
+        // recovery, the original view would remain switched-off permanently.
+        // Only resume after a grace period if the same backend is still active
+        // and the outgoing protocol is back in PLAY.
+        proxy.getScheduler().buildTask(this,()->{
+            if(views.get(player.getUniqueId())!=previous || !previous.switching ||
+                    !player.isActive() || previous.user==null)return;
+            if(previous.user.getEncoderState()==ConnectionState.PLAY &&
+                    java.util.Objects.equals(previous.backend,serverOf(player))) {
+                previous.switching=false;
+                log.debug("Resumed Pat rendering after unsuccessful backend transfer for {}",
+                    player.getUsername());
+            }
+        }).delay(5,TimeUnit.SECONDS).schedule();
     }
 
     @Subscribe
