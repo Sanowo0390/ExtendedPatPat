@@ -78,7 +78,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.1",
+    version="0.6.2",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -626,11 +626,8 @@ public final class PatPatVelocity {
             view.user.sendPacketSilently(new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
                 EntityTypes.ITEM_FRAME,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),
                 0,face,null));
-            view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,List.of(
-                new EntityData<>(0,EntityDataTypes.BYTE,(byte)0x20),
-                new EntityData<>(8,EntityDataTypes.ITEMSTACK,
-                    mapItem(view.user,mapFrames.mapId(style,0,skinCatalog)))
-            )));
+            view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,
+                ItemFrameMetadata.onSpawn(mapItem(view.user,mapFrames.mapId(style,0,skinCatalog)))));
         } catch(Exception ex) {
             cleanup(view,fakeIds);
             if(squash)view.squishing.remove(targetEntityId);
@@ -660,7 +657,7 @@ public final class PatPatVelocity {
                     int frame=style.at(tick,duration);
                     if(frame!=sentFrame){
                         view.user.sendPacketSilently(new WrapperPlayServerEntityMetadata(id,
-                            List.of(new EntityData<>(8,EntityDataTypes.ITEMSTACK,
+                            List.of(ItemFrameMetadata.mapItem(
                                 mapItem(view.user,mapFrames.mapId(style,frame,skinCatalog))))));
                         sentFrame=frame;
                     }
@@ -715,7 +712,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.1 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.2 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
