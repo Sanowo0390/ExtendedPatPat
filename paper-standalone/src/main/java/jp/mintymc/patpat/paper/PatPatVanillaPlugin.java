@@ -9,6 +9,7 @@ import org.bukkit.SoundCategory;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Display;
@@ -48,18 +49,19 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     private final Map<UUID,Long> lastPat = new HashMap<>();
     private final Set<UUID> disabled = new HashSet<>();
     private final Set<Animation> animations = new HashSet<>();
-    /** A single shared Java resource pack supplies these five item models. */
-    private static final int HAND_FRAMES=5;
-    private final ItemStack[] handFrames=new ItemStack[HAND_FRAMES];
-    private ItemStack handFrame(int index) {
-        int i=Math.floorMod(index,HAND_FRAMES);
-        if(handFrames[i]!=null)return handFrames[i].clone();
+    private final SkinCatalog skinCatalog=SkinCatalog.load();
+    private final Map<UUID,String> selectedSkins=new HashMap<>();
+    private record ViewerSprite(Player viewer,ItemDisplay display,SkinCatalog.Skin skin) {}
+    private SkinCatalog.Skin skin(Player viewer) {
+        return skinCatalog.get(selectedSkins.getOrDefault(viewer.getUniqueId(),"default"));
+    }
+    private ItemStack handFrame(SkinCatalog.Skin skin,int index) {
         ItemStack item=new ItemStack(Material.PAPER);
         var meta=item.getItemMeta();
-        meta.setItemModel(new NamespacedKey("patpat","hand_"+i));
+        meta.setItemModel(new NamespacedKey("patpat","hand_"+skin.id()+"_"+
+            Math.min(skin.frames()-1,Math.max(0,index))));
         item.setItemMeta(meta);
-        handFrames[i]=item;
-        return item.clone();
+        return item;
     }
     private boolean useResourcePack() {
         return getConfig().getString("animation.renderer","resourcepack").equalsIgnoreCase("resourcepack");
@@ -80,6 +82,15 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
         for (String s : getConfig().getStringList("disabled-players")) {
             try { disabled.add(UUID.fromString(s)); }
             catch (IllegalArgumentException ex) { getLogger().warning("Invalid UUID in disabled-players: " + s); }
+        }
+        selectedSkins.clear();
+        ConfigurationSection preferences=getConfig().getConfigurationSection("selected-skins");
+        if(preferences!=null)for(String uuid:preferences.getKeys(false)) {
+            try {
+                UUID id=UUID.fromString(uuid);
+                String style=preferences.getString(uuid,"default");
+                if(skinCatalog.contains(style))selectedSkins.put(id,style);
+            }catch(IllegalArgumentException ignored) {}
         }
     }
 
@@ -110,15 +121,22 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
         if (getConfig().getBoolean("effects.hearts", false))
             target.getWorld().spawnParticle(Particle.HEART, target.getEyeLocation(), 1, 0.1,0.1,0.1,0.01);
         if (getConfig().getBoolean("sound.enabled", true)) {
-            List<String> sounds = getConfig().getStringList("sound.ids");
-            if (!sounds.isEmpty()) {
-                String id = sounds.get(ThreadLocalRandom.current().nextInt(sounds.size()));
-                float a = (float) getConfig().getDouble("sound.pitch-min", 0.9);
-                float b = (float) getConfig().getDouble("sound.pitch-max", 1.1);
-                float low = Math.min(a,b), high = Math.max(a,b);
-                float pitch = low + ThreadLocalRandom.current().nextFloat() * (high-low);
-                target.getWorld().playSound(target.getLocation(), id, SoundCategory.PLAYERS,
-                    (float) getConfig().getDouble("sound.volume",0.65), pitch);
+            List<String> defaults=getConfig().getStringList("sound.ids");
+            for(Player viewer:target.getWorld().getPlayers()) {
+                if(viewer.getLocation().distanceSquared(target.getLocation())>1024 ||
+                        disabled.contains(viewer.getUniqueId()))continue;
+                SkinCatalog.Skin style=skin(viewer);
+                String id=useResourcePack() && !style.sound().isBlank() ? style.sound()
+                    :defaults.isEmpty()?null:defaults.get(ThreadLocalRandom.current().nextInt(defaults.size()));
+                if(id==null)continue;
+                float a=style.sound().isBlank()?(float)getConfig().getDouble("sound.pitch-min",0.9)
+                    :style.pitchMin();
+                float b=style.sound().isBlank()?(float)getConfig().getDouble("sound.pitch-max",1.1)
+                    :style.pitchMax();
+                float pitch=Math.min(a,b)+ThreadLocalRandom.current().nextFloat()*Math.abs(b-a);
+                float volume=style.sound().isBlank()?(float)getConfig().getDouble("sound.volume",0.65)
+                    :style.volume();
+                viewer.playSound(target.getLocation(),id,SoundCategory.PLAYERS,volume,pitch);
             }
         }
         if (getConfig().getBoolean("animation.enabled", true) &&
@@ -128,12 +146,33 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0 || args[0].equalsIgnoreCase("status")) {
-            sender.sendMessage("§aPatPatVanilla §7v0.2.0 | active animations: " + animations.size());
+            sender.sendMessage("§aPatPatVanilla §7v0.3.0 | active animations: " + animations.size()
+                + (sender instanceof Player p?" | skin="+skin(p).id():""));
             return true;
         }
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("patpatvanilla.admin")) { sender.sendMessage("§cNo permission."); return true; }
             reloadConfig(); loadDisabled(); sender.sendMessage("§aPatPatVanilla reloaded."); return true;
+        }
+        if(args[0].equalsIgnoreCase("skin")) {
+            if(!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");return true;
+            }
+            if(args.length==1) {
+                sender.sendMessage("§aPatPat skin: §e"+skin(player).id()+"§7 | /ppv skin list");return true;
+            }
+            if(args[1].equalsIgnoreCase("list")) {
+                sender.sendMessage("§aAvailable skins: §e"+skinCatalog.description());return true;
+            }
+            String id=args[1].toLowerCase(Locale.ROOT);
+            if(!skinCatalog.contains(id)) {
+                sender.sendMessage("§cUnknown skin: "+id+" §7(/ppv skin list)");return true;
+            }
+            selectedSkins.put(player.getUniqueId(),id);
+            getConfig().set("selected-skins."+player.getUniqueId(),id);
+            saveConfig();
+            sender.sendMessage("§aPatPat skin changed to §e"+id+" §7(visible only to you)");
+            return true;
         }
         if (args[0].equalsIgnoreCase("toggle")) {
             if (!(sender instanceof Player player)) { sender.sendMessage("§cPlayers only."); return true; }
@@ -144,21 +183,25 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             sender.sendMessage("§aPatPatVanilla: " + (enabled ? "§aON" : "§cOFF"));
             return true;
         }
-        sender.sendMessage("§e/" + label + " <status|toggle [on|off]|reload>");
+        sender.sendMessage("§e/" + label + " <status|skin [list|id]|toggle [on|off]|reload>");
         return true;
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return List.of("status","toggle","reload").stream()
+        if (args.length == 1) return List.of("status","skin","toggle","reload").stream()
                 .filter(x -> x.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         if (args.length == 2 && args[0].equalsIgnoreCase("toggle"))
             return List.of("on","off").stream().filter(x -> x.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
+        if (args.length == 2 && args[0].equalsIgnoreCase("skin")) {
+            List<String> values=new ArrayList<>();values.add("list");values.addAll(skinCatalog.ids());
+            return values.stream().filter(x->x.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
+        }
         return List.of();
     }
 
     private final class Animation extends BukkitRunnable {
         private final LivingEntity target;
         private final List<BlockDisplay> blocks = new ArrayList<>();
-        private ItemDisplay sprite;
+        private final List<ViewerSprite> sprites=new ArrayList<>();
         private final int ticks;
         private final double offsetY, depth;
         private int frame;
@@ -176,23 +219,33 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             var blockData = material.createBlockData();
             Location origin = position(0);
             if(useResourcePack()) {
-                sprite=target.getWorld().spawn(origin,ItemDisplay.class,d->{
-                    d.setPersistent(false);
-                    d.setGravity(false);
-                    d.setInvulnerable(true);
-                    d.setBillboard(Display.Billboard.CENTER);
-                    d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
-                    d.setViewRange(range);
-                    d.setShadowRadius(0);
-                    d.setShadowStrength(0);
-                    d.setItemStack(handFrame(0));
-                    d.setTransformation(new Transformation(
-                        new Vector3f(-0.5f*size,-0.5f*size,0),
-                        new Quaternionf(),
-                        new Vector3f(size,size,0.02f),
-                        new Quaternionf()
-                    ));
-                });
+                for(Player viewer:target.getWorld().getPlayers()) {
+                    if(viewer.getLocation().distanceSquared(origin)>range*range ||
+                            disabled.contains(viewer.getUniqueId()))continue;
+                    SkinCatalog.Skin style=skin(viewer);
+                    ItemDisplay sprite=target.getWorld().spawn(
+                        origin.clone().add(style.offsetX(),style.offsetY(),style.offsetZ()),
+                        ItemDisplay.class,d->{
+                            d.setVisibleByDefault(false);
+                            d.setPersistent(false);
+                            d.setGravity(false);
+                            d.setInvulnerable(true);
+                            d.setBillboard(Display.Billboard.CENTER);
+                            d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
+                            d.setViewRange(range);
+                            d.setShadowRadius(0);
+                            d.setShadowStrength(0);
+                            d.setItemStack(handFrame(style,0));
+                            d.setTransformation(new Transformation(
+                                new Vector3f(-size*style.scaleX()*0.5f,-size*style.scaleY()*0.5f,0),
+                                new Quaternionf(),
+                                new Vector3f(size*style.scaleX(),size*style.scaleY(),0.02f),
+                                new Quaternionf()
+                            ));
+                        });
+                    viewer.showEntity(PatPatVanillaPlugin.this,sprite);
+                    sprites.add(new ViewerSprite(viewer,sprite,style));
+                }
             } else for (Part part : HAND) {
                 BlockDisplay block = target.getWorld().spawn(origin,BlockDisplay.class,d -> {
                     d.setPersistent(false);
@@ -224,11 +277,12 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             double eased = 1.0-(1.0-t)*(1.0-t);
             Location p = position(depth*Math.sin(Math.PI*eased));
             for (BlockDisplay block : blocks) if (block.isValid()) block.teleport(p);
-            if(sprite!=null && sprite.isValid()) {
-                sprite.teleport(p);
-                // 5-frame PNG sprites are advanced per animation tick, not globally.
-                sprite.setItemStack(handFrame(Math.min(HAND_FRAMES-1,
-                    (int)((long)frame*HAND_FRAMES/Math.max(1,ticks+1)))));
+            for(ViewerSprite entry:sprites) {
+                ItemDisplay display=entry.display();
+                if(!display.isValid())continue;
+                SkinCatalog.Skin style=entry.skin();
+                display.teleport(p.clone().add(style.offsetX(),style.offsetY(),style.offsetZ()));
+                display.setItemStack(handFrame(style,style.at(frame,ticks+1)));
             }
             frame++;
         }
@@ -237,8 +291,8 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             done = true;
             try { cancel(); } catch (IllegalStateException ignored) { }
             for (BlockDisplay block : blocks) if (block.isValid()) block.remove();
-            if(sprite!=null && sprite.isValid())sprite.remove();
-            sprite=null;
+            for(ViewerSprite entry:sprites)if(entry.display().isValid())entry.display().remove();
+            sprites.clear();
             blocks.clear(); animations.remove(this);
         }
     }
