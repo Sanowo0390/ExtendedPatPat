@@ -10,9 +10,9 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.entity.BlockDisplay;
-import org.bukkit.entity.ItemDisplay;
-import org.bukkit.entity.Display;
+import org.bukkit.entity.ItemFrame;
+import org.bukkit.map.MapView;
+import org.bukkit.block.BlockFace;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -20,14 +20,10 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Transformation;
-import org.joml.Quaternionf;
-import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -41,73 +37,38 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, TabExecutor {
-    private record Part(float x, float y, float w, float h) {}
-    private static final Part[] HAND = {
-        new Part(-0.15f,-0.16f,0.30f,0.29f), // palm
-        new Part(-0.145f,0.105f,0.065f,0.215f),
-        new Part(-0.068f,0.13f,0.068f,0.23f),
-        new Part(0.012f,0.123f,0.067f,0.22f),
-        new Part(0.091f,0.099f,0.062f,0.201f),
-        new Part(0.129f,-0.15f,0.105f,0.165f) // thumb
-    };
     private final Map<UUID,Long> lastPat = new HashMap<>();
     private final Set<UUID> disabled = new HashSet<>();
     private final Set<Animation> animations = new HashSet<>();
-    private final Set<UUID> packReady=new HashSet<>();
-    private DefaultPackHost defaultPack;
+    private PaperMapSkins mapSkins;
+    private final Map<UUID,Set<Integer>> sentMaps=new HashMap<>();
     private final SkinCatalog skinCatalog=SkinCatalog.load();
     private final Map<UUID,String> selectedSkins=new HashMap<>();
     private static final class ViewerSprite {
         private final Player viewer;
-        private final ItemDisplay display;
+        private final ItemFrame frame;
         private final SkinCatalog.Skin skin;
         private int lastFrame;
-        ViewerSprite(Player viewer,ItemDisplay display,SkinCatalog.Skin skin) {
-            this.viewer=viewer;this.display=display;this.skin=skin;
+        ViewerSprite(Player viewer,ItemFrame frame,SkinCatalog.Skin skin){
+            this.viewer=viewer;this.frame=frame;this.skin=skin;
         }
         Player viewer(){return viewer;}
-        ItemDisplay display(){return display;}
+        ItemFrame frame(){return frame;}
         SkinCatalog.Skin skin(){return skin;}
         int lastFrame(){return lastFrame;}
-        void lastFrame(int frame){lastFrame=frame;}
-    }
-    /** Built once per style. Paper's ItemDisplay receives a clone to avoid
-     * constructing metadata and resource identifiers every animation tick.
-     */
-    private final Map<String,ItemStack[]> framesBySkin=new HashMap<>();
-    private SkinCatalog.Skin skin(Player viewer) {
-        return skinCatalog.get(selectedSkins.getOrDefault(viewer.getUniqueId(),"default"));
-    }
-    private ItemStack handFrame(SkinCatalog.Skin skin,int index) {
-        ItemStack[] cached=framesBySkin.computeIfAbsent(skin.id(),id->{
-            ItemStack[] built=new ItemStack[skin.frames()];
-            for(int i=0;i<built.length;i++){
-                ItemStack item=new ItemStack(Material.PAPER);
-                var meta=item.getItemMeta();
-                meta.setItemModel(new NamespacedKey("patpat","hand_"+id+"_"+i));
-                item.setItemMeta(meta);
-                built[i]=item;
-            }
-            return built;
-        });
-        return cached[Math.max(0,Math.min(index,cached.length-1))].clone();
-    }
-    private boolean useResourcePack() {
-        return getConfig().getString("animation.renderer","resourcepack").equalsIgnoreCase("resourcepack");
+        void lastFrame(int n){lastFrame=n;}
     }
 
     @Override public void onEnable() {
         saveDefaultConfig();
         loadDisabled();
         try {
-            defaultPack=new DefaultPackHost(getDataFolder().toPath(),
-                msg->getLogger().info(msg));
-            if(getConfig().getBoolean("pack.http-enabled",false))
-                defaultPack.start(getConfig().getString("pack.http-bind","127.0.0.1"),
-                    getConfig().getInt("pack.http-port",8765));
-            getLogger().info("Embedded default PatPat pack SHA1="+defaultPack.sha1());
-        }catch(Exception error) {
-            getLogger().severe("PatPat embedded pack unavailable: "+error);
+            mapSkins=new PaperMapSkins(this,skinCatalog,new MapFrames(skinCatalog));
+            getLogger().info("URL-free PatPat map art ready ("+skinCatalog.ids().size()+" styles)");
+        }catch(Exception ex){
+            getLogger().severe("Could not initialize Java map art: "+ex.getMessage());
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
         Bukkit.getPluginManager().registerEvents(this, this);
         var command = getCommand("extendedpatpat");
@@ -115,8 +76,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     }
     @Override public void onDisable() {
         for (Animation animation : List.copyOf(animations)) animation.finish();
-        packReady.clear();
-        if(defaultPack!=null)defaultPack.close();
+        sentMaps.clear();
     }
     /** ViaVersion may be installed on Paper or only at the proxy.
      * If it is only at the proxy, backend Paper cannot reliably read the original
@@ -135,58 +95,17 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
         }
         return 777;
     }
-    private boolean spriteFor(Player viewer) {
-        return useResourcePack() && protocol(viewer)>=769 &&
-            (packReady.contains(viewer.getUniqueId()) ||
-             getConfig().getBoolean("pack.assume-installed",false));
+    @EventHandler public void onQuit(PlayerQuitEvent event){
+        sentMaps.remove(event.getPlayer().getUniqueId());
+        lastPat.remove(event.getPlayer().getUniqueId());
     }
-    @EventHandler public void onJoin(PlayerJoinEvent event) {
-        Player player=event.getPlayer();
-        packReady.remove(player.getUniqueId());
-        Bukkit.getScheduler().runTaskLater(this,()->{
-            if(player.isOnline())offerPack(player);
-        },20L);
-    }
-    @EventHandler public void onQuit(PlayerQuitEvent event) {
-        packReady.remove(event.getPlayer().getUniqueId());
-    }
-    @EventHandler public void onPackStatus(PlayerResourcePackStatusEvent event) {
-        if(!DefaultPackId.ID.equals(event.getID()))return;
-        if(event.getStatus()==PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED)
-            packReady.add(event.getPlayer().getUniqueId());
-        else if(event.getStatus()==PlayerResourcePackStatusEvent.Status.DECLINED ||
-            event.getStatus()==PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD ||
-            event.getStatus()==PlayerResourcePackStatusEvent.Status.FAILED_RELOAD ||
-            event.getStatus()==PlayerResourcePackStatusEvent.Status.DISCARDED ||
-            event.getStatus()==PlayerResourcePackStatusEvent.Status.INVALID_URL)
-            packReady.remove(event.getPlayer().getUniqueId());
-    }
-    private void offerPack(Player player) {
-        if(protocol(player)<769)return;
-        String url=getConfig().getString("pack.url","");
-        if(url==null || url.isBlank())return;
-        if(!url.startsWith("https://") && !url.startsWith("http://")) {
-            getLogger().warning("PatPat pack URL must be reachable via HTTP(S)");
-            return;
-        }
-        try {
-            byte[] hash=defaultPack==null?null:defaultPack.hash();
-            String custom=getConfig().getString("pack.sha1","");
-            if(custom!=null && !custom.isBlank()) {
-                hash=HexFormat.of().parseHex(custom);
-                if(hash.length!=20)throw new IllegalArgumentException("Pack SHA-1 must be 40 hex chars");
-            }
-            // addResourcePack, not setResourcePack: keep other plugins' packs intact.
-            player.addResourcePack(DefaultPackId.ID,url,hash,
-                "PatPat専用の手アニメーション（サーバーパックとは別）",false);
-        }catch(Exception error){
-            getLogger().warning("Could not offer PatPat resource pack: "+error);
+    private void ensureMaps(Player viewer,SkinCatalog.Skin skin){
+        Set<Integer> sent=sentMaps.computeIfAbsent(viewer.getUniqueId(),key->new HashSet<>());
+        for(MapView view:mapSkins.views(skin)){
+            if(sent.add(view.getId()))viewer.sendMap(view);
         }
     }
-    private static final class DefaultPackId {
-        private static final UUID ID=
-            UUID.fromString("cc05eb6d-9c58-5b4d-9d29-6bd46f1344cc");
-    }
+
     private void loadDisabled() {
         disabled.clear();
         for (String s : getConfig().getStringList("disabled-players")) {
@@ -236,16 +155,12 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                 if(viewer.getLocation().distanceSquared(target.getLocation())>1024 ||
                         disabled.contains(viewer.getUniqueId()))continue;
                 SkinCatalog.Skin style=skin(viewer);
-                String id=useResourcePack() && !style.sound().isBlank() ? style.sound()
-                    :defaults.isEmpty()?null:defaults.get(ThreadLocalRandom.current().nextInt(defaults.size()));
+                String id=defaults.isEmpty()?null:defaults.get(ThreadLocalRandom.current().nextInt(defaults.size()));
                 if(id==null)continue;
-                float a=style.sound().isBlank()?(float)getConfig().getDouble("sound.pitch-min",0.9)
-                    :style.pitchMin();
-                float b=style.sound().isBlank()?(float)getConfig().getDouble("sound.pitch-max",1.1)
-                    :style.pitchMax();
+                float a=(float)getConfig().getDouble("sound.pitch-min",0.9);
+                float b=(float)getConfig().getDouble("sound.pitch-max",1.1);
                 float pitch=Math.min(a,b)+ThreadLocalRandom.current().nextFloat()*Math.abs(b-a);
-                float volume=style.sound().isBlank()?(float)getConfig().getDouble("sound.volume",0.65)
-                    :style.volume();
+                float volume=(float)getConfig().getDouble("sound.volume",0.65);
                 viewer.playSound(target.getLocation(),id,SoundCategory.PLAYERS,volume,pitch);
             }
         }
@@ -265,18 +180,6 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("extendedpatpat.admin")) { sender.sendMessage("§cNo permission."); return true; }
             reloadConfig(); loadDisabled(); sender.sendMessage("§aExtendedPatPat Paper reloaded."); return true;
-        }
-        if(args[0].equalsIgnoreCase("pack")) {
-            if(!(sender instanceof Player player)) {
-                sender.sendMessage("§cPlayers only.");return true;
-            }
-            if(getConfig().getString("pack.url","").isBlank()) {
-                sender.sendMessage("§ePatPat pack URL is not set. Embedded pack saved under plugins/ExtendedPatPatPaper/");
-                return true;
-            }
-            offerPack(player);
-            sender.sendMessage("§aPatPat追加パックを再送しました（Java 1.21.4以降）。");
-            return true;
         }
         if(args[0].equalsIgnoreCase("skin")) {
             if(!(sender instanceof Player player)) {
@@ -307,11 +210,11 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             sender.sendMessage("§aExtendedPatPat Paper: " + (enabled ? "§aON" : "§cOFF"));
             return true;
         }
-        sender.sendMessage("§e/" + label + " <status|pack|skin [list|id]|toggle [on|off]|reload>");
+        sender.sendMessage("§e/" + label + " <status|skin [list|id]|toggle [on|off]|reload>");
         return true;
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return List.of("status","pack","skin","toggle","reload").stream()
+        if (args.length == 1) return List.of("status","skin","toggle","reload").stream()
                 .filter(x -> x.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         if (args.length == 2 && args[0].equalsIgnoreCase("toggle"))
             return List.of("on","off").stream().filter(x -> x.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
@@ -324,113 +227,78 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
 
     private final class Animation extends BukkitRunnable {
         private final LivingEntity target;
-        private final List<BlockDisplay> blocks = new ArrayList<>();
-        private final List<Player> voxelViewers=new ArrayList<>();
         private final List<ViewerSprite> sprites=new ArrayList<>();
         private final int ticks;
-        private final double offsetY, depth;
-        private int frame;
+        private final double offsetY,depth;
+        private int tick;
         private boolean done;
-
-        private Animation(LivingEntity target) {
-            this.target = target;
-            this.ticks = Math.max(2,Math.min(40,getConfig().getInt("animation.ticks",6)));
-            this.offsetY = getConfig().getDouble("animation.offset-y",0.16);
-            this.depth = Math.max(0,getConfig().getDouble("animation.depth",0.425));
-            float size = (float) Math.max(0.1,Math.min(4,getConfig().getDouble("animation.size",1.0)));
-            float range = (float) Math.max(1,Math.min(64,getConfig().getDouble("animation.view-range",16)));
-            Material material = Material.matchMaterial(getConfig().getString("animation.material","PINK_TERRACOTTA"));
-            if (material == null || !material.isBlock() || material.isAir()) material = Material.PINK_TERRACOTTA;
-            var blockData = material.createBlockData();
-            Location origin = position(0);
-            for(Player viewer:target.getWorld().getPlayers()) {
+        private Animation(LivingEntity target){
+            this.target=target;
+            this.ticks=Math.max(2,Math.min(40,getConfig().getInt("animation.ticks",6)));
+            this.offsetY=getConfig().getDouble("animation.offset-y",0.16);
+            this.depth=Math.max(0,getConfig().getDouble("animation.depth",0.425));
+            float range=(float)Math.max(1,Math.min(64,getConfig().getDouble("animation.view-range",16)));
+            Location origin=position(0);
+            for(Player viewer:target.getWorld().getPlayers()){
                 if(viewer.getLocation().distanceSquared(origin)>range*range ||
-                        disabled.contains(viewer.getUniqueId()))continue;
-                int client=protocol(viewer);
-                if(client<762)continue; // Display entities require Java 1.19.4
-                if(!spriteFor(viewer)) {
-                    voxelViewers.add(viewer);
-                    continue;
-                }
+                    disabled.contains(viewer.getUniqueId()) || protocol(viewer)<393)continue;
                 SkinCatalog.Skin style=skin(viewer);
-                ItemDisplay sprite=target.getWorld().spawn(
-                        origin.clone().add(style.offsetX(),style.offsetY(),style.offsetZ()),
-                        ItemDisplay.class,d->{
-                            d.setVisibleByDefault(false);
-                            d.setPersistent(false);
-                            d.setGravity(false);
-                            d.setInvulnerable(true);
-                            d.setBillboard(Display.Billboard.CENTER);
-                            d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
-                            d.setViewRange(range);
-                            d.setShadowRadius(0);
-                            d.setShadowStrength(0);
-                            d.setItemStack(handFrame(style,0));
-                            d.setTransformation(new Transformation(
-                                new Vector3f(-size*style.scaleX()*0.5f,-size*style.scaleY()*0.5f,0),
-                                new Quaternionf(),
-                                new Vector3f(size*style.scaleX(),size*style.scaleY(),0.02f),
-                                new Quaternionf()
-                            ));
-                        });
-                viewer.showEntity(PatPatVanillaPlugin.this,sprite);
-                sprites.add(new ViewerSprite(viewer,sprite,style));
-            }
-            if(!voxelViewers.isEmpty())for (Part part : HAND) {
-                BlockDisplay block = target.getWorld().spawn(origin,BlockDisplay.class,d -> {
-                    d.setVisibleByDefault(false);
-                    d.setPersistent(false);
-                    d.setGravity(false);
-                    d.setInvulnerable(true);
-                    d.setBillboard(Display.Billboard.CENTER);
-                    d.setViewRange(range);
-                    d.setShadowRadius(0);
-                    d.setShadowStrength(0);
-                    d.setBlock(blockData);
-                    d.setTransformation(new Transformation(
-                        new Vector3f(part.x()*size,part.y()*size,0),
-                        new Quaternionf(),
-                        new Vector3f(part.w()*size,part.h()*size,0.06f),
-                        new Quaternionf()
-                    ));
-                });
-                for(Player viewer:voxelViewers)viewer.showEntity(PatPatVanillaPlugin.this,block);
-                blocks.add(block);
+                try{
+                    ensureMaps(viewer,style);
+                    MapView first=mapSkins.view(style,0);
+                    ItemFrame item=target.getWorld().spawn(origin,ItemFrame.class,frame->{
+                        frame.setVisibleByDefault(false);
+                        frame.setPersistent(false);
+                        frame.setVisible(false);
+                        frame.setFixed(true); // No support block needed for short-lived art.
+                        frame.setFacingDirection(facing(viewer,origin),true);
+                        frame.setItem(mapSkins.item(style,0),false);
+                        frame.setItemDropChance(0f);
+                    });
+                    viewer.showEntity(PatPatVanillaPlugin.this,item);
+                    sprites.add(new ViewerSprite(viewer,item,style));
+                }catch(Exception error){
+                    getLogger().warning("Could not show map hand to "+viewer.getName()+": "+error.getMessage());
+                }
             }
             if(hasViewers())animations.add(this);
         }
-        boolean hasViewers(){return !blocks.isEmpty() || !sprites.isEmpty();}
-
-        private Location position(double down) {
+        private BlockFace facing(Player viewer,Location where){
+            double dx=viewer.getLocation().getX()-where.getX();
+            double dz=viewer.getLocation().getZ()-where.getZ();
+            return Math.abs(dx)>Math.abs(dz)?
+                (dx>=0?BlockFace.EAST:BlockFace.WEST):
+                (dz>=0?BlockFace.SOUTH:BlockFace.NORTH);
+        }
+        boolean hasViewers(){return !sprites.isEmpty();}
+        private Location position(double down){
             return target.getLocation().add(0,target.getHeight()+offsetY-down,0);
         }
-        @Override public void run() {
-            if (!target.isValid() || target.isDead() || frame > ticks) { finish(); return; }
-            double t = (double) frame/ticks;
-            double eased = 1.0-(1.0-t)*(1.0-t);
-            Location p = position(depth*Math.sin(Math.PI*eased));
-            for (BlockDisplay block : blocks) if (block.isValid()) block.teleport(p);
-            for(ViewerSprite entry:sprites) {
-                ItemDisplay display=entry.display();
-                if(!display.isValid())continue;
-                SkinCatalog.Skin style=entry.skin();
-                display.teleport(p.clone().add(style.offsetX(),style.offsetY(),style.offsetZ()));
-                int nextFrame=style.at(frame,ticks+1);
-                if(nextFrame!=entry.lastFrame()) {
-                    display.setItemStack(handFrame(style,nextFrame));
-                    entry.lastFrame(nextFrame);
+        @Override public void run(){
+            if(!target.isValid() || target.isDead() || tick>ticks){finish();return;}
+            double t=(double)tick/ticks;
+            double eased=1-(1-t)*(1-t);
+            Location position=position(depth*Math.sin(Math.PI*eased));
+            for(ViewerSprite view:sprites){
+                ItemFrame frame=view.frame();
+                if(!frame.isValid())continue;
+                frame.teleport(position.clone().add(view.skin().offsetX(),view.skin().offsetY(),
+                    view.skin().offsetZ()));
+                int index=view.skin().at(tick,ticks+1);
+                if(index!=view.lastFrame()){
+                    frame.setItem(mapSkins.item(view.skin(),index),false);
+                    view.lastFrame(index);
                 }
             }
-            frame++;
+            tick++;
         }
-        private void finish() {
-            if (done) return;
-            done = true;
-            try { cancel(); } catch (IllegalStateException ignored) { }
-            for (BlockDisplay block : blocks) if (block.isValid()) block.remove();
-            for(ViewerSprite entry:sprites)if(entry.display().isValid())entry.display().remove();
+        private void finish(){
+            if(done)return;
+            done=true;
+            try{cancel();}catch(IllegalStateException ignored){}
+            for(ViewerSprite view:sprites)if(view.frame().isValid())view.frame().remove();
             sprites.clear();
-            blocks.clear(); animations.remove(this);
+            animations.remove(this);
         }
     }
 }
