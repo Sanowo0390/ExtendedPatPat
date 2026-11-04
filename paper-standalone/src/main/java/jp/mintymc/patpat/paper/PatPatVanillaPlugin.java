@@ -176,7 +176,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0 || args[0].equalsIgnoreCase("status")) {
-            sender.sendMessage("§aExtendedPatPat Paper §7v0.6.0 | active animations: " + animations.size()
+            sender.sendMessage("§aExtendedPatPat Paper §7v0.6.1 | active animations: " + animations.size()
                 + (sender instanceof Player p?
                     " | personal="+(disabled.contains(p.getUniqueId())?"OFF":"ON")
                     +" | skin="+skin(p).id():""));

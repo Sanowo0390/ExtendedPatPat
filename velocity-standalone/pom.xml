@@ -3,7 +3,7 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>jp.mintymc.patpat</groupId><artifactId>extendedpatpat-velocity</artifactId><version>0.6.0</version>
+  <groupId>jp.mintymc.patpat</groupId><artifactId>extendedpatpat-velocity</artifactId><version>0.6.1</version>
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -27,7 +27,7 @@
       <resource><directory>src/main/resources</directory></resource>
       <resource><directory>../resourcepack/dist</directory><includes><include>patpat-skins.properties</include><include>maps/**/*.bin</include></includes></resource>
     </resources>
-    <finalName>ExtendedPatPat-Velocity-0.6.0</finalName>
+    <finalName>ExtendedPatPat-Velocity-0.6.1</finalName>
     <plugins>
       <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version>
         <configuration><annotationProcessorPaths>

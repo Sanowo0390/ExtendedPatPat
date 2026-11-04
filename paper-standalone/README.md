@@ -4,7 +4,7 @@ Paper/Purpur 26.3（Java 25）向け、**リソースパック不要のマップ
 
 ## 導入
 
-`ExtendedPatPat-Paper-0.6.0.jar`をPaper/Purpurの`plugins/`に配置し再起動。ほかのPatPat版とは同時に導入しないでください。
+`ExtendedPatPat-Paper-0.6.1.jar`をPaper/Purpurの`plugins/`に配置し再起動。ほかのPatPat版とは同時に導入しないでください。
 
 - 設定：`plugins/ExtendedPatPatPaper/config.yml`
 - コマンド：`/extendedpatpat`（`/epp`）
@@ -19,3 +19,7 @@ URL・追加パック・クライアントModは不要。透明度、色数、�
 サウンドはバニラMinecraftの音を利用します。Java版画像追加・スキン選択：[resourcepack/README.md](../resourcepack/README.md)。
 
 原作由来素材のライセンス：[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
+
+## 個人のON/OFF
+
+`/extendedpatpat toggle [on|off]` は送信・受信・Pat対象の許可を同時に切り替えます。OFF時は自分の表示中の手と、自分を対象にした表示をすぐ削除します。設定は `config.yml` に保存されます。

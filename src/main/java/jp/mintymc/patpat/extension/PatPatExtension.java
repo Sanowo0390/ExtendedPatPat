@@ -319,8 +319,8 @@ public final class PatPatExtension implements Extension {
     @Subscribe public void commands(GeyserDefineCommandsEvent event) {
         register(event,"status",false,(source,args)->{
             PatSession state=source.connection() instanceof GeyserSession s ? sessions.get(s) : null;
-            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("ExtendedPatPat Geyser 0.13.0 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
-            else source.sendMessage("ExtendedPatPat Geyser 0.13.0 / compatible="+compatible+" / sessions="+sessions.size());
+            if(state!=null) state.session().executeInEventLoop(()->source.sendMessage("ExtendedPatPat Geyser 0.13.1 / compatible="+compatible+" / backendHello="+state.ready()+" / standalone="+settings.standaloneMode()+" / personal="+patEnabled(state.session())+" / active="+state.active()+" / allowed="+settings.allows(source)+" / size="+settings.scale()+" / offsets="+settings.offsetSpace()));
+            else source.sendMessage("ExtendedPatPat Geyser 0.13.1 / compatible="+compatible+" / sessions="+sessions.size());
         });
         register(event,"test",true,(source,args)->withSession(source,PatSession::test));
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));

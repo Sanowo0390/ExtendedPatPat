@@ -4,7 +4,7 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.0.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.1.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
@@ -23,3 +23,7 @@ Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPa
 `/extendedpatpat skin list`と`/extendedpatpat skin <ID>`で自分が見るマップ画像を選択できます。標準配布にBonkなどのサンプル素材は含まれません。カスタム素材の追加：[resourcepack/README.md](../resourcepack/README.md)。
 
 原作由来素材のライセンス：[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
+
+## 個人のON/OFF
+
+`/extendedpatpat toggle [on|off]` は送信と受信の両方を制御し、OFFのプレイヤーは他人のPat対象にもなりません。Geyser-Velocity併用時は統合版プレイヤーの設定をGeyserと共通化します。`/extendedpatpat status` に個人のON/OFFが表示されます。

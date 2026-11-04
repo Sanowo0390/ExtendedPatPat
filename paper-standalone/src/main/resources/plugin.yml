@@ -1,5 +1,5 @@
 name: ExtendedPatPatPaper
-version: 0.6.0
+version: 0.6.1
 main: jp.mintymc.patpat.paper.PatPatVanillaPlugin
 api-version: '26.3'
 description: ExtendedPatPat - Java Edition client-side animated hand on Paper/Purpur
