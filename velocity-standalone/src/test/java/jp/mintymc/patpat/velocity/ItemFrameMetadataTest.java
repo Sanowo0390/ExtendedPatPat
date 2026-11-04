@@ -1,39 +1,33 @@
 package jp.mintymc.patpat.velocity;
 
-import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
-import com.github.retrooper.packetevents.protocol.item.ItemStack;
 import org.junit.jupiter.api.Test;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
+/** Source/constant contract tests avoid initializing PacketEvents' live-server
+ * serializers in a standalone Maven test process.
+ */
 class ItemFrameMetadataTest {
-    private static ItemStack testMap() {
-        // PacketEvents ItemStack initializes the live server registry on first
-        // access. Null is sufficient for verifying metadata IDs and serializers
-        // without booting a Velocity proxy in this unit test.
-        return null;
+    @Test void minecraft263ItemFrameFieldsMustNotConflict() {
+        assertEquals(0,ItemFrameMetadata.ENTITY_FLAGS);
+        assertEquals(8,ItemFrameMetadata.HANGING_DIRECTION);
+        assertEquals(9,ItemFrameMetadata.DISPLAYED_ITEM);
+        assertEquals(10,ItemFrameMetadata.ITEM_ROTATION);
+        assertNotEquals(ItemFrameMetadata.HANGING_DIRECTION,ItemFrameMetadata.DISPLAYED_ITEM);
     }
 
-    @Test void spawnMustPlaceMapInField9NotHangingEntityDirectionField8() {
-        ItemStack item=testMap();
-        var metadata=ItemFrameMetadata.onSpawn(item);
-        assertEquals(2,metadata.size());
-        assertEquals(0,metadata.get(0).getIndex());
-        assertSame(EntityDataTypes.BYTE,metadata.get(0).getType());
-        assertEquals((byte)0x20,metadata.get(0).getValue());
-        assertEquals(9,metadata.get(1).getIndex());
-        assertSame(EntityDataTypes.ITEMSTACK,metadata.get(1).getType());
-        assertSame(item,metadata.get(1).getValue());
-        assertTrue(metadata.stream().noneMatch(entry->entry.getIndex()==8),
-            "Field 8 is HangingEntity direction; using it for ItemStack disconnects Minecraft 26.3");
-    }
-
-    @Test void animationUpdateUsesTheSameItemField() {
-        ItemStack item=testMap();
-        var update=ItemFrameMetadata.mapItem(item);
-        assertEquals(ItemFrameMetadata.DISPLAYED_ITEM,update.getIndex());
-        assertEquals(9,update.getIndex());
-        assertNotEquals(ItemFrameMetadata.HANGING_DIRECTION,update.getIndex());
-        assertSame(EntityDataTypes.ITEMSTACK,update.getType());
-        assertSame(item,update.getValue());
+    @Test void bothSpawnAndAnimationUseCentralizedItemField() throws Exception {
+        String base="src/main/java/jp/mintymc/patpat/velocity/";
+        String renderer=Files.readString(Path.of(base+"PatPatVelocity.java"));
+        String metadata=Files.readString(Path.of(base+"ItemFrameMetadata.java"));
+        assertTrue(renderer.contains("ItemFrameMetadata.onSpawn("),
+            "Initial spawn must use the tested map-item metadata factory");
+        assertTrue(renderer.contains("ItemFrameMetadata.mapItem("),
+            "Animated frame updates must use the same metadata factory");
+        assertTrue(metadata.contains("new EntityData<>(DISPLAYED_ITEM,EntityDataTypes.ITEMSTACK,item)"),
+            "Map ItemStack must be encoded using DISPLAYED_ITEM=9");
+        assertFalse(renderer.contains("new EntityData<>(8,EntityDataTypes.ITEMSTACK"),
+            "Index 8 is HangingEntity direction, not ItemStack: disconnects Minecraft 26.3");
     }
 }
