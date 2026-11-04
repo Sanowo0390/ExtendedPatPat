@@ -8,7 +8,7 @@ import java.util.Map;
 /**
  * 128x128 viewer-local map art. Unlike Geyser's billboard, an ItemFrame
  * cannot be scaled as an entity. Scale its map pixels in memory instead;
- * image-scale=0.5 means half the 1-block map width (the Geyser default).
+ * image-scale=0.6 means 60% of the 1-block map width (the Geyser default).
  *
  * The hand's world-space travel is converted to pixels independently of image size.
  */
