@@ -77,12 +77,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.9",
+    version="0.7.0",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -106,6 +107,8 @@ public final class PatPatVelocity {
     private final SkinCatalog skinCatalog=SkinCatalog.load();
     private volatile MapFrames mapFrames=new MapFrames(skinCatalog);
     private volatile TextFrames textFrames;
+    private volatile HeadTileFrames headTileFrames;
+    private final AtomicBoolean headTileGeneration=new AtomicBoolean();
     private final Map<UUID,String> selectedSkins=new ConcurrentHashMap<>();
     private final AtomicInteger entitySequence=new AtomicInteger(1_900_000_000);
     private final AtomicInteger active=new AtomicInteger();
@@ -227,6 +230,8 @@ public final class PatPatVelocity {
             mapFrames=new MapFrames(skinCatalog,number("image-scale",0.6,0.05,1.0),
                 number("hand-motion-depth",number("hand-depth",0.28,0,2),0,2));
             textFrames=new TextFrames(skinCatalog,(int)number("text-display-resolution",24,8,32));
+            headTileFrames=new HeadTileFrames(folder.resolve("head-tiles"),skinCatalog,
+                (int)number("head-tile-resolution",24,16,32));
             views.values().forEach(v->v.sentMaps.clear());
             disabled.clear();
             Path disabledFile=folder.resolve("disabled-players.txt");
@@ -687,8 +692,13 @@ public final class PatPatVelocity {
         final SkinCatalog.Skin style=skin(player.getUniqueId());
         final MapFrames images=mapFrames;
         final TextFrames textImages=textFrames;
-        final boolean useText=TextFrames.useText(
-            text("hand-renderer","item_frame"),view.user.getClientVersion());
+        final HeadTileFrames headImages=headTileFrames;
+        final String renderer=text("hand-renderer","item_frame");
+        final boolean useHead="head_tiles".equalsIgnoreCase(renderer)
+            && headImages!=null && headImages.ready(style)
+            && HeadTileFrames.supported(view.user.getClientVersion());
+        final boolean useText=TextFrames.useText(renderer,view.user.getClientVersion());
+        final int headRows=useHead?headImages.rows():1;
         final double imageSize=number("image-scale",0.6,0.05,1.0);
         final double displayMs=number("duration-ms",0,0,10000);
         final int duration=Math.max(2,Math.min(40,(int)Math.ceil(
@@ -707,15 +717,33 @@ public final class PatPatVelocity {
             && view.squishing.add(targetEntityId);
         final double minScale=number("squish-min-scale",0.86,0.5,1.0);
         final int id=entitySequence.getAndIncrement();
-        final int[] fakeIds={id};
+        final int[] fakeIds=new int[headRows];
+        fakeIds[0]=id;
+        for(int row=1;row<headRows;row++)fakeIds[row]=entitySequence.getAndIncrement();
         final Vector3d[] textPosition={null};
+        final Vector3d[] headPositions=new Vector3d[headRows];
         try {
             Vector3d pos=targetPosition(view,targetId,style);
             if(pos==null) {
                 if(squash)view.squishing.remove(targetEntityId);
                 active.decrementAndGet();return;
             }
-            if(useText){
+            if(useHead){
+                // One CENTER billboard per 8px sprite row. No vanilla text line gap,
+                // no block-glyph pixels, and no resource pack.
+                for(int row=0;row<headRows;row++){
+                    Vector3d at=HeadTileFrames.position(pos,imageSize,0,row,headRows);
+                    headPositions[row]=at;
+                    int entity=fakeIds[row];
+                    if(!sendPlay(view,new WrapperPlayServerSpawnEntity(entity,UUID.randomUUID(),
+                        EntityTypes.TEXT_DISPLAY,new Location(at.getX(),at.getY(),at.getZ(),0,0),
+                        0,0,null)))throw new IllegalStateException("Play state ended");
+                    if(!sendPlay(view,new WrapperPlayServerEntityMetadata(entity,
+                        HeadTileFrames.spawnMetadata(
+                            headImages.row(style,0,row),imageSize,headImages.resolution()))))
+                        throw new IllegalStateException("Play state ended");
+                }
+            }else if(useText){
                 // Center billboard for the viewing player; the Java client handles camera angles.
                 Vector3d initial=TextFrames.position(pos,imageSize,0);
                 textPosition[0]=initial;
@@ -750,6 +778,7 @@ public final class PatPatVelocity {
             int sentFrame=0;
             int sentPose=0;
             Vector3d lastTextPosition=textPosition[0];
+            final Vector3d[] lastHeadPositions=headPositions.clone();
             private boolean finished;
             @Override public void run() {
                 try {
@@ -763,7 +792,29 @@ public final class PatPatVelocity {
                     Vector3d anchor=targetPosition(view,targetId,style);
                     if(anchor==null){finish();return;}
                     int frame=style.at(tick,duration);
-                    if(useText){
+                    if(useHead){
+                        if(frame!=sentFrame){
+                            for(int row=0;row<headRows;row++){
+                                if(!sendPlay(view,new WrapperPlayServerEntityMetadata(fakeIds[row],
+                                        List.of(HeadTileFrames.textMetadata(
+                                            headImages.row(style,frame,row)))))){
+                                    finish();return;
+                                }
+                            }
+                            sentFrame=frame;
+                        }
+                        double phase=Math.min(1.0,(double)tick/strokeDuration);
+                        double eased=1.0-(1.0-phase)*(1.0-phase);
+                        double down=motion?-depth*Math.sin(Math.PI*eased):0;
+                        for(int row=0;row<headRows;row++){
+                            Vector3d next=HeadTileFrames.position(anchor,imageSize,down,row,headRows);
+                            if(!next.equals(lastHeadPositions[row])){
+                                if(!sendPlay(view,new WrapperPlayServerEntityTeleport(
+                                        fakeIds[row],next,0,0,false))){finish();return;}
+                                lastHeadPositions[row]=next;
+                            }
+                        }
+                    }else if(useText){
                         if(frame!=sentFrame){
                             if(!sendPlay(view,new WrapperPlayServerEntityMetadata(id,
                                     List.of(TextFrames.textMetadata(textImages.frame(style,frame)))))){
@@ -856,10 +907,58 @@ public final class PatPatVelocity {
         @Override public void execute(Invocation ctx) {
             CommandSource sender=ctx.source();
             String[] args=ctx.arguments();
+            if(args.length>0 && args[0].equalsIgnoreCase("tiles")){
+                if(!sender.hasPermission("extendedpatpat.admin")){
+                    sender.sendMessage(Component.text("No permission: extendedpatpat.admin"));return;
+                }
+                if(args.length>1 && args[1].equalsIgnoreCase("generate")){
+                    String skinId=args.length>2?args[2]:"default";
+                    if(!skinCatalog.contains(skinId)){
+                        sender.sendMessage(Component.text("Unknown skin: "+skinId));return;
+                    }
+                    String key=System.getenv("MINESKIN_API_KEY");
+                    if(key==null || key.isBlank())key=text("mineskin-api-key","");
+                    if(key.isBlank()){
+                        sender.sendMessage(Component.text(
+                            "Set MINESKIN_API_KEY or mineskin-api-key in Velocity config first."));return;
+                    }
+                    if(!headTileGeneration.compareAndSet(false,true)){
+                        sender.sendMessage(Component.text("Head tile generation already active."));return;
+                    }
+                    final String apiKey=key;
+                    final int resolution=HeadTileFrames.normalizeResolution(
+                        (int)number("head-tile-resolution",24,16,32));
+                    sender.sendMessage(Component.text(
+                        "Generating signed head tiles for "+skinId+" ("+resolution+"px)."
+                        +" This may require many MineSkin jobs; results are cached."));
+                    proxy.getScheduler().buildTask(this,()->{
+                        try{
+                            SkinCatalog.Skin style=skinCatalog.get(skinId);
+                            new HeadTileGenerator().generate(folder.resolve("head-tiles"),style,
+                                resolution,apiKey,message->log.info("Head tiles: {}",message));
+                            headTileFrames=new HeadTileFrames(folder.resolve("head-tiles"),
+                                skinCatalog,resolution);
+                            sender.sendMessage(Component.text("Head tiles ready: "+skinId
+                                +" | switch hand-renderer=head_tiles, then /epp reload"));
+                        }catch(Exception ex){
+                            log.warn("Head tile generation for {} failed: {}",skinId,ex.toString());
+                            sender.sendMessage(Component.text(
+                                "Head tile generation failed; see Velocity log. Cached tiles kept."));
+                        }finally{headTileGeneration.set(false);}
+                    }).schedule();
+                    return;
+                }
+                HeadTileFrames frames=headTileFrames;
+                String state=frames==null?"not loaded":frames.readyCount()+" skin(s) ready";
+                sender.sendMessage(Component.text("Head tiles: "+state
+                    +" | renderer="+text("hand-renderer","item_frame")
+                    +" | /extendedpatpat tiles generate [skin-id]"));
+                return;
+            }
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.9 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.7.0 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
