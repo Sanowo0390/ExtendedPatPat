@@ -1,14 +1,15 @@
-name: PatpatPaper
-version: 0.4.0
+name: ExtendedPatPatPaper
+version: 0.5.0
 main: jp.mintymc.patpat.paper.PatPatVanillaPlugin
 api-version: '26.3'
-description: Pat living entities with a vanilla server-only animated voxel hand
+description: ExtendedPatPat - Java Edition client-side animated hand on Paper/Purpur
 author: Sanowo0390
 commands:
   patpatvanilla:
-    description: Configure PatPatVanilla
-    usage: /patpatvanilla <status|toggle|reload>
-    aliases: [ppv]
+    description: Configure ExtendedPatPat Paper
+    usage: /patpatvanilla <status|pack|skin|toggle|reload>
+    aliases: [ppv, extendedpatpat, epp]
+website: https://github.com/Sanowo0390/ExtendedPatPat
 permissions:
   patpatvanilla.use:
     default: true

@@ -1,6 +1,6 @@
 id: patpatbedrock
-name: PatPatGeyserExtension
+name: ExtendedPatPatGeyser
 main: jp.mintymc.patpat.extension.PatPatExtension
 api: 2.12.1
-version: 0.12.0
+version: 0.13.0
 authors: [Sanowo0390]

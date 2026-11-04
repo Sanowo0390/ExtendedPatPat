@@ -34,7 +34,7 @@ sound:
 disabled-players: []
 
 # PatPat専用リソースパックはJAR内に含まれます（通常のserver.propertiesとは別）。
-# 起動時plugins/PatpatPaper/PatPatJava-26.3.zipへ書き出します。
+# 起動時plugins/ExtendedPatPatPaper/PatPatJava-26.3.zipへ書き出します。
 # 参加者へ送信するには、HTTP(S)でアクセス可能なpack.urlが必要です。
 # 内蔵配信機能を使う場合はhttp-enabledと公開URLを設定してください。
 pack:

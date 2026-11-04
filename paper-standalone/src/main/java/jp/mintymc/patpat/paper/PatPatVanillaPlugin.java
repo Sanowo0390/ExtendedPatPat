@@ -74,6 +74,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     }
 
     @Override public void onEnable() {
+        migrateLegacyDataFolder();
         saveDefaultConfig();
         loadDisabled();
         try {
@@ -164,6 +165,27 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
         private static final UUID ID=
             UUID.fromString("cc05eb6d-9c58-5b4d-9d29-6bd46f1344cc");
     }
+    /** The Paper plugin's display name changes its data folder.
+     * Bring forward the old configuration only when the new folder is empty.
+     * Never delete or overwrite the user's previous settings.
+     */
+    private void migrateLegacyDataFolder() {
+        java.nio.file.Path target=getDataFolder().toPath().resolve("config.yml");
+        if(java.nio.file.Files.exists(target))return;
+        for(String legacyName:List.of("PatpatPaper","PatPatVanilla")) {
+            java.nio.file.Path source=getDataFolder().toPath().resolveSibling(legacyName)
+                .resolve("config.yml");
+            if(!java.nio.file.Files.isRegularFile(source))continue;
+            try {
+                java.nio.file.Files.createDirectories(target.getParent());
+                java.nio.file.Files.copy(source,target);
+                getLogger().info("Migrated "+legacyName+" config.yml to ExtendedPatPatPaper; old file preserved.");
+            }catch(java.io.IOException ex){
+                getLogger().warning("Could not migrate legacy config from "+source+": "+ex.getMessage());
+            }
+            break;
+        }
+    }
     private void loadDisabled() {
         disabled.clear();
         for (String s : getConfig().getStringList("disabled-players")) {
@@ -233,20 +255,20 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0 || args[0].equalsIgnoreCase("status")) {
-            sender.sendMessage("§aPatpatPaper §7v0.4.0 | active animations: " + animations.size()
+            sender.sendMessage("§aExtendedPatPat Paper §7v0.5.0 | active animations: " + animations.size()
                 + (sender instanceof Player p?" | skin="+skin(p).id():""));
             return true;
         }
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("patpatvanilla.admin")) { sender.sendMessage("§cNo permission."); return true; }
-            reloadConfig(); loadDisabled(); sender.sendMessage("§aPatPatVanilla reloaded."); return true;
+            reloadConfig(); loadDisabled(); sender.sendMessage("§aExtendedPatPat Paper reloaded."); return true;
         }
         if(args[0].equalsIgnoreCase("pack")) {
             if(!(sender instanceof Player player)) {
                 sender.sendMessage("§cPlayers only.");return true;
             }
             if(getConfig().getString("pack.url","").isBlank()) {
-                sender.sendMessage("§ePatPat pack URL is not set. Embedded pack saved under plugins/PatpatPaper/");
+                sender.sendMessage("§ePatPat pack URL is not set. Embedded pack saved under plugins/ExtendedPatPatPaper/");
                 return true;
             }
             offerPack(player);
@@ -279,7 +301,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             if (enabled) disabled.remove(player.getUniqueId()); else disabled.add(player.getUniqueId());
             getConfig().set("disabled-players", disabled.stream().map(UUID::toString).sorted().toList());
             saveConfig();
-            sender.sendMessage("§aPatPatVanilla: " + (enabled ? "§aON" : "§cOFF"));
+            sender.sendMessage("§aExtendedPatPat Paper: " + (enabled ? "§aON" : "§cOFF"));
             return true;
         }
         sender.sendMessage("§e/" + label + " <status|pack|skin [list|id]|toggle [on|off]|reload>");

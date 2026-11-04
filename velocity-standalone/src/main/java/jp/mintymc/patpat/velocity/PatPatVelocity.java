@@ -76,8 +76,8 @@ import java.util.function.Consumer;
 
 @Plugin(
     id="patpatvelocity",
-    name="PatPatVelocity",
-    version="0.2.0",
+    name="ExtendedPatPatVelocity",
+    version="0.5.0",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -126,11 +126,12 @@ public final class PatPatVelocity {
             log.error("PatPat resource pack preparation failed; voxel fallback remains available",error);
         }
         PacketEvents.getAPI().getEventManager().registerListener(new Listener());
-        var meta=proxy.getCommandManager().metaBuilder("patpatvelocity").aliases("ppv").plugin(this).build();
+        var meta=proxy.getCommandManager().metaBuilder("patpatvelocity")
+            .aliases("ppv","extendedpatpat","epp").plugin(this).build();
         proxy.getCommandManager().register(meta,new Commands());
         System.getProperties().put(BEDROCK_TO_JAVA,bedrockConsumer);
         System.getProperties().put(PREFER_STANDALONE,standalonePreference);
-        log.info("PatPatVelocity ready; mode={}, bridge via Geyser",
+        log.info("ExtendedPatPat Velocity ready; mode={}, bridge via Geyser",
             enabled("official-integration-enabled",false)?"optional-official":"proxy-standalone");
     }
 
@@ -255,7 +256,7 @@ public final class PatPatVelocity {
                     if(skinCatalog.contains(style))selectedSkins.put(id,style);
                 } catch(IllegalArgumentException ignored) {}
             }
-        } catch(IOException exception) { log.error("Unable to load PatPatVelocity configuration",exception); }
+        } catch(IOException exception) { log.error("Unable to load ExtendedPatPat Velocity configuration",exception); }
     }
     private void persistDisabled() {
         try { Files.write(folder.resolve("disabled-players.txt"),
@@ -743,7 +744,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("PatPatVelocity v0.4.0 | mode="+state
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.5.0 | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
                     +" | active="+active.get()
                     +" | Geyser bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
@@ -753,7 +754,7 @@ public final class PatPatVelocity {
                 if(!sender.hasPermission("patpatvelocity.admin")) {
                     sender.sendMessage(Component.text("No permission: patpatvelocity.admin"));return;
                 }
-                reload();sender.sendMessage(Component.text("PatPatVelocity configuration reloaded"));return;
+                reload();sender.sendMessage(Component.text("ExtendedPatPat Velocity configuration reloaded"));return;
             }
             if(args[0].equalsIgnoreCase("pack")) {
                 if(!(sender instanceof Player p)) {
@@ -794,7 +795,7 @@ public final class PatPatVelocity {
                     : disabled.contains(p.getUniqueId());
                 if(desired)disabled.remove(p.getUniqueId());else disabled.add(p.getUniqueId());
                 persistDisabled();
-                sender.sendMessage(Component.text("PatPatVelocity "+(desired?"ON":"OFF")));return;
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity "+"+(desired?"ON":"OFF")));return;
             }
             sender.sendMessage(Component.text("/ppv <status|pack|skin [list|id]|toggle [on|off]|reload>"));
         }

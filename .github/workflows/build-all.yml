@@ -1,4 +1,4 @@
-name: Build PatPat (Velocity / Geyser / Paper)
+name: Build ExtendedPatPat (Velocity / Geyser / Paper)
 on:
   push:
     branches: [main]
@@ -36,7 +36,7 @@ jobs:
           from pathlib import Path
           from zipfile import ZipFile
           from io import BytesIO
-          jar,=Path('velocity-standalone/target').glob('PatPatVelocity-*.jar')
+          jar,=Path('velocity-standalone/target').glob('ExtendedPatPat-Velocity-*.jar')
           with ZipFile(jar) as plugin:
               data=plugin.read('PatPatJava-26.3.zip')
               config=plugin.read('patpat-skins.properties').decode('utf-8')
@@ -50,8 +50,8 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: PatPatVelocity
-          path: velocity-standalone/target/PatPatVelocity-*.jar
+          name: ExtendedPatPat-Velocity
+          path: velocity-standalone/target/ExtendedPatPat-Velocity-*.jar
           if-no-files-found: error
   paper:
     runs-on: ubuntu-latest
@@ -79,7 +79,7 @@ jobs:
           from pathlib import Path
           from zipfile import ZipFile
           from io import BytesIO
-          jar,=Path('paper-standalone/target').glob('PatpatPaper-*.jar')
+          jar,=Path('paper-standalone/target').glob('ExtendedPatPat-Paper-*.jar')
           with ZipFile(jar) as plugin:
               data=plugin.read('PatPatJava-26.3.zip')
               config=plugin.read('patpat-skins.properties').decode('utf-8')
@@ -93,8 +93,8 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: PatpatPaper
-          path: paper-standalone/target/PatpatPaper-*.jar
+          name: ExtendedPatPat-Paper
+          path: paper-standalone/target/ExtendedPatPat-Paper-*.jar
           if-no-files-found: error
   geyser:
     runs-on: ubuntu-latest
@@ -122,6 +122,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: matrix.geyser-build == 'latest'
         with:
-          name: PatPatGeyserExtension
-          path: target/PatPatGeyserExtension-*.jar
+          name: ExtendedPatPat-Geyser
+          path: target/ExtendedPatPat-Geyser-*.jar
           if-no-files-found: error
