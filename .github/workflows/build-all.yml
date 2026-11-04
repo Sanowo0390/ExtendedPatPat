@@ -26,27 +26,21 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install Pillow==11.3.0 json5==0.12.0
-      - name: Embed default-only Java pack
+      - name: Build map palette frames (default-only)
         run: python resourcepack/build.py
       - name: Build and test Velocity
         run: mvn -B -ntp -f velocity-standalone/pom.xml verify
-      - name: Confirm default-only pack is inside Velocity JAR
+      - name: Verify Velocity embeds map frames, without resource pack
         run: |
           python - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
-          from io import BytesIO
           jar,=Path('velocity-standalone/target').glob('ExtendedPatPat-Velocity-*.jar')
-          with ZipFile(jar) as plugin:
-              data=plugin.read('PatPatJava-26.3.zip')
-              config=plugin.read('patpat-skins.properties').decode('utf-8')
-              assert 'skins=default' in config
-              with ZipFile(BytesIO(data)) as pack:
-                  assert pack.testzip() is None
-                  paths=pack.namelist()
-                  assert 'assets/patpat/items/hand_default_0.json' in paths
-                  assert not any('bonk' in item.lower() for item in paths)
-          print('Verified embedded PatPat default pack:',len(data),'bytes')
+          with ZipFile(jar) as z:
+              assert 'maps/default/0.bin' in z.namelist()
+              assert len(z.read('maps/default/0.bin')) == 16384
+              assert 'PatPatJava-26.3.zip' not in z.namelist()
+              assert b'skins=default' in z.read('patpat-skins.properties')
           PY
       - uses: actions/upload-artifact@v4
         with:
@@ -69,27 +63,21 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install Pillow==11.3.0 json5==0.12.0
-      - name: Embed default-only Java pack
+      - name: Build map palette frames (default-only)
         run: python resourcepack/build.py
       - name: Build Paper
         run: mvn -B -ntp -f paper-standalone/pom.xml verify
-      - name: Confirm default-only pack is inside Paper JAR
+      - name: Verify Paper embeds map frames, without resource pack
         run: |
           python - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
-          from io import BytesIO
           jar,=Path('paper-standalone/target').glob('ExtendedPatPat-Paper-*.jar')
-          with ZipFile(jar) as plugin:
-              data=plugin.read('PatPatJava-26.3.zip')
-              config=plugin.read('patpat-skins.properties').decode('utf-8')
-              assert 'skins=default' in config
-              with ZipFile(BytesIO(data)) as pack:
-                  assert pack.testzip() is None
-                  paths=pack.namelist()
-                  assert 'assets/patpat/items/hand_default_0.json' in paths
-                  assert not any('bonk' in item.lower() for item in paths)
-          print('Verified embedded PatPat default pack:',len(data),'bytes')
+          with ZipFile(jar) as z:
+              assert 'maps/default/0.bin' in z.namelist()
+              assert len(z.read('maps/default/0.bin')) == 16384
+              assert 'PatPatJava-26.3.zip' not in z.namelist()
+              assert b'skins=default' in z.read('patpat-skins.properties')
           PY
       - uses: actions/upload-artifact@v4
         with:

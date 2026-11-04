@@ -120,6 +120,49 @@ def image_bytes(im):
     dst.save(io,format='PNG',optimize=True)
     return io.getvalue()
 
+
+# Minecraft Java map palette: 61 standard base colours, 4 brightness variants
+# (180, 220, 255, 135)/255. Transparent map pixels use color ID 0.
+# Colors are protocol data, not third-party artwork.
+MAP_BASES=[
+    (0,0,0),(127,178,56),(247,233,163),(199,199,199),(255,0,0),
+    (160,160,255),(167,167,167),(0,124,0),(255,255,255),(164,168,184),
+    (151,109,77),(112,112,112),(64,64,255),(143,119,72),(255,252,245),
+    (216,127,51),(178,76,216),(102,153,216),(229,229,51),(127,204,25),
+    (242,127,165),(76,76,76),(153,153,153),(76,127,153),(127,63,178),
+    (51,76,178),(102,76,51),(102,127,51),(153,51,51),(25,25,25),
+    (250,238,77),(92,219,213),(74,128,255),(0,217,58),(129,86,49),
+    (112,2,0),(209,177,161),(159,82,36),(149,87,108),(112,108,138),
+    (186,133,36),(103,117,53),(160,77,78),(57,41,35),(135,107,98),
+    (87,92,92),(122,73,88),(76,62,92),(76,50,35),(76,82,42),
+    (142,60,46),(37,22,16),(189,48,49),(148,63,97),(92,25,29),
+    (22,126,134),(58,142,140),(86,44,62),(20,180,133),(100,100,100),
+    (216,175,147),(127,167,150)
+]
+MAP_PALETTE=[(base_id*4+shade,tuple(v*factor//255 for v in rgb))
+             for base_id,rgb in enumerate(MAP_BASES) if base_id
+             for shade,factor in enumerate((180,220,255,135))]
+def map_pixels(frame):
+    # Alpha threshold preserves the original transparent hand silhouette.
+    # Pixel-art interpolation is disabled to avoid introducing muddy edges.
+    side=max(frame.size)
+    canvas=Image.new('RGBA',(side,side),(0,0,0,0))
+    canvas.alpha_composite(frame,((side-frame.width)//2,(side-frame.height)//2))
+    canvas=canvas.resize((128,128),resample=Image.Resampling.NEAREST)
+    lut={}
+    data=bytearray(128*128)
+    for i,(red,green,blue,alpha) in enumerate(canvas.getdata()):
+        if alpha<128:continue
+        color=(red,green,blue)
+        choice=lut.get(color)
+        if choice is None:
+            choice=min(MAP_PALETTE,key=lambda item:
+                2*(item[1][0]-red)**2 + 4*(item[1][1]-green)**2
+                + 3*(item[1][2]-blue)**2)[0]
+            lut[color]=choice
+        data[i]=choice
+    return bytes(data)
+
 def main():
     with Image.open(SOURCE) as im:
         rgba=im.convert('RGBA')
@@ -169,6 +212,17 @@ def main():
                 legacy='hand_'+str(n)
                 pack['assets/patpat/models/item/'+legacy+'.json']=pack['assets/patpat/models/item/'+model+'.json']
                 pack['assets/patpat/items/'+legacy+'.json']=pack['assets/patpat/items/'+model+'.json']
+    # Java map animation: one 128x128-byte palette frame per source frame.
+    # This does not require a URL, resource pack or client mod.
+    for style in styles:
+        directory=OUT/'maps'/style.id
+        directory.mkdir(parents=True,exist_ok=True)
+        for i,frame in enumerate(style.frames):
+            payload=map_pixels(frame)
+            assert len(payload)==16384
+            (directory/(str(i)+'.bin')).write_bytes(payload)
+    print('Compiled '+str(sum(len(s.frames) for s in styles))+
+          ' map frames (128x128), no client resource pack required')
     if sounds: pack['assets/patpat/sounds.json']=j(sounds)
     OUT.mkdir(parents=True,exist_ok=True)
     dest=OUT/'PatPatJava-26.3.zip'
