@@ -241,6 +241,18 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             if (!sender.hasPermission("patpatvanilla.admin")) { sender.sendMessage("§cNo permission."); return true; }
             reloadConfig(); loadDisabled(); sender.sendMessage("§aPatPatVanilla reloaded."); return true;
         }
+        if(args[0].equalsIgnoreCase("pack")) {
+            if(!(sender instanceof Player player)) {
+                sender.sendMessage("§cPlayers only.");return true;
+            }
+            if(getConfig().getString("pack.url","").isBlank()) {
+                sender.sendMessage("§ePatPat pack URL is not set. Embedded pack saved under plugins/PatpatPaper/");
+                return true;
+            }
+            offerPack(player);
+            sender.sendMessage("§aPatPat追加パックを再送しました（Java 1.21.4以降）。");
+            return true;
+        }
         if(args[0].equalsIgnoreCase("skin")) {
             if(!(sender instanceof Player player)) {
                 sender.sendMessage("§cPlayers only.");return true;
@@ -270,11 +282,11 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             sender.sendMessage("§aPatPatVanilla: " + (enabled ? "§aON" : "§cOFF"));
             return true;
         }
-        sender.sendMessage("§e/" + label + " <status|skin [list|id]|toggle [on|off]|reload>");
+        sender.sendMessage("§e/" + label + " <status|pack|skin [list|id]|toggle [on|off]|reload>");
         return true;
     }
     @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return List.of("status","skin","toggle","reload").stream()
+        if (args.length == 1) return List.of("status","pack","skin","toggle","reload").stream()
                 .filter(x -> x.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         if (args.length == 2 && args[0].equalsIgnoreCase("toggle"))
             return List.of("on","off").stream().filter(x -> x.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
