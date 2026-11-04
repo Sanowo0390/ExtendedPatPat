@@ -37,8 +37,11 @@ jobs:
           from zipfile import ZipFile
           jar,=Path('velocity-standalone/target').glob('ExtendedPatPat-Velocity-*.jar')
           with ZipFile(jar) as z:
-              assert 'maps/default/0.bin' in z.namelist()
-              assert len(z.read('maps/default/0.bin')) == 16384
+              for frame in range(5):
+                  pixels=z.read(f'maps/default/{frame}.bin')
+                  assert len(pixels)==16384
+                  assert any(pixel!=0 for pixel in pixels)
+                  assert pixels[0]==0, 'Transparent corners must remain transparent'
               assert 'PatPatJava-26.3.zip' not in z.namelist()
               assert b'skins=default' in z.read('patpat-skins.properties')
           PY
@@ -74,8 +77,11 @@ jobs:
           from zipfile import ZipFile
           jar,=Path('paper-standalone/target').glob('ExtendedPatPat-Paper-*.jar')
           with ZipFile(jar) as z:
-              assert 'maps/default/0.bin' in z.namelist()
-              assert len(z.read('maps/default/0.bin')) == 16384
+              for frame in range(5):
+                  pixels=z.read(f'maps/default/{frame}.bin')
+                  assert len(pixels)==16384
+                  assert any(pixel!=0 for pixel in pixels)
+                  assert pixels[0]==0, 'Transparent corners must remain transparent'
               assert 'PatPatJava-26.3.zip' not in z.namelist()
               assert b'skins=default' in z.read('patpat-skins.properties')
           PY
