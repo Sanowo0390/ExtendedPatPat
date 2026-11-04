@@ -37,7 +37,8 @@ final class HandRenderer {
         long id=session.getEntityCache().nextEntityId();
         Vector3f position=anchor(entity);
         session.sendUpstreamPacket(spawnImagePacket(id,position,(float)cfg.scale(),0));
-        if(cfg.squishEnabled())session.sendUpstreamPacket(SquishAnimations.packet(entity));
+        if(cfg.squishEnabled() && entity.bedrockDefinition()!=null)
+            session.sendUpstreamPacket(SquishAnimations.packet(entity));
         if(cfg.soundEnabled()){
             PlaySoundPacket sound=new PlaySoundPacket();sound.setSound(cfg.soundEvent());
             // Each recipient hears the sound at full intended level.

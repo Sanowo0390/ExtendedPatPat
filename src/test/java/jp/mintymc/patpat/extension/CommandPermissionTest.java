@@ -26,7 +26,7 @@ class CommandPermissionTest {
             extension.commands(event);
         }
         ArgumentCaptor<Command> commands=ArgumentCaptor.forClass(Command.class);
-        verify(event,times(6)).register(commands.capture());
+        verify(event,times(5)).register(commands.capture());
         CommandManager<GeyserCommandSource> manager=mock(CommandManager.class);
         GeyserCommandSource source=mock(GeyserCommandSource.class);
         when(source.connection()).thenReturn(mock(GeyserSession.class));
@@ -43,10 +43,10 @@ class CommandPermissionTest {
         verifyNoInteractions(source);
     }
     @Test void explicitConfiguredPermissionStillRestrictsUse() {
-        Properties props=new Properties();props.setProperty("required-permission","patpatbedrock.use");
+        Properties props=new Properties();props.setProperty("required-permission","extendedpatpatgeyser.use");
         Settings settings=Settings.from(props);CommandSource source=mock(CommandSource.class);
         assertFalse(settings.allows(source));
-        when(source.hasPermission("patpatbedrock.use")).thenReturn(true);
+        when(source.hasPermission("extendedpatpatgeyser.use")).thenReturn(true);
         assertTrue(settings.allows(source));
     }
 }
