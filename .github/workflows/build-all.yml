@@ -30,6 +30,24 @@ jobs:
         run: python resourcepack/build.py
       - name: Build and test Velocity
         run: mvn -B -ntp -f velocity-standalone/pom.xml verify
+      - name: Confirm default-only pack is inside Velocity JAR
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          jar,=Path('velocity-standalone/target').glob('PatPatVelocity-*.jar')
+          with ZipFile(jar) as plugin:
+              data=plugin.read('PatPatJava-26.3.zip')
+              config=plugin.read('patpat-skins.properties').decode('utf-8')
+              assert 'skins=default' in config
+              with ZipFile(BytesIO(data)) as pack:
+                  assert pack.testzip() is None
+                  paths=pack.namelist()
+                  assert 'assets/patpat/items/hand_default_0.json' in paths
+                  assert not any('bonk' in item.lower() for item in paths)
+          print('Verified embedded PatPat default pack:',len(data),'bytes')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: PatPatVelocity
@@ -55,6 +73,24 @@ jobs:
         run: python resourcepack/build.py
       - name: Build Paper
         run: mvn -B -ntp -f paper-standalone/pom.xml verify
+      - name: Confirm default-only pack is inside Paper JAR
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          jar,=Path('paper-standalone/target').glob('PatpatPaper-*.jar')
+          with ZipFile(jar) as plugin:
+              data=plugin.read('PatPatJava-26.3.zip')
+              config=plugin.read('patpat-skins.properties').decode('utf-8')
+              assert 'skins=default' in config
+              with ZipFile(BytesIO(data)) as pack:
+                  assert pack.testzip() is None
+                  paths=pack.namelist()
+                  assert 'assets/patpat/items/hand_default_0.json' in paths
+                  assert not any('bonk' in item.lower() for item in paths)
+          print('Verified embedded PatPat default pack:',len(data),'bytes')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: PatpatPaper
