@@ -51,9 +51,9 @@ The builder automatically generates:
 - the same \`patpat-skins.properties\` in **both Java plugin JARs**.
 
 Each Java player selects a style independently:
-\`/ppv skin list\` lists available choices and
-\`/ppv skin bonk_bonk_animation\` enables the example.
-\`/ppv skin default\` reverts. Selections persist after reconnect and restart.
+\`/extendedpatpat skin list\` lists available choices and
+\`/extendedpatpat skin bonk_bonk_animation\` enables the example.
+\`/extendedpatpat skin default\` reverts. Selections persist after reconnect and restart.
 
 On Velocity, only the receiving Java client sees their chosen style using
 viewer-local ItemDisplay packets. Paper produces viewer-specific hidden-by-default

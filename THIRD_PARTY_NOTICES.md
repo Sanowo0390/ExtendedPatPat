@@ -22,10 +22,9 @@ content of this repository**:
 | `src/main/resources/pat2.ogg` | `LopyMine/PatPat/src/main/resources/assets/patpat/sounds/pat2.ogg` | Same Git blob SHA |
 | `src/main/resources/default-hand.png` | `LopyMine/PatPat/src/main/resources/assets/patpat/textures/default/patpat.png` | Visually same sprite artwork, different encoding |
 
-The provenance and redistribution terms of the related
-`src/main/resources/default-hand.gif` must also be confirmed. Generated
-Java/Bedrock resource packs and JARs incorporating these assets **retain the
-upstream creator's rights and obligations**; bundling does not relicense them.
+Generated Java/Bedrock resource packs and JARs incorporating these assets
+**retain the upstream creator's rights and obligations**; bundling does not
+relicense them.
 
 This notice acknowledges the existing distribution and is not itself a grant
 of permission for third-party material. Review upstream license obligations
