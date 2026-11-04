@@ -59,8 +59,9 @@ public final class PatPatExtension implements Extension {
     private boolean setPatEnabled(UUID uuid,boolean enabled) throws IOException {
         PatPreferences store=preferences;
         if(store==null)throw new IOException("Pat preferences have not been initialized");
-        boolean updated=store.setEnabled(uuid,enabled);
-        if(!updated)return false;
+        // PatPreferences returns the NEW enabled state (false for a valid OFF),
+        // NOT an operation-success flag. IOException is the only write failure.
+        store.setEnabled(uuid,enabled);
         if(!enabled) {
             sessions.values().forEach(state->{
                 GeyserSession current=state.session();
@@ -74,8 +75,10 @@ public final class PatPatExtension implements Extension {
         if(values==null || values.length!=2 ||
                 !(values[0] instanceof UUID uuid) ||
                 !(values[1] instanceof Boolean enabled))return false;
-        try {return setPatEnabled(uuid,enabled);}
-        catch(IOException ex) {
+        try {
+            setPatEnabled(uuid,enabled);
+            return true; // Explicit OFF is successful, even though its state is false.
+        }catch(IOException ex) {
             logger().error("Unable to save Bedrock Pat toggle from Velocity",ex);
             return false;
         }
