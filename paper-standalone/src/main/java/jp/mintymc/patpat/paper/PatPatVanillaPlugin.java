@@ -44,6 +44,9 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     private final Map<UUID,Set<Integer>> sentMaps=new HashMap<>();
     private final SkinCatalog skinCatalog=SkinCatalog.load();
     private final Map<UUID,String> selectedSkins=new HashMap<>();
+    private SkinCatalog.Skin skin(Player viewer){
+        return skinCatalog.get(selectedSkins.getOrDefault(viewer.getUniqueId(),"default"));
+    }
     private static final class ViewerSprite {
         private final Player viewer;
         private final ItemFrame frame;
