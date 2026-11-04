@@ -2,13 +2,15 @@ package jp.mintymc.patpat.velocity;
 
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.item.ItemStack;
-import com.github.retrooper.packetevents.protocol.item.type.ItemTypes;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ItemFrameMetadataTest {
     private static ItemStack testMap() {
-        return ItemStack.builder().type(ItemTypes.FILLED_MAP).amount(1).build();
+        // PacketEvents ItemStack initializes the live server registry on first
+        // access. Null is sufficient for verifying metadata IDs and serializers
+        // without booting a Velocity proxy in this unit test.
+        return null;
     }
 
     @Test void spawnMustPlaceMapInField9NotHangingEntityDirectionField8() {
