@@ -7,7 +7,7 @@ This repository provides two pieces that run in the same Velocity JVM:
 | Component | Install directory | Responsibility |
 |---|---|---|
 | ExtendedPatPat Velocity 0.5.0 | \`Velocity/plugins/\` | Java edition interaction detection, proxy-side policy, temporary client-only BlockDisplay hand, cross-edition relay |
-| ExtendedPatPat Geyser 0.12.0 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
+| ExtendedPatPat Geyser 0.13.0 | \`Velocity/plugins/Geyser-Velocity/extensions/\` | Bedrock edition hand image/GIF, resource pack, effects, Bedrock interaction detection |
 
 Requirements: Velocity 3.5, **PacketEvents 2.14.0 for Velocity**, and **Geyser-Velocity 2.12.1系** (required Geyser internals are checked at startup). The normal Geyser-Velocity plugin is also in \`Velocity/plugins/\`.
 

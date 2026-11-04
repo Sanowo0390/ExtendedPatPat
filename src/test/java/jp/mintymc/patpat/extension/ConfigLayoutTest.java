@@ -38,6 +38,16 @@ class ConfigLayoutTest {
         assertEquals(formatted,Files.readString(file));
     }
 
+    @Test void recognizesOldV2LayoutAfterBrandRenameWithoutTouchingUsersConfig() throws Exception {
+        Path file=folder.resolve("config.properties");
+        String old="# PatPatGeyserExtension | Config Layout v2\n"
+            +"hand-motion-depth=0.93\ncustom-setting=keep\n";
+        Files.writeString(file,old,StandardCharsets.UTF_8);
+        assertFalse(ConfigLayout.formatIfLegacy(file));
+        assertEquals(old,Files.readString(file,StandardCharsets.UTF_8));
+        assertFalse(Files.exists(folder.resolve("config.properties.backup-before-layout-v2")));
+    }
+
     @Test void newTemplateContainsEveryOperationalSettingOnlyOnce() throws Exception {
         Path file=folder.resolve("config.properties");
         try(var stream=getClass().getResourceAsStream("/config.properties")) {

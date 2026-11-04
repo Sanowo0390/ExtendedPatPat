@@ -139,7 +139,7 @@ def main():
             seen.add(skin.id);styles.append(skin)
     if len(styles)>32: raise ValueError('Too many skin packs')
     pack={'pack.mcmeta':j({'pack':{
-        'description':'PatPat animated hands | Minecraft Java 26.3',
+        'description':'ExtendedPatPat animated hands | Minecraft Java 26.3',
         'pack_format':46,
         'supported_formats':{'min_inclusive':46,'max_inclusive':97},
         'min_format':46,'max_format':97}})}
