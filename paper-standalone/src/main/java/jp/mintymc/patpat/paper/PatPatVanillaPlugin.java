@@ -219,8 +219,10 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             if(enabled)disabled.remove(uuid);else disabled.add(uuid);
             getConfig().set("disabled-players",disabled.stream().map(UUID::toString).sorted().toList());
             saveConfig();
-            if(!enabled)for(Animation animation:List.copyOf(animations))
+            if(!enabled)for(Animation animation:List.copyOf(animations)){
                 animation.hideViewer(uuid);
+                animation.hideTarget(uuid);
+            }
             sender.sendMessage("§aExtendedPatPat Paper: "+(enabled?"§aON":"§cOFF")
                 +" §7(送受信ともに切り替えました)");
             return true;
@@ -286,6 +288,10 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                 (dz>=0?BlockFace.SOUTH:BlockFace.NORTH);
         }
         boolean hasViewers(){return !sprites.isEmpty();}
+        void hideTarget(UUID targetId){
+            if(target instanceof Player player && player.getUniqueId().equals(targetId))
+                finish();
+        }
         void hideViewer(UUID viewerId){
             for(var iterator=sprites.iterator();iterator.hasNext();){
                 ViewerSprite sprite=iterator.next();
@@ -299,7 +305,11 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             return target.getLocation().add(0,target.getHeight()+offsetY-down,0);
         }
         @Override public void run(){
-            if(!target.isValid() || target.isDead() || tick>ticks){finish();return;}
+            if(!target.isValid() || target.isDead() || tick>ticks ||
+                    (target instanceof Player targetPlayer &&
+                     disabled.contains(targetPlayer.getUniqueId()))){
+                finish();return;
+            }
             double t=(double)tick/ticks;
             double eased=1-(1-t)*(1-t);
             Location position=position(depth*Math.sin(Math.PI*eased));
