@@ -227,10 +227,12 @@ final class PatSession extends SessionAdapter {
         if(!closed && !session.isClosed() && owner.settings().enabled() && owner.patEnabled(session)) renderer.show(targetJavaId);
     }
     void toggle(String[] args) {
+        // Geyser's command parser can supply an empty optional argument.
+        String[] values=Arrays.stream(args).filter(x->x!=null && !x.isBlank()).toArray(String[]::new);
         boolean next;
-        if(args.length==0) next=!owner.patEnabled(session);
-        else if(args.length==1 && args[0].equalsIgnoreCase("on")) next=true;
-        else if(args.length==1 && args[0].equalsIgnoreCase("off")) next=false;
+        if(values.length==0) next=!owner.patEnabled(session);
+        else if(values.length==1 && values[0].equalsIgnoreCase("on")) next=true;
+        else if(values.length==1 && values[0].equalsIgnoreCase("off")) next=false;
         else {session.sendMessage("使い方: /extendedpatpatgeyser toggle [on|off]");return;}
         try {
             owner.setPatEnabled(session,next);
