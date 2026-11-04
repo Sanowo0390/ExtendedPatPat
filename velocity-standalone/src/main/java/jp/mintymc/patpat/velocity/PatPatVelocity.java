@@ -82,7 +82,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.7",
+    version="0.6.8",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -105,6 +105,7 @@ public final class PatPatVelocity {
     private final Set<UUID> disabled=ConcurrentHashMap.newKeySet();
     private final SkinCatalog skinCatalog=SkinCatalog.load();
     private volatile MapFrames mapFrames=new MapFrames(skinCatalog);
+    private volatile TextFrames textFrames;
     private final Map<UUID,String> selectedSkins=new ConcurrentHashMap<>();
     private final AtomicInteger entitySequence=new AtomicInteger(1_900_000_000);
     private final AtomicInteger active=new AtomicInteger();
@@ -225,6 +226,7 @@ public final class PatPatVelocity {
             // Recreate images when the map-pixel scale changes on reload.
             mapFrames=new MapFrames(skinCatalog,number("image-scale",0.6,0.05,1.0),
                 number("hand-motion-depth",number("hand-depth",0.28,0,2),0,2));
+            textFrames=new TextFrames(skinCatalog,(int)number("text-display-resolution",24,8,32));
             views.values().forEach(v->v.sentMaps.clear());
             disabled.clear();
             Path disabledFile=folder.resolve("disabled-players.txt");
@@ -684,6 +686,10 @@ public final class PatPatVelocity {
         }
         final SkinCatalog.Skin style=skin(player.getUniqueId());
         final MapFrames images=mapFrames;
+        final TextFrames textImages=textFrames;
+        final boolean useText=TextFrames.useText(
+            text("hand-renderer","item_frame"),view.user.getClientVersion());
+        final double imageSize=number("image-scale",0.6,0.05,1.0);
         final double displayMs=number("duration-ms",0,0,10000);
         final int duration=Math.max(2,Math.min(40,(int)Math.ceil(
             (displayMs>0?displayMs:style.durationMs())/50.0)));
@@ -702,22 +708,34 @@ public final class PatPatVelocity {
         final double minScale=number("squish-min-scale",0.86,0.5,1.0);
         final int id=entitySequence.getAndIncrement();
         final int[] fakeIds={id};
+        final Vector3d[] textPosition={null};
         try {
             Vector3d pos=targetPosition(view,targetId,style);
             if(pos==null) {
                 if(squash)view.squishing.remove(targetEntityId);
                 active.decrementAndGet();return;
             }
-            if(!sendMap(view,style,0,0,images))throw new IllegalStateException("Play state ended");
-            int face=faceTowardViewer(pos,view.self);
-            // Invisible item frame: the map is visible, its background frame is not.
-            // Unlike the old six-BlockDisplay hand, this renders at map resolution.
-            if(!sendPlay(view,new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
-                EntityTypes.ITEM_FRAME,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),
-                0,face,null)))throw new IllegalStateException("Play state ended");
-            if(!sendPlay(view,new WrapperPlayServerEntityMetadata(id,
-                ItemFrameMetadata.onSpawn(mapItem(view.user,images.mapId(style,0,0))))))
-                throw new IllegalStateException("Play state ended");
+            if(useText){
+                // Center billboard for the viewing player; the Java client handles camera angles.
+                Vector3d initial=TextFrames.position(pos,imageSize,0);
+                textPosition[0]=initial;
+                if(!sendPlay(view,new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
+                    EntityTypes.TEXT_DISPLAY,new Location(initial.getX(),initial.getY(),initial.getZ(),0,0),
+                    0,0,null)))throw new IllegalStateException("Play state ended");
+                if(!sendPlay(view,new WrapperPlayServerEntityMetadata(id,
+                    TextFrames.spawnMetadata(textImages.frame(style,0),imageSize,textImages.resolution()))))
+                    throw new IllegalStateException("Play state ended");
+            }else{
+                // Original sharp map renderer; retains its four fixed facing directions.
+                if(!sendMap(view,style,0,0,images))throw new IllegalStateException("Play state ended");
+                int face=faceTowardViewer(pos,view.self);
+                if(!sendPlay(view,new WrapperPlayServerSpawnEntity(id,UUID.randomUUID(),
+                    EntityTypes.ITEM_FRAME,new Location(pos.getX(),pos.getY(),pos.getZ(),0,0),
+                    0,face,null)))throw new IllegalStateException("Play state ended");
+                if(!sendPlay(view,new WrapperPlayServerEntityMetadata(id,
+                    ItemFrameMetadata.onSpawn(mapItem(view.user,images.mapId(style,0,0))))))
+                    throw new IllegalStateException("Play state ended");
+            }
         } catch(Exception ex) {
             cleanup(view,fakeIds);
             if(squash)view.squishing.remove(targetEntityId);
@@ -731,6 +749,7 @@ public final class PatPatVelocity {
             int tick=0;
             int sentFrame=0;
             int sentPose=0;
+            Vector3d lastTextPosition=textPosition[0];
             private boolean finished;
             @Override public void run() {
                 try {
@@ -741,20 +760,39 @@ public final class PatPatVelocity {
                         finish();return;
                     }
                     double t=(double)tick/duration;
-                    if(targetPosition(view,targetId,style)==null){finish();return;}
-                    // Minecraft 26.3 item frames are BlockAttachedEntity: sub-block
-                    // teleports snap to a block, so shift the map's pixels instead.
+                    Vector3d anchor=targetPosition(view,targetId,style);
+                    if(anchor==null){finish();return;}
                     int frame=style.at(tick,duration);
-                    int pose=motion?MapMotion.poseAt(tick,strokeDuration,depth):0;
-                    if(frame!=sentFrame || pose!=sentPose){
-                        if(!sendMap(view,style,frame,pose,images) ||
-                                !sendPlay(view,new WrapperPlayServerEntityMetadata(id,
-                                    List.of(ItemFrameMetadata.mapItem(
-                                        mapItem(view.user,images.mapId(style,frame,pose))))))){
-                            finish();return;
+                    if(useText){
+                        if(frame!=sentFrame){
+                            if(!sendPlay(view,new WrapperPlayServerEntityMetadata(id,
+                                    List.of(TextFrames.textMetadata(textImages.frame(style,frame)))))){
+                                finish();return;
+                            }
+                            sentFrame=frame;
                         }
-                        sentFrame=frame;
-                        sentPose=pose;
+                        double phase=Math.min(1.0,(double)tick/strokeDuration);
+                        double eased=1.0-(1.0-phase)*(1.0-phase);
+                        double down=motion?-depth*Math.sin(Math.PI*eased):0;
+                        Vector3d next=TextFrames.position(anchor,imageSize,down);
+                        if(!next.equals(lastTextPosition)){
+                            if(!sendPlay(view,new WrapperPlayServerEntityTeleport(
+                                    id,next,0,0,false))){finish();return;}
+                            lastTextPosition=next;
+                        }
+                    }else{
+                        // ItemFrames snap to block coordinates; move the map pixels.
+                        int pose=motion?MapMotion.poseAt(tick,strokeDuration,depth):0;
+                        if(frame!=sentFrame || pose!=sentPose){
+                            if(!sendMap(view,style,frame,pose,images) ||
+                                    !sendPlay(view,new WrapperPlayServerEntityMetadata(id,
+                                        List.of(ItemFrameMetadata.mapItem(
+                                            mapItem(view.user,images.mapId(style,frame,pose))))))){
+                                finish();return;
+                            }
+                            sentFrame=frame;
+                            sentPose=pose;
+                        }
                     }
                     if(squash){
                         double pressure=Math.sin(Math.PI*t);
@@ -821,11 +859,12 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.7 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.8 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
-                    +" | image-scale="+number("image-scale",0.6,0.05,1.0)
+                    +" | renderer="+text("hand-renderer","item_frame")
+                     +" | image-scale="+number("image-scale",0.6,0.05,1.0)
                     +" | offset=(" +number("offset-x",0.5,-8,8)+","
                         +number("offset-y",0,-8,8)+","
                         +number("offset-z",0,-8,8)+")"
