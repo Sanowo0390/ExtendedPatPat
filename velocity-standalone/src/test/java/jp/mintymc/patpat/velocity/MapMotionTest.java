@@ -14,7 +14,8 @@ class MapMotionTest {
     }
     @Test void depthAndDurationControlMotionSafely() {
         assertEquals(0,MapMotion.poseAt(3,6,0));
-        assertEquals(1,MapMotion.poseAt(3,6,0.2125));
+        assertEquals(MapMotion.poseAt(3,6,0.425),MapMotion.poseAt(3,6,0.2125),
+            "Depth affects map pixels, not pose quantization");
         assertEquals(0,MapMotion.poseAt(-1,6,0.425));
         assertEquals(0,MapMotion.poseAt(7,6,0.425));
         assertEquals(0,MapMotion.poseAt(2,6,Double.NaN));

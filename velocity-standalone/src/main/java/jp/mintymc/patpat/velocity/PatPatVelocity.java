@@ -82,7 +82,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.6",
+    version="0.6.7",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -223,7 +223,8 @@ public final class PatPatVelocity {
             try(var in=Files.newInputStream(file)){loaded.load(in);}
             config=loaded;
             // Recreate images when the map-pixel scale changes on reload.
-            mapFrames=new MapFrames(skinCatalog,number("image-scale",0.5,0.05,1.0));
+            mapFrames=new MapFrames(skinCatalog,number("image-scale",0.6,0.05,1.0),
+                number("hand-motion-depth",number("hand-depth",0.28,0,2),0,2));
             views.values().forEach(v->v.sentMaps.clear());
             disabled.clear();
             Path disabledFile=folder.resolve("disabled-players.txt");
@@ -690,7 +691,7 @@ public final class PatPatVelocity {
             number("hand-motion-duration-ms",240,50,5000)/50.0)));
         final boolean motion=enabled("hand-motion-enabled",true);
         final double depth=number("hand-motion-depth",
-            number("hand-depth",0.425,0,2),0,2);
+            number("hand-depth",0.28,0,2),0,2);
         final Tracked trackedTarget=view.find(targetId);
         final int targetEntityId=trackedTarget!=null?trackedTarget.id:
             targetId.equals(view.player)?view.selfEntityId:0;
@@ -820,11 +821,11 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.6 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.7 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
-                    +" | image-scale="+number("image-scale",0.5,0.05,1.0)
+                    +" | image-scale="+number("image-scale",0.6,0.05,1.0)
                     +" | offset=(" +number("offset-x",0.5,-8,8)+","
                         +number("offset-y",0,-8,8)+","
                         +number("offset-z",0,-8,8)+")"

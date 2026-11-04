@@ -11,8 +11,8 @@
 
 | JAR | 動作環境 |
 |---|---|
-| **ExtendedPatPat-Velocity** (0.6.6) | Velocity 3.5 + PacketEvents 2.14.0 |
-| **ExtendedPatPat-Geyser** (0.13.1) | Geyser-Velocity 2.12.1系 |
+| **ExtendedPatPat-Velocity** (0.6.7) | Velocity 3.5 + PacketEvents 2.14.0 |
+| **ExtendedPatPat-Geyser** (0.13.2) | Geyser-Velocity 2.12.1系 |
 | **ExtendedPatPat-Paper** (0.6.1) | Paper/Purpur 26.3（Java 25） |
 
 - **Java・統合版のクロスプレイ**：Velocity版を`plugins/`に、Geyser版をGeyserの`extensions/`に配置。Paperバックエンド用PatPatは不要です。
@@ -42,6 +42,8 @@
 `/epp` でも利用できます。統合版は `/extendedpatpatgeyser`（`status`、`test`、`pat`、`toggle`、`reload`）。
 
 **ON/OFFの仕様：** `toggle off` でPatの送信・受信を両方停止し、自分がPat対象になることも防ぎます。表示中の手も終了します。`toggle on` で再開し、指定なしの `toggle` は反転します。設定は再接続後も保持されます。Geyser-VelocityとVelocity版を併用している統合版プレイヤーは、Velocityの `/extendedpatpat toggle` またはGeyserの `/extendedpatpatgeyser toggle` のどちらでも同じ状態を操作できます。
+
+既定の表示サイズは `image-scale=0.6`、上下移動は `hand-motion-depth=0.28` ブロックです。Java/統合版で同じ値に設定してください。既存の設定ファイルは自動変更されません。
 
 詳細：[Velocityの設定](velocity-standalone/README.md) ／ [Paperの設定](paper-standalone/README.md) ／ [画像の追加方法](resourcepack/README.md)
 
