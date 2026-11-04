@@ -172,8 +172,14 @@ def main():
     if sounds: pack['assets/patpat/sounds.json']=j(sounds)
     OUT.mkdir(parents=True,exist_ok=True)
     dest=OUT/'PatPatJava-26.3.zip'
+    # Fixed timestamps/order: identical assets yield byte-identical ZIP and SHA-1
+    # across the independently built Velocity and Paper artifacts.
     with zipfile.ZipFile(dest,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as out:
-        for name,data in sorted(pack.items()): out.writestr(name,data)
+        for name,data in sorted(pack.items()):
+            info=zipfile.ZipInfo(name,date_time=(2020,1,1,0,0,0))
+            info.compress_type=zipfile.ZIP_DEFLATED
+            info.external_attr=(0o100644 << 16)
+            out.writestr(info,data,compress_type=zipfile.ZIP_DEFLATED,compresslevel=9)
     with zipfile.ZipFile(dest) as check:
         assert check.testzip() is None
         for s in styles:
