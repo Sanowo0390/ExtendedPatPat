@@ -75,7 +75,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 @Plugin(
-    id="patpatvelocity",
+    id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
     version="0.5.0",
     authors={"Sanowo0390"},
@@ -126,8 +126,8 @@ public final class PatPatVelocity {
             log.error("PatPat resource pack preparation failed; voxel fallback remains available",error);
         }
         PacketEvents.getAPI().getEventManager().registerListener(new Listener());
-        var meta=proxy.getCommandManager().metaBuilder("patpatvelocity")
-            .aliases("ppv","extendedpatpat","epp").plugin(this).build();
+        var meta=proxy.getCommandManager().metaBuilder("extendedpatpat")
+            .aliases("epp").plugin(this).build();
         proxy.getCommandManager().register(meta,new Commands());
         System.getProperties().put(BEDROCK_TO_JAVA,bedrockConsumer);
         System.getProperties().put(PREFER_STANDALONE,standalonePreference);
@@ -751,8 +751,8 @@ public final class PatPatVelocity {
                 return;
             }
             if(args[0].equalsIgnoreCase("reload")) {
-                if(!sender.hasPermission("patpatvelocity.admin")) {
-                    sender.sendMessage(Component.text("No permission: patpatvelocity.admin"));return;
+                if(!sender.hasPermission("extendedpatpat.admin")) {
+                    sender.sendMessage(Component.text("No permission: extendedpatpat.admin"));return;
                 }
                 reload();sender.sendMessage(Component.text("ExtendedPatPat Velocity configuration reloaded"));return;
             }
@@ -762,7 +762,7 @@ public final class PatPatVelocity {
                 }
                 if(text("resource-pack-url","").isBlank()) {
                     sender.sendMessage(Component.text("PatPat pack URL is not configured; "
-                        +"the embedded ZIP is extracted under plugins/patpatvelocity/"));
+                        +"the embedded ZIP is extracted under plugins/extendedpatpatvelocity/"));
                     return;
                 }
                 packOffered.remove(p.getUniqueId());
@@ -776,14 +776,14 @@ public final class PatPatVelocity {
                 }
                 if(args.length==1) {
                     sender.sendMessage(Component.text("Current skin: "+skin(p.getUniqueId()).id()
-                        +" | /ppv skin list | /ppv skin <id>"));return;
+                        +" | /extendedpatpat skin list | /extendedpatpat skin <id>"));return;
                 }
                 if(args[1].equalsIgnoreCase("list")) {
                     sender.sendMessage(Component.text("Available PatPat skins: "+skinCatalog.description()));return;
                 }
                 String id=args[1].toLowerCase(java.util.Locale.ROOT);
                 if(!skinCatalog.contains(id)) {
-                    sender.sendMessage(Component.text("Unknown skin '"+id+"'. Use /ppv skin list."));return;
+                    sender.sendMessage(Component.text("Unknown skin '"+id+"'. Use /extendedpatpat skin list."));return;
                 }
                 selectedSkins.put(p.getUniqueId(),id);
                 persistSkins();
@@ -797,7 +797,7 @@ public final class PatPatVelocity {
                 persistDisabled();
                 sender.sendMessage(Component.text("ExtendedPatPat Velocity "+(desired?"ON":"OFF")));return;
             }
-            sender.sendMessage(Component.text("/ppv <status|pack|skin [list|id]|toggle [on|off]|reload>"));
+            sender.sendMessage(Component.text("/extendedpatpat <status|pack|skin [list|id]|toggle [on|off]|reload>"));
         }
         @Override public List<String> suggest(Invocation invocation) {
             String[] args=invocation.arguments();

@@ -169,7 +169,6 @@ final class PatSession extends SessionAdapter {
         if((!useBackend && !owner.settings().standaloneMode()) || !owner.settings().enabled() || !owner.patEnabled(session) || !eligible(target)) return false;
         long now=System.nanoTime();if(now<nextPat)return true;
         nextPat=now+owner.settings().cooldown()*1_000_000L;
-        owner.recordPat(session);
         if(owner.settings().swingHandEnabled()) {
             session.sendUpstreamPacket(PatSwing.packet(session.getPlayerEntity().geyserId()));
             owner.relaySwing(this);
@@ -189,7 +188,7 @@ final class PatSession extends SessionAdapter {
         return true;
     }
     void commandPat() {
-        if(!owner.patEnabled(session)){session.sendMessage("PatはOFFです。/patpatbedrock toggle on で有効にしてください。");return;}
+        if(!owner.patEnabled(session)){session.sendMessage("PatはOFFです。/extendedpatpatgeyser toggle on で有効にしてください。");return;}
         if((!ready || owner.preferProxyStandalone()) && !owner.settings().standaloneMode()){
             session.sendMessage("PatPatのstandalone-modeが無効です。");
             return;
@@ -198,7 +197,7 @@ final class PatSession extends SessionAdapter {
         if(!attempt(target))session.sendMessage("撫でられる対象がいません。対象に照準を合わせ、空の手と距離を確認してください。");
     }
     void test(boolean text) {
-        if(!owner.patEnabled(session)){session.sendMessage("PatはOFFです。/patpatbedrock toggle on で有効にしてください。");return;}
+        if(!owner.patEnabled(session)){session.sendMessage("PatはOFFです。/extendedpatpatgeyser toggle on で有効にしてください。");return;}
         Entity target=findAimedTarget();
         // Test uses the same crosshair/distance/entity checks as a real Pat.
         // In particular, never silently fall back to the player's own head.
@@ -224,15 +223,12 @@ final class PatSession extends SessionAdapter {
     void showStandalone(int targetJavaId) {
         if(!closed && !session.isClosed() && owner.settings().enabled() && owner.patEnabled(session)) renderer.show(targetJavaId,false);
     }
-    void stats() {
-        session.sendMessage("あなたのPat回数: "+owner.patCount(session)+" 回（この拡張で受け付けた操作）");
-    }
     void toggle(String[] args) {
         boolean next;
         if(args.length==0) next=!owner.patEnabled(session);
         else if(args.length==1 && args[0].equalsIgnoreCase("on")) next=true;
         else if(args.length==1 && args[0].equalsIgnoreCase("off")) next=false;
-        else {session.sendMessage("使い方: /patpatbedrock toggle [on|off]");return;}
+        else {session.sendMessage("使い方: /extendedpatpatgeyser toggle [on|off]");return;}
         try {
             owner.setPatEnabled(session,next);
             if(!next){renderer.clear();camera.stop();}

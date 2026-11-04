@@ -100,55 +100,36 @@ class ImageSupportTest {
         Path huge=directory.resolve("huge.png");ImageIO.write(new BufferedImage(1025,1,BufferedImage.TYPE_INT_ARGB),"PNG",huge.toFile());
         assertThrows(java.io.IOException.class,()->ImageAnimation.load(huge));
     }
-    @Test void upgradesExistingConfigAndPreparesDefaultGifWithoutOverwritingUserValues() throws Exception {
-        Files.writeString(directory.resolve("config.properties"),"height-offset=-0.25\nduration-ms=1400\n");
-        PatPatExtension extension=mock(PatPatExtension.class,CALLS_REAL_METHODS);
-        doReturn(directory).when(extension).dataFolder();
-        doReturn(mock(org.geysermc.geyser.api.extension.ExtensionLogger.class)).when(extension).logger();
-        extension.pre(null);
-        assertNotNull(extension.animation());assertEquals(5,extension.animation().frames().size());
-        assertEquals(-.25,extension.settings().height());assertEquals(1400,extension.settings().duration());
-        assertTrue(Files.isRegularFile(directory.resolve("images/hand.png")));
-        assertEquals("images/hand.png",extension.settings().imageFile());
-        assertTrue(Files.readString(directory.resolve("config.properties")).contains("offset-y=-0.25"));
-        assertTrue(Files.readString(directory.resolve("config.properties")).contains("image-scale=0.5"));
-        assertTrue(Files.readString(directory.resolve("config.properties")).contains("offset-x=0.5"));
-        try(var files=Files.list(directory.resolve("generated"))){assertTrue(files.anyMatch(p->p.getFileName().toString().endsWith(".mcpack")));}
-    }
-    @Test void oldBundledGifMigratesToNewPngWhileKeepingOtherOptions() throws Exception {
-        Files.writeString(directory.resolve("config.properties"),
-                "image-file=images/hand.gif\nimage-scale=0.75\n");
-        Path images=directory.resolve("images");
-        Files.createDirectories(images);
-        try(var in=getClass().getResourceAsStream("/default-hand.gif")) {
-            assertNotNull(in);
-            Files.copy(in,images.resolve("hand.gif"));
-        }
-        PatPatExtension extension=mock(PatPatExtension.class,CALLS_REAL_METHODS);
-        doReturn(directory).when(extension).dataFolder();
-        doReturn(mock(org.geysermc.geyser.api.extension.ExtensionLogger.class)).when(extension).logger();
-        extension.pre(null);
-        assertEquals("images/hand.png",extension.settings().imageFile());
-        assertEquals(.75,extension.settings().scale(),1e-6);
-        assertEquals(5,extension.animation().frames().size());
-        assertTrue(Files.isRegularFile(images.resolve("hand.gif")),"Preserve old image on disk");
-        assertTrue(Files.isRegularFile(images.resolve("hand.png")));
-    }
 
-    @Test void customGifAtOldDefaultPathIsNotReplaced() throws Exception {
+    @Test void freshInstallCreatesDefaultImagePackWithoutLegacyMigration() throws Exception {
+        PatPatExtension extension=mock(PatPatExtension.class,CALLS_REAL_METHODS);
+        doReturn(directory).when(extension).dataFolder();
+        doReturn(mock(org.geysermc.geyser.api.extension.ExtensionLogger.class)).when(extension).logger();
+        extension.pre(null);
+        assertNotNull(extension.animation());
+        assertEquals(5,extension.animation().frames().size());
+        assertEquals("images/hand.png",extension.settings().imageFile());
+        assertTrue(Files.isRegularFile(directory.resolve("images/hand.png")));
+        assertTrue(Files.isRegularFile(directory.resolve("config.properties")));
+        assertFalse(Files.exists(directory.resolve("config.properties.backup-before-layout-v2")));
+        try(var files=Files.list(directory.resolve("generated"))){
+            assertTrue(files.anyMatch(p->p.getFileName().toString().endsWith(".mcpack")));
+        }
+    }
+    @Test void explicitlyConfiguredCustomGifIsNotOverwritten() throws Exception {
         Files.writeString(directory.resolve("config.properties"),
-                "image-file=images/hand.gif\n");
+                "image-file=images/custom.gif\\n");
         Path images=directory.resolve("images");
         Files.createDirectories(images);
         try(var in=getClass().getResourceAsStream("/disposal.gif")) {
             assertNotNull(in);
-            Files.copy(in,images.resolve("hand.gif"));
+            Files.copy(in,images.resolve("custom.gif"));
         }
         PatPatExtension extension=mock(PatPatExtension.class,CALLS_REAL_METHODS);
         doReturn(directory).when(extension).dataFolder();
         doReturn(mock(org.geysermc.geyser.api.extension.ExtensionLogger.class)).when(extension).logger();
         extension.pre(null);
-        assertEquals("images/hand.gif",extension.settings().imageFile());
+        assertEquals("images/custom.gif",extension.settings().imageFile());
         assertEquals(3,extension.animation().frames().size());
     }
 

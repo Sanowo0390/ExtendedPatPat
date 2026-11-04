@@ -26,10 +26,10 @@ No official PatPat Plugin and no server-side Paper plugin are necessary.
 1. Install **PacketEvents 2.14.0 Velocity** and **Geyser-Velocity 2.12.1系** in \`Velocity/plugins/\` as normal Velocity plugins.
 2. Put **ExtendedPatPat-Velocity-0.5.0.jar** from the unified **Build ExtendedPatPat** GitHub Actions run in \`Velocity/plugins/\`.
 3. Put **ExtendedPatPat-Geyser-0.13.0.jar** from the same unified GitHub Actions run in \`Velocity/plugins/Geyser-Velocity/extensions/\`. **Remove older copies** of this extension first.
-4. Restart Velocity. Run \`/ppv status\`; the default mode is **standalone**, and Geyser bridge should be \`true\`.
+4. Restart Velocity. Run \`/extendedpatpat status\`; the default mode is **standalone**, and Geyser bridge should be \`true\`.
 5. Java: sneak + right-click a mob or another player; Bedrock: use the configured Geyser gesture. Other people on the same backend should see it.
 
-**If you already ran an earlier version, manually edit \`plugins/patpatvelocity/config.properties\`**. Existing configs are preserved; ensure \`official-integration-enabled=false\`, \`standalone-fallback=true\`, and \`bridge-enabled=true\`. In the Geyser extension's config, keep \`standalone-mode=true\`.
+**If you already ran an earlier version, manually edit \`plugins/extendedpatpatvelocity/config.properties\`**. Existing configs are preserved; ensure \`official-integration-enabled=false\`, \`standalone-fallback=true\`, and \`bridge-enabled=true\`. In the Geyser extension's config, keep \`standalone-mode=true\`.
 
 The separate Paper \`ExtendedPatPat Paper\` prototype must **not** be installed together with this plugin because it can produce duplicate Java visuals.
 
@@ -41,11 +41,11 @@ Upstream does not always notify the initiating Java player for mob Pats. \`offic
 
 ## Config and commands
 
-\`Velocity/plugins/patpatvelocity/config.properties\`: \`official-integration-enabled=false\` by default, \`cooldown-ms=250\`, \`max-distance=4.0\`, \`require-sneaking=true\`, \`hand-enabled=true\`, \`hand-size=1.0\`, \`hand-depth=0.425\`, \`bridge-enabled=true\`, and optional Velocity \`required-permission\`.
+\`Velocity/plugins/extendedpatpatvelocity/config.properties\`: \`official-integration-enabled=false\` by default, \`cooldown-ms=250\`, \`max-distance=4.0\`, \`require-sneaking=true\`, \`hand-enabled=true\`, \`hand-size=1.0\`, \`hand-depth=0.425\`, \`bridge-enabled=true\`, and optional Velocity \`required-permission\`.
 
-- \`/ppv status\` — current mode/bridge status
-- \`/ppv toggle [on|off]\` — individual Java visual preference, persisted by UUID
-- \`/ppv reload\` — reload proxy settings; requires \`patpatvelocity.admin\`
+- \`/extendedpatpat status\` — current mode/bridge status
+- \`/extendedpatpat toggle [on|off]\` — individual Java visual preference, persisted by UUID
+- \`/extendedpatpat reload\` — reload proxy settings; requires \`patpatvelocity.admin\`
 
 ## Important limitations
 
@@ -95,10 +95,10 @@ Place custom PatPat Mod ZIPs, PNG sprite strips or GIFs in
 \`resourcepack/skins/\`, then run [Build All](../resourcepack/README.md)
 to rebuild **both the Java resource pack and the matching plugin JARs**.
 
-\`/ppv skin list\` shows the styles in the combined pack.
-\`/ppv skin <id>\` selects one for this Java viewer, and
-\`/ppv skin default\` resets it. Each user's choice is persisted in
-\`plugins/patpatvelocity/player-skins.properties\`.
+\`/extendedpatpat skin list\` shows the styles in the combined pack.
+\`/extendedpatpat skin <id>\` selects one for this Java viewer, and
+\`/extendedpatpat skin default\` resets it. Each user's choice is persisted in
+\`plugins/extendedpatpatvelocity/player-skins.properties\`.
 
 The viewer's selected style drives item model frames, duration, transforms,
 and optional sound. Importing \`Bonk Bonk Animation.zip\` as
@@ -109,7 +109,7 @@ installed/accepted by Java clients; commands do not transmit textures.
 
 ## 内包型パック配布・ViaVersion（v0.5.0）
 
-**ExtendedPatPat-Velocity.jarに標準用の `PatPatJava-26.3.zip` が入っています。** 起動すると `plugins/patpatvelocity/PatPatJava-26.3.zip` に取り出します。通常のサーバーパックを置き換える必要はありません。
+**ExtendedPatPat-Velocity.jarに標準用の `PatPatJava-26.3.zip` が入っています。** 起動すると `plugins/extendedpatpatvelocity/PatPatJava-26.3.zip` に取り出します。通常のサーバーパックを置き換える必要はありません。
 
 自動適用（任意）にはこのZIPがクライアントからHTTP(S)で取得できるURLが必要です。2つの方法があります。
 
@@ -122,8 +122,8 @@ ZIPをJARから取り出す作業は自動ですが、**公開URLやポートの
 
 Velocityは `Player.getProtocolVersion()` とPacketEventsのクライアントバージョンを見てViaを含む接続を識別します。Java 1.21.4以上では画像方式、1.19.4～1.21.3はVoxel、それ以前はDisplayパケットを送信しません。実際のVia経由変換は接続元バージョンごとに実機検証が必要です。
 
-例として以前示したBonkパックは同梱せず、標準画像のみを配布します。`/ppv skin list` には配布した画像のみ表示されます。
+例として以前示したBonkパックは同梱せず、標準画像のみを配布します。`/extendedpatpat skin list` には配布した画像のみ表示されます。
 
-## Release names and preserved identifiers
+## Fresh installation (no legacy migration)
 
-The distributed JAR is `ExtendedPatPat-Velocity-0.5.0.jar`. The Velocity plugin's **display name** is `ExtendedPatPatVelocity` but its **ID** remains `patpatvelocity`; this avoids losing `plugins/patpatvelocity/` settings, player choices, and bridge compatibility. Existing `/ppv` and `/patpatvelocity` commands work; aliases `/extendedpatpat` and `/epp` are also available. Remove older PatPatVelocity JARs to avoid duplicate plugin IDs.
+Velocity plugin ID: `extendedpatpatvelocity`. Config directory: `plugins/extendedpatpatvelocity/`. Commands: `/extendedpatpat` and `/epp`. Permission: `extendedpatpat.admin`. Earlier PatPatVelocity settings and IDs are not migrated; back up and remove previous JARs/configurations before using this release.

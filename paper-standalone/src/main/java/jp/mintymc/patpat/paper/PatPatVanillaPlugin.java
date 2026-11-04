@@ -74,7 +74,6 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
     }
 
     @Override public void onEnable() {
-        migrateLegacyDataFolder();
         saveDefaultConfig();
         loadDisabled();
         try {
@@ -88,7 +87,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             getLogger().severe("PatPat embedded pack unavailable: "+error);
         }
         Bukkit.getPluginManager().registerEvents(this, this);
-        var command = getCommand("patpatvanilla");
+        var command = getCommand("extendedpatpat");
         if (command != null) { command.setExecutor(this); command.setTabCompleter(this); }
     }
     @Override public void onDisable() {
@@ -165,27 +164,6 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
         private static final UUID ID=
             UUID.fromString("cc05eb6d-9c58-5b4d-9d29-6bd46f1344cc");
     }
-    /** The Paper plugin's display name changes its data folder.
-     * Bring forward the old configuration only when the new folder is empty.
-     * Never delete or overwrite the user's previous settings.
-     */
-    private void migrateLegacyDataFolder() {
-        java.nio.file.Path target=getDataFolder().toPath().resolve("config.yml");
-        if(java.nio.file.Files.exists(target))return;
-        for(String legacyName:List.of("PatpatPaper","PatPatVanilla")) {
-            java.nio.file.Path source=getDataFolder().toPath().resolveSibling(legacyName)
-                .resolve("config.yml");
-            if(!java.nio.file.Files.isRegularFile(source))continue;
-            try {
-                java.nio.file.Files.createDirectories(target.getParent());
-                java.nio.file.Files.copy(source,target);
-                getLogger().info("Migrated "+legacyName+" config.yml to ExtendedPatPatPaper; old file preserved.");
-            }catch(java.io.IOException ex){
-                getLogger().warning("Could not migrate legacy config from "+source+": "+ex.getMessage());
-            }
-            break;
-        }
-    }
     private void loadDisabled() {
         disabled.clear();
         for (String s : getConfig().getStringList("disabled-players")) {
@@ -208,7 +186,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
         if (!getConfig().getBoolean("enabled", true) || e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
         if (!(e.getRightClicked() instanceof LivingEntity target) || target == p) return;
-        if (!p.hasPermission("patpatvanilla.use") || disabled.contains(p.getUniqueId())) return;
+        if (!p.hasPermission("extendedpatpat.use") || disabled.contains(p.getUniqueId())) return;
         if (target instanceof Player other &&
                 (!getConfig().getBoolean("interaction.allow-players", true) || disabled.contains(other.getUniqueId()))) return;
         if (getConfig().getBoolean("interaction.sneaking", true) && !p.isSneaking()) return;
@@ -260,7 +238,7 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
             return true;
         }
         if (args[0].equalsIgnoreCase("reload")) {
-            if (!sender.hasPermission("patpatvanilla.admin")) { sender.sendMessage("§cNo permission."); return true; }
+            if (!sender.hasPermission("extendedpatpat.admin")) { sender.sendMessage("§cNo permission."); return true; }
             reloadConfig(); loadDisabled(); sender.sendMessage("§aExtendedPatPat Paper reloaded."); return true;
         }
         if(args[0].equalsIgnoreCase("pack")) {
@@ -280,14 +258,14 @@ public final class PatPatVanillaPlugin extends JavaPlugin implements Listener, T
                 sender.sendMessage("§cPlayers only.");return true;
             }
             if(args.length==1) {
-                sender.sendMessage("§aPatPat skin: §e"+skin(player).id()+"§7 | /ppv skin list");return true;
+                sender.sendMessage("§aPatPat skin: §e"+skin(player).id()+"§7 | /extendedpatpat skin list");return true;
             }
             if(args[1].equalsIgnoreCase("list")) {
                 sender.sendMessage("§aAvailable skins: §e"+skinCatalog.description());return true;
             }
             String id=args[1].toLowerCase(Locale.ROOT);
             if(!skinCatalog.contains(id)) {
-                sender.sendMessage("§cUnknown skin: "+id+" §7(/ppv skin list)");return true;
+                sender.sendMessage("§cUnknown skin: "+id+" §7(/extendedpatpat skin list)");return true;
             }
             selectedSkins.put(player.getUniqueId(),id);
             getConfig().set("selected-skins."+player.getUniqueId(),id);

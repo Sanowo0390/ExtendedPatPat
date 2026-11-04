@@ -211,7 +211,7 @@ class SessionBridgeTest {
         verify(session,never()).sendUpstreamPacket(any());
     }
 
-    @Test void successfulPatTriggersVanillaSwingAndRecordsStats() {
+    @Test void successfulPatTriggersVanillaSwing() {
         setupAimedTarget();
         var event=new PacketSendingEvent(network,interact());
         bridge.packetSending(event);
@@ -219,7 +219,6 @@ class SessionBridgeTest {
         verify(session).sendUpstreamPacket(argThat(p ->
                 p instanceof org.cloudburstmc.protocol.bedrock.packet.AnimatePacket swing
                 && swing.getAction()==org.cloudburstmc.protocol.bedrock.packet.AnimatePacket.Action.SWING_ARM));
-        verify(owner).recordPat(session);
     }
 
     @Test void ignoredMobTypePreservesVanillaInteractionWithoutPatOrDamage() {
@@ -239,7 +238,6 @@ class SessionBridgeTest {
         bridge.packetSending(event);
         assertTrue(event.isCancelled());
         verify(session).sendDownstreamGamePacket(same(packet));
-        verify(owner,never()).recordPat(any());
     }
 
     @Test void backendPatOnlyBobsTheRecipientAndNotOtherViewers() {

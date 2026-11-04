@@ -5,13 +5,13 @@ api-version: '26.3'
 description: ExtendedPatPat - Java Edition client-side animated hand on Paper/Purpur
 author: Sanowo0390
 commands:
-  patpatvanilla:
+  extendedpatpat:
     description: Configure ExtendedPatPat Paper
-    usage: /patpatvanilla <status|pack|skin|toggle|reload>
-    aliases: [ppv, extendedpatpat, epp]
+    usage: /extendedpatpat <status|pack|skin|toggle|reload>
+    aliases: [epp]
 website: https://github.com/Sanowo0390/ExtendedPatPat
 permissions:
-  patpatvanilla.use:
+  extendedpatpat.use:
     default: true
-  patpatvanilla.admin:
+  extendedpatpat.admin:
     default: op

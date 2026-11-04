@@ -6,8 +6,8 @@ Install the JAR from the **Build ExtendedPatPat Paper Paper** GitHub Actions art
 
 - Animated voxel hand built with 6 vanilla BlockDisplay entities; follows the target and moves smoothly down/up
 - Optional arm swing and hearts, randomized vanilla sounds, cooldown and per-user toggle
-- Configure in plugins/ExtendedPatPatPaper/config.yml; use /ppv reload (permission patpatvanilla.admin)
-- /ppv toggle [on|off]; permission patpatvanilla.use defaults to everyone
+- Configure in plugins/ExtendedPatPatPaper/config.yml; use /extendedpatpat reload (permission extendedpatpat.admin)
+- /extendedpatpat toggle [on|off]; permission extendedpatpat.use defaults to everyone
 
 **Limitations:** this is **not pixel-identical** to PatPat's client 2D PNG/GIF renderer. Client-side keybindings, shaders/mixins, and exact player/mob squish/camera transforms cannot be recreated by a pure vanilla server plugin. This project includes original PatPat-derived hand and sound assets under the upstream LGPL-3.0; see the repository's THIRD_PARTY_NOTICES.md. Not tested with Folia. Bedrock visuals are managed independently by ExtendedPatPat Geyser; test carefully if both addons handle Bedrock interactions, to avoid duplicated effects.
 
@@ -33,7 +33,7 @@ Paper now embeds the same generated \`patpat-skins.properties\` registry
 as Velocity. Add ZIP/GIF/PNG skins under \`resourcepack/skins/\` before
 running [Build All](../resourcepack/README.md).
 
-Use \`/ppv skin list\` and \`/ppv skin <id>\` to select the Java-side hand.
+Use \`/extendedpatpat skin list\` and \`/extendedpatpat skin <id>\` to select the Java-side hand.
 Selections are saved under \`selected-skins\` in the plugin config. Each nearby
 Java viewer receives a separate ItemDisplay hidden from all other viewers
 with their selected frame sequence and optional sound. That is heavier than
@@ -50,6 +50,6 @@ ViaVersionが**Paper自身に導入されている場合**、そのAPIで実際�
 
 以前のBonkなど追加スキンは含まれず、デフォルト素材だけが内包されます。
 
-## Rebranding & migration
+## Fresh installation (no legacy migration)
 
-The release artifact is now `ExtendedPatPat-Paper-0.5.0.jar` and the Bukkit plugin display name is `ExtendedPatPatPaper`. The previous `plugins/PatpatPaper/config.yml` is copied on first startup if the new config does not exist. The legacy `/ppv` and `/patpatvanilla` command and permission nodes remain functional; `/extendedpatpat` and `/epp` are added as aliases. The old JAR must be removed before installing the renamed file.
+Bukkit plugin: `ExtendedPatPatPaper`. Directory: `plugins/ExtendedPatPatPaper/`. Commands: `/extendedpatpat`, `/epp`. Permissions: `extendedpatpat.use`, `extendedpatpat.admin`. Settings from earlier PatPatVanilla/PatpatPaper installations are not automatically transferred.

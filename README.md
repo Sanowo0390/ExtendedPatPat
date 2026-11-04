@@ -42,17 +42,17 @@ URLを用意しない場合はプレイヤーによる手動導入、または�
 
 | Java版（Velocity／Paper） | 内容 |
 |---|---|
-| `/ppv status` | 状態を表示 |
-| `/ppv toggle` | 自分の演出をON／OFF |
-| `/ppv pack` | 追加パックを再送信（URL設定時） |
-| `/ppv skin list` / `/ppv skin default` | 利用できる手画像の確認／選択 |
-| `/ppv reload` | 設定再読み込み（管理者） |
+| `/extendedpatpat status` | 状態を表示 |
+| `/extendedpatpat toggle` | 自分の演出をON／OFF |
+| `/extendedpatpat pack` | 追加パックを再送信（URL設定時） |
+| `/extendedpatpat skin list` / `/extendedpatpat skin default` | 利用できる手画像の確認／選択 |
+| `/extendedpatpat reload` | 設定再読み込み（管理者） |
 
-統合版：`/patpatbedrock status`、`test`、`pat`、`toggle`、`stats`、`reload`。詳細は[Geyser拡張の設定](src/main/resources/config.properties)を参照してください。
+統合版：`/extendedpatpatgeyser status`、`test`、`pat`、`toggle`、`stats`、`reload`。詳細は[Geyser拡張の設定](src/main/resources/config.properties)を参照してください。
 
 ## 更新時の注意
 
-旧JAR（PatPatVelocity／PatPatGeyserExtension／PatpatPaper）は**削除してから**新しいJARを配置してください。従来の `/ppv`、`/patpatbedrock` や内部IDは互換性のため維持し、Java版では `/extendedpatpat`（`/epp`）も使用できます。Paper版は旧 `plugins/PatpatPaper/config.yml` を初回起動時に新フォルダーへコピーします。
+旧バージョンとの互換性維持・設定ファイルの自動移行は**廃止**しました。新規導入する場合は旧JARと旧設定ディレクトリをバックアップのうえ削除し、すべて新しい設定から始めてください。Java版コマンドは `/extendedpatpat`（略称 `/epp`）、Geyserは `/extendedpatpatgeyser` です。
 
 Geyserの内部APIに依存するため、更新後は互換性の確認を推奨します。**GitHub Actionsでのビルド・単体テスト成功はMinecraft実機での動作保証ではありません。**
 

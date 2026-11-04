@@ -18,7 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class PatPatExtension implements Extension {
     private volatile Settings settings=Settings.from(new Properties());
     private volatile PatPreferences preferences;
-    private volatile PatStatistics statistics;
     private final Map<GeyserSession,PatSession> sessions=new ConcurrentHashMap<>();
     private volatile boolean compatible;
     private volatile boolean cameraSupported=true;
@@ -50,35 +49,12 @@ public final class PatPatExtension implements Extension {
         if(store==null)throw new IOException("Pat preferences have not been initialized");
         return store.setEnabled(session.getPlayerEntity().uuid(),enabled);
     }
-    long patCount(GeyserSession session) {
-        return statistics==null?0:statistics.total(session.getPlayerEntity().uuid());
-    }
-    void recordPat(GeyserSession session) {
-        if(statistics==null)return;
-        statistics.record(session.getPlayerEntity().uuid());
-        if(statistics.shouldFlush())flushStatistics();
-    }
-    private void flushStatistics() {
-        try {if(statistics!=null)statistics.flush();}
-        catch(IOException e){logger().warning("Unable to save Pat statistics: "+e.getMessage());}
-    }
     ImageAnimation animation() { return animation; }
     @Subscribe public void pre(GeyserPreInitializeEvent event) {
         try {
             Files.createDirectories(dataFolder());
             preferences=new PatPreferences(dataFolder().resolve("disabled-players.txt"));
-            statistics=new PatStatistics(dataFolder().resolve("pat-stats.properties"));
             copyDefault("config.properties"); copyDefault("PatPatBedrock.mcpack");
-            upgradeConfig();
-            // Legacy config is reorganized once; user values and unknown keys stay.
-            // A verbatim backup is kept alongside config.properties.
-            try {
-                if(ConfigLayout.formatIfLegacy(dataFolder().resolve("config.properties")))
-                    logger().info("Formatted legacy config; backup saved as config.properties.backup-before-layout-v2");
-            }catch(IOException formattingError) {
-                logger().warning("Could not reorganize config; using existing values: "+formattingError.getMessage());
-            }
-            migrateOldBundledDefault();
             settings=Settings.load(dataFolder().resolve("config.properties"));
             if(!Set.of("image","glyph").contains(settings.renderer()))throw new IOException("renderer must be image or glyph");
             copyDefaultImage();
@@ -94,38 +70,6 @@ public final class PatPatExtension implements Extension {
             }
         } catch(IOException e) { Properties disabled=new Properties();disabled.setProperty("enabled","false");settings=Settings.from(disabled);animation=null;generatedPack=null;logger().error("Unable to load configuration/image; bridge disabled",e); }
     }
-    private void upgradeConfig() throws IOException {
-        Path file=dataFolder().resolve("config.properties");Properties old=new Properties();
-        try(var reader=Files.newBufferedReader(file,java.nio.charset.StandardCharsets.UTF_8)){old.load(reader);}
-        Map<String,String> added=new LinkedHashMap<>();
-        added.put("renderer","image");added.put("image-file","images/hand.png");added.put("image-sprite-columns","5");added.put("image-sprite-frame-ms","50");added.put("image-scale","0.5");added.put("image-loop","true");added.put("offset-space","view");
-        added.put("offset-x","0.5");added.put("offset-y",old.getProperty("height-offset","0.0"));added.put("offset-z","0.0");added.put("sitting-offset-y","0.2");added.put("standalone-mode","true");added.put("squish-enabled","true");added.put("hand-motion-enabled","true");added.put("hand-motion-depth","0.425");added.put("hand-motion-duration-ms","240");added.put("swing-hand-enabled","true");added.put("camera-shake-enabled","false");added.put("camera-shake-intensity","0.06");added.put("ignored-entity-types","");added.put("ignored-player-uuids","");
-        StringBuilder append=new StringBuilder();
-        added.forEach((key,value)->{if(!old.containsKey(key))append.append(key).append('=').append(value).append('\n');});
-        if(!append.isEmpty())Files.writeString(file,"\n# Added image options: offset-space=view means X toward viewer, Y up, Z right.\n"+append,
-                java.nio.charset.StandardCharsets.UTF_8,StandardOpenOption.APPEND);
-    }
-    /**
-     * Upgrade only unchanged copies of the old bundled GIF. A user-modified
-     * hand.gif is kept as their selected custom image, even if its path is the
-     * historical default name.
-     */
-    private void migrateOldBundledDefault() throws IOException {
-        Path file=dataFolder().resolve("config.properties");
-        String config=Files.readString(file,java.nio.charset.StandardCharsets.UTF_8);
-        String oldLine="image-file=images/hand.gif";
-        if(!config.contains(oldLine))return;
-        Path old=dataFolder().resolve("images/hand.gif");
-        boolean unmodified=!Files.exists(old);
-        if(!unmodified)try(InputStream bundled=getClass().getResourceAsStream("/default-hand.gif")) {
-            unmodified=bundled!=null && java.util.Arrays.equals(Files.readAllBytes(old),bundled.readAllBytes());
-        }
-        if(unmodified) {
-            String next=config.replace(oldLine,"image-file=images/hand.png");
-            Files.writeString(file,next,java.nio.charset.StandardCharsets.UTF_8);
-        }
-    }
-
     private void copyDefaultImage() throws IOException {
         Path path=dataFolder().resolve("images/hand.png");
         Files.createDirectories(path.getParent());
@@ -154,7 +98,7 @@ public final class PatPatExtension implements Extension {
         } catch(Exception e) {logger().error("Unable to register hand pack; text test remains available",e);}
     }
     @Subscribe public void permissions(GeyserRegisterPermissionsEvent event) {
-        event.register("patpatbedrock.admin",TriState.NOT_SET);
+        event.register("extendedpatpatgeyser.admin",TriState.NOT_SET);
     }
     @Subscribe public void post(GeyserPostInitializeEvent event) {
         // Geyser build hashes change every release. Probe runtime internals and
@@ -270,7 +214,7 @@ public final class PatPatExtension implements Extension {
         if(System.getProperties().get(BEDROCK_USERS)==bridgedBedrockUsers)
             System.getProperties().remove(BEDROCK_USERS);
         bridgedBedrockUsers.clear();
-        flushStatistics();sessions.values().forEach(PatSession::close);sessions.clear();
+        sessions.values().forEach(PatSession::close);sessions.clear();
     }
 
     /** Bedrock-origin Pat events are forwarded only to Java viewers by the optional Velocity plugin. */
@@ -313,9 +257,8 @@ public final class PatPatExtension implements Extension {
         register(event,"pat",true,(source,args)->withSession(source,PatSession::commandPat));
         // Always allow users to disable effects even without the optional use permission.
         register(event,"toggle",true,(source,args)->withSession(source,s->s.toggle(args),false));
-        register(event,"stats",true,(source,args)->withSession(source,s->s.stats(),false));
         event.register(Command.builder(this).name("reload").source(CommandSource.class).description("Reload PatPat extension config")
-                .permission("patpatbedrock.admin",TriState.NOT_SET).executor((source,cmd,args)->{
+                .permission("extendedpatpatgeyser.admin",TriState.NOT_SET).executor((source,cmd,args)->{
                     try {
                         Settings loaded=Settings.load(dataFolder().resolve("config.properties"));
                         if(!loaded.renderer().equals(settings.renderer()) || !loaded.imageFile().equals(settings.imageFile())

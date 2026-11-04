@@ -32,22 +32,6 @@ class PatExtrasTest {
         assertFalse(Settings.from(p).swingHandEnabled());
     }
 
-    @Test void personalPatTotalsPersistAcrossReloadAndNeverMixPlayers() throws Exception {
-        Path path=temp.resolve("stats.properties");
-        UUID a=UUID.randomUUID(),b=UUID.randomUUID();
-        PatStatistics statistics=new PatStatistics(path);
-        assertEquals(1,statistics.record(a));
-        assertEquals(2,statistics.record(a));
-        assertEquals(1,statistics.record(b));
-        statistics.flush();
-        PatStatistics reloaded=new PatStatistics(path);
-        assertEquals(2,reloaded.total(a));
-        assertEquals(1,reloaded.total(b));
-        assertEquals(0,reloaded.total(UUID.randomUUID()));
-        assertEquals(3,reloaded.record(a));
-        reloaded.flush();
-        assertEquals(3,new PatStatistics(path).total(a));
-    }
     @Test void optionalCameraFeedbackIsVerticalAndFinishesAtRest() {
         Properties props=new Properties();
         assertFalse(Settings.from(props).cameraShakeEnabled(),"Do not take over the camera by default");
