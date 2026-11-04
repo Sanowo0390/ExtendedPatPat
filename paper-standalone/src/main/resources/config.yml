@@ -1,4 +1,4 @@
-# Paper/Purpur 26.3 (Java 25); embedded default Java pack, no client Mod.
+# Paper/Purpur 26.3 (Java 25); map-based animated hand, no resource pack or client Mod.
 enabled: true
 interaction:
   sneaking: true
@@ -9,11 +9,8 @@ interaction:
   ignored-worlds: []
 animation:
   enabled: true
-  # resourcepack = 5-frame PNG hand; voxel = original block hand
-  # Install the matching PatPatJava-26.3.zip into the Java client or deliver with server.properties.
-  renderer: resourcepack
-  material: PINK_TERRACOTTA
-  size: 1.0
+  # Invisible, viewer-only item frames with 128x128 map images.
+  # Map IDs are persisted in plugins/ExtendedPatPatPaper/map-ids.properties
   offset-y: 0.16
   depth: 0.425
   ticks: 6
@@ -32,15 +29,3 @@ sound:
     - minecraft:block.moss.place
     - minecraft:block.honey_block.place
 disabled-players: []
-
-# PatPat専用リソースパックはJAR内に含まれます（通常のserver.propertiesとは別）。
-# 起動時plugins/ExtendedPatPatPaper/PatPatJava-26.3.zipへ書き出します。
-# 参加者へ送信するには、HTTP(S)でアクセス可能なpack.urlが必要です。
-# 内蔵配信機能を使う場合はhttp-enabledと公開URLを設定してください。
-pack:
-  url: ""
-  sha1: "" # 空欄ならJARに内包されたパックのSHA-1
-  assume-installed: false
-  http-enabled: false
-  http-bind: "127.0.0.1"
-  http-port: 8765

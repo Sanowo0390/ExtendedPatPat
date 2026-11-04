@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Generate a Java 26.3 pack and a shared skin index from PatPat Mod packs.
-Place any *.zip (PatPat resource pack), *.png (horizontal sprite strip), or
-*.gif in resourcepack/skins/. ZIPs are inspected, never extracted to disk.
+"""Compile URL-free Java Edition map frames and a shared skin manifest.
+Optional PatPat-compatible ZIP/PNG/GIF inputs are read from resourcepack/skins/.
+Never produces a server resource pack or redistributes sample assets.
 """
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-import hashlib, json, re, zipfile, os
+import json, re, zipfile, os
 from PIL import Image, ImageSequence
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -108,19 +108,6 @@ def archive(path):
             pitch_min=bounded(snd,'min_pitch',0.9,0.1,4),
             pitch_max=bounded(snd,'max_pitch',1.1,0.1,4))
 
-def j(data):
-    return (json.dumps(data,ensure_ascii=False,indent=2)+'\n').encode('utf-8')
-
-def image_bytes(im):
-    # Generated vanilla item textures are square; pad non-square sprite frames.
-    side=max(im.size)
-    dst=Image.new('RGBA',(side,side),(0,0,0,0))
-    dst.alpha_composite(im,((side-im.width)//2,(side-im.height)//2))
-    io=BytesIO()
-    dst.save(io,format='PNG',optimize=True)
-    return io.getvalue()
-
-
 # Minecraft Java map palette: 61 standard base colours, 4 brightness variants
 # (180, 220, 255, 135)/255. Transparent map pixels use color ID 0.
 # Colors are protocol data, not third-party artwork.
@@ -167,7 +154,7 @@ def main():
     with Image.open(SOURCE) as im:
         rgba=im.convert('RGBA')
         b=BytesIO();rgba.save(b,format='PNG')
-        first=Skin('default','Default',decode_frames(b.getvalue(),5))
+        first=Skin('default','Default',decode_frames(b.getvalue(),5),duration=250)
     styles=[first]
     seen={'default'}
     if SKINS.exists() and os.environ.get("PATPAT_DEFAULT_ONLY","0")!="1":
@@ -177,73 +164,28 @@ def main():
                 skin=archive(path)
             elif path.suffix.lower() in ('.png','.gif'):
                 skin=Skin(slug(path.stem),path.stem,decode_frames(path.read_bytes()))
-            else: continue
-            if skin.id in seen: raise ValueError('Duplicate skin ID: '+skin.id)
+            else:continue
+            if skin.id in seen:raise ValueError('Duplicate skin ID: '+skin.id)
             seen.add(skin.id);styles.append(skin)
-    if len(styles)>32: raise ValueError('Too many skin packs')
-    pack={'pack.mcmeta':j({'pack':{
-        'description':'ExtendedPatPat animated hands | Minecraft Java 26.3',
-        'pack_format':46,
-        'supported_formats':{'min_inclusive':46,'max_inclusive':97},
-        'min_format':46,'max_format':97}})}
-    index=['# Generated: both plugins embed this exact manifest.',
-        'skins='+','.join(s.id for s in styles)]
-    sounds={}
-    for s in styles:
-        prefix='skin.'+s.id+'.'
-        values={'label':s.label,'frames':len(s.frames),'duration-ms':s.duration,
-            'scale-x':s.scale_x,'scale-y':s.scale_y,'offset-x':s.offset_x,
-            'offset-y':s.offset_y,'offset-z':s.offset_z,
-            'sound-volume':s.volume,'sound-pitch-min':s.pitch_min,'sound-pitch-max':s.pitch_max}
-        if s.sound:
-            sounds['skin_'+s.id]={'sounds':['patpat:skin_'+s.id]}
-            pack['assets/patpat/sounds/skin_'+s.id+'.ogg']=s.sound
-            values['sound']='patpat:skin_'+s.id
-        for key,value in values.items(): index.append(prefix+key+'='+str(value))
-        for n,frame in enumerate(s.frames):
-            model='hand_'+s.id+'_'+str(n)
-            pack['assets/patpat/textures/item/'+model+'.png']=image_bytes(frame)
-            pack['assets/patpat/models/item/'+model+'.json']=j({
-                'parent':'minecraft:item/generated',
-                'textures':{'layer0':'patpat:item/'+model}})
-            pack['assets/patpat/items/'+model+'.json']=j({
-                'model':{'type':'minecraft:model','model':'patpat:item/'+model}})
-            if s.id=='default':
-                legacy='hand_'+str(n)
-                pack['assets/patpat/models/item/'+legacy+'.json']=pack['assets/patpat/models/item/'+model+'.json']
-                pack['assets/patpat/items/'+legacy+'.json']=pack['assets/patpat/items/'+model+'.json']
-    # Java map animation: one 128x128-byte palette frame per source frame.
-    # This does not require a URL, resource pack or client mod.
-    for style in styles:
-        directory=OUT/'maps'/style.id
-        directory.mkdir(parents=True,exist_ok=True)
-        for i,frame in enumerate(style.frames):
-            payload=map_pixels(frame)
-            assert len(payload)==16384
-            (directory/(str(i)+'.bin')).write_bytes(payload)
-    print('Compiled '+str(sum(len(s.frames) for s in styles))+
-          ' map frames (128x128), no client resource pack required')
-    if sounds: pack['assets/patpat/sounds.json']=j(sounds)
+    if len(styles)>32:raise ValueError('Too many skin packs')
     OUT.mkdir(parents=True,exist_ok=True)
-    dest=OUT/'PatPatJava-26.3.zip'
-    # Fixed timestamps/order: identical assets yield byte-identical ZIP and SHA-1
-    # across the independently built Velocity and Paper artifacts.
-    with zipfile.ZipFile(dest,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as out:
-        for name,data in sorted(pack.items()):
-            info=zipfile.ZipInfo(name,date_time=(2020,1,1,0,0,0))
-            info.compress_type=zipfile.ZIP_DEFLATED
-            info.external_attr=(0o100644 << 16)
-            out.writestr(info,data,compress_type=zipfile.ZIP_DEFLATED,compresslevel=9)
-    with zipfile.ZipFile(dest) as check:
-        assert check.testzip() is None
-        for s in styles:
-            for n in range(len(s.frames)):
-                assert 'assets/patpat/items/hand_'+s.id+'_'+str(n)+'.json' in check.namelist()
+    index=['# Generated URL-free Java map skins','skins='+','.join(s.id for s in styles)]
+    for skin in styles:
+        prefix='skin.'+skin.id+'.'
+        values={'label':skin.label,'frames':len(skin.frames),
+                'duration-ms':skin.duration,'scale-x':skin.scale_x,
+                'scale-y':skin.scale_y,'offset-x':skin.offset_x,
+                'offset-y':skin.offset_y,'offset-z':skin.offset_z}
+        for key,value in values.items():index.append(prefix+key+'='+str(value))
+        folder=OUT/'maps'/skin.id
+        folder.mkdir(parents=True,exist_ok=True)
+        for n,frame in enumerate(skin.frames):
+            pixels=map_pixels(frame)
+            assert len(pixels)==16384
+            (folder/(str(n)+'.bin')).write_bytes(pixels)
     (OUT/'patpat-skins.properties').write_text('\n'.join(index)+'\n',encoding='utf-8')
-    sha=hashlib.sha1(dest.read_bytes()).hexdigest()
-    (OUT/'PatPatJava-26.3.zip.sha1').write_text(sha+'  '+dest.name+'\n')
-    print('Packed '+', '.join(s.id+'('+str(len(s.frames))+' frames)' for s in styles)+
-          ' | zip='+str(dest.stat().st_size)+' bytes | sha1='+sha)
+    print('Compiled '+', '.join(s.id+'('+str(len(s.frames))+' map frames)' for s in styles))
+    print('No client resource pack, URL, or HTTP server needed.')
 
 if __name__=='__main__':
     main()

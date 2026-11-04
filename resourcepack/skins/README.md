@@ -24,3 +24,5 @@ here into \`PatPatJava-26.3.zip\`.
 **標準リリースでは `PATPAT_DEFAULT_ONLY=1` を指定してこのフォルダーを無視します。例として提供されたBonkは公開JARに含まれません。**
 
 The public project and release artifacts are now called **ExtendedPatPat**. The internal model namespace `patpat:` is retained for compatibility.
+
+Java版はマップパケット方式です。ZIP/PNG/GIFから生成するのは地図の色IDバイナリであり、リソースパックは配布しません。サンプル素材はJARに含まれません。
