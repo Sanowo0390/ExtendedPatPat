@@ -30,6 +30,24 @@ final class PatPatProtocol {
         }while(entityId!=0);
         return out.toByteArray();
     }
+    /** Strict target-only request from the native PatPat client. */
+    static int readRequest(byte[] bytes) {
+        if(bytes==null || bytes.length<1 || bytes.length>5)
+            throw new IllegalArgumentException("Invalid native Pat request");
+        int[] index={0};
+        int target=readVarInt(bytes,index);
+        if(target<=0 || index[0]!=bytes.length)
+            throw new IllegalArgumentException("Invalid target entity ID or trailing bytes");
+        return target;
+    }
+    /** Native PatPat v2 clientbound event: target and actor VarInts. */
+    static byte[] notification(int target,int actor) {
+        if(target<=0 || actor<=0)throw new IllegalArgumentException("Invalid Pat entity ID");
+        ByteArrayOutputStream out=new ByteArrayOutputStream(10);
+        out.writeBytes(request(target));
+        out.writeBytes(request(actor));
+        return out.toByteArray();
+    }
     static Pat decode(byte[] bytes) {
         if(bytes==null || bytes.length<2 || bytes.length>10)
             throw new IllegalArgumentException("Invalid PatPat v2 packet length");

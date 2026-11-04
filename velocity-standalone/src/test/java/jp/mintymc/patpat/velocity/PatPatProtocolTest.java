@@ -25,6 +25,17 @@ class PatPatProtocolTest {
         System.arraycopy(actorNegative,0,withActor,1,actorNegative.length);
         assertEquals(Integer.MIN_VALUE,PatPatProtocol.decode(withActor).actor());
     }
+    @Test void nativeModPacketsCanBeBridgedBothWays() {
+        assertEquals(300,PatPatProtocol.readRequest(new byte[]{(byte)0xac,2}));
+        assertEquals(new PatPatProtocol.Pat(300,42),
+            PatPatProtocol.decode(PatPatProtocol.notification(300,42)));
+        assertThrows(IllegalArgumentException.class,
+            ()->PatPatProtocol.readRequest(new byte[]{(byte)0xac,2,1}));
+        assertThrows(IllegalArgumentException.class,
+            ()->PatPatProtocol.readRequest(new byte[]{0}));
+        assertThrows(IllegalArgumentException.class,
+            ()->PatPatProtocol.notification(-1,5));
+    }
     @Test void rejectsInvalidPackets() {
         assertThrows(IllegalArgumentException.class,()->PatPatProtocol.decode(new byte[]{1}));
         assertThrows(IllegalArgumentException.class,()->PatPatProtocol.decode(new byte[]{(byte)0x80,1}));
