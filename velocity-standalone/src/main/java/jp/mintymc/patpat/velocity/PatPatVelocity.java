@@ -81,7 +81,7 @@ import java.util.function.Consumer;
 @Plugin(
     id="extendedpatpatvelocity",
     name="ExtendedPatPatVelocity",
-    version="0.6.4",
+    version="0.6.5",
     authors={"Sanowo0390"},
     dependencies={@Dependency(id="packetevents")}
 )
@@ -161,7 +161,10 @@ public final class PatPatVelocity {
         Player player=event.getPlayer();
         UUID uuid=player.getUniqueId();
         View replacement=new View(uuid,null);
-        replacement.backend=serverOf(player);
+        // ServerConnectedEvent runs before Player#getCurrentServer() is reliably set.
+        // Read the authoritative destination from the event itself; otherwise
+        // backend stays null and canSendPlay() rejects EVERY Pat animation.
+        replacement.backend=event.getServer().getServerInfo().getName();
         views.put(uuid,replacement);
         if(!enabled("official-integration-enabled",false) || isBedrock(uuid))return;
         // The official Paper plugin sends HELLO only after the client has registered
@@ -765,7 +768,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.4 | personal="+
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.5 | personal="+
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
