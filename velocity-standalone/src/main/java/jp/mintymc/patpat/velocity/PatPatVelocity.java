@@ -86,6 +86,8 @@ public final class PatPatVelocity {
     private static final String JAVA_TO_BEDROCK="jp.mintymc.patpat.bridge.v1.java-to-bedrock";
     private static final String BEDROCK_TO_JAVA="jp.mintymc.patpat.bridge.v1.bedrock-to-java";
     private static final String BEDROCK_USERS="jp.mintymc.patpat.bridge.v1.bedrock-users";
+    private static final String BEDROCK_TOGGLE_READ="jp.mintymc.patpat.bridge.v1.toggle-read";
+    private static final String BEDROCK_TOGGLE_WRITE="jp.mintymc.patpat.bridge.v1.toggle-write";
     private static final String PREFER_STANDALONE="jp.mintymc.patpat.bridge.v1.prefer-standalone";
     // These names and packet formats are defined by the upstream LopyMine/PatPat-Plugin.
     private static final String REGISTER_CHANNEL="minecraft:register";
@@ -200,10 +202,27 @@ public final class PatPatVelocity {
             }
         } catch(IOException exception) { log.error("Unable to load ExtendedPatPat Velocity configuration",exception); }
     }
-    private void persistDisabled() {
-        try { Files.write(folder.resolve("disabled-players.txt"),
-            disabled.stream().map(UUID::toString).sorted().toList()); }
-        catch(IOException exception) { log.error("Unable to save personal preference",exception); }
+    private boolean persistDisabled() {
+        Path temporary=null;
+        try {
+            Files.createDirectories(folder);
+            temporary=Files.createTempFile(folder,"pat-disabled-",".tmp");
+            Files.write(temporary,disabled.stream().map(UUID::toString).sorted().toList(),
+                StandardCharsets.UTF_8);
+            try{
+                Files.move(temporary,folder.resolve("disabled-players.txt"),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            }catch(java.nio.file.AtomicMoveNotSupportedException unsupported){
+                Files.move(temporary,folder.resolve("disabled-players.txt"),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        }catch(IOException ex){log.error("Unable to save personal preference",ex);return false;}
+        finally{
+            if(temporary!=null)try{Files.deleteIfExists(temporary);}
+                catch(IOException ignored){}
+        }
     }
     private void persistSkins() {
         Properties props=new Properties();
@@ -228,6 +247,26 @@ public final class PatPatVelocity {
     private boolean isBedrock(UUID uuid) {
         Object value=System.getProperties().get(BEDROCK_USERS);
         return value instanceof Set<?> set && set.contains(uuid);
+    }
+    private boolean personalEnabled(UUID uuid) {
+        if(isBedrock(uuid)) {
+            Object callback=System.getProperties().get(BEDROCK_TOGGLE_READ);
+            if(callback instanceof java.util.function.Function<?,?> raw) {
+                @SuppressWarnings("unchecked")
+                var read=(java.util.function.Function<UUID,Boolean>)raw;
+                try{return Boolean.TRUE.equals(read.apply(uuid));}
+                catch(RuntimeException ex){log.warn("Cannot read Geyser toggle",ex);}
+            }
+        }
+        return !disabled.contains(uuid);
+    }
+    private boolean writeBedrockToggle(UUID uuid,boolean enabled) {
+        Object callback=System.getProperties().get(BEDROCK_TOGGLE_WRITE);
+        if(!(callback instanceof java.util.function.Function<?,?> raw))return false;
+        @SuppressWarnings("unchecked")
+        var write=(java.util.function.Function<Object[],Boolean>)raw;
+        try{return Boolean.TRUE.equals(write.apply(new Object[]{uuid,enabled}));}
+        catch(RuntimeException ex){log.warn("Cannot save Geyser toggle",ex);return false;}
     }
 
     private static final class Tracked {
@@ -657,7 +696,9 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.0 | mode="+state
+                sender.sendMessage(Component.text("ExtendedPatPat Velocity v0.6.0 | personal="+
+                    (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
+                    +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
                     +" | active="+active.get()
                     +" | Geyser bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
@@ -690,11 +731,32 @@ public final class PatPatVelocity {
                 return;
             }
             if(args[0].equalsIgnoreCase("toggle") && sender instanceof Player p) {
-                boolean desired=args.length>1 ? args[1].equalsIgnoreCase("on")
-                    : disabled.contains(p.getUniqueId());
-                if(desired)disabled.remove(p.getUniqueId());else disabled.add(p.getUniqueId());
-                persistDisabled();
-                sender.sendMessage(Component.text("ExtendedPatPat Velocity "+(desired?"ON":"OFF")));return;
+                if(args.length>2 || (args.length==2 &&
+                        !args[1].equalsIgnoreCase("on") && !args[1].equalsIgnoreCase("off"))) {
+                    sender.sendMessage(Component.text("Usage: /extendedpatpat toggle [on|off]"));
+                    return;
+                }
+                UUID uuid=p.getUniqueId();
+                boolean previous=personalEnabled(uuid);
+                boolean desired=args.length==2?args[1].equalsIgnoreCase("on"):!previous;
+                if(isBedrock(uuid)) {
+                    if(!writeBedrockToggle(uuid,desired)) {
+                        sender.sendMessage(Component.text("Geyser toggle is unavailable; "
+                            +"use /extendedpatpatgeyser toggle instead."));
+                        return;
+                    }
+                    if(disabled.remove(uuid))persistDisabled();
+                }else{
+                    if(desired)disabled.remove(uuid);else disabled.add(uuid);
+                    if(!persistDisabled()){
+                        if(previous)disabled.remove(uuid);else disabled.add(uuid);
+                        sender.sendMessage(Component.text("Could not save your setting."));
+                        return;
+                    }
+                }
+                sender.sendMessage(Component.text("ExtendedPatPat "+(desired?"ON":"OFF")
+                    +" (send and receive effects)"));
+                return;
             }
             sender.sendMessage(Component.text("/extendedpatpat <status|skin [list|id]|toggle [on|off]|reload>"));
         }
