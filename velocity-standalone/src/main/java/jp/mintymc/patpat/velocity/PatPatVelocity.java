@@ -7,6 +7,7 @@ import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.attribute.Attributes;
+import com.github.retrooper.packetevents.protocol.player.ClientVersion;
 import com.github.retrooper.packetevents.protocol.component.ComponentTypes;
 import com.github.retrooper.packetevents.protocol.component.builtin.item.ItemModel;
 import com.github.retrooper.packetevents.protocol.item.ItemStack;
@@ -91,6 +92,7 @@ public final class PatPatVelocity {
     private static final UUID RESOURCE_PACK_ID=
         UUID.fromString("cc05eb6d-9c58-5b4d-9d29-6bd46f1344cc");
     private final Set<UUID> packReady=ConcurrentHashMap.newKeySet();
+    private DefaultPackHost defaultPack;
     private final Set<UUID> packOffered=ConcurrentHashMap.newKeySet();
     private final ProxyServer proxy;
     private final Logger log;
@@ -114,6 +116,15 @@ public final class PatPatVelocity {
     @Subscribe
     public void init(ProxyInitializeEvent event) {
         reload();
+        try {
+            defaultPack=new DefaultPackHost(folder,message->log.info("{}",message));
+            if(enabled("pack-http-enabled",false))
+                defaultPack.start(text("pack-http-bind","127.0.0.1"),
+                    (int)number("pack-http-port",8765,1,65535));
+            log.info("Embedded default PatPat pack SHA1={}",defaultPack.sha1());
+        }catch(Exception error) {
+            log.error("PatPat resource pack preparation failed; voxel fallback remains available",error);
+        }
         PacketEvents.getAPI().getEventManager().registerListener(new Listener());
         var meta=proxy.getCommandManager().metaBuilder("patpatvelocity").aliases("ppv").plugin(this).build();
         proxy.getCommandManager().register(meta,new Commands());
@@ -129,6 +140,7 @@ public final class PatPatVelocity {
             System.getProperties().remove(BEDROCK_TO_JAVA);
         if(System.getProperties().get(PREFER_STANDALONE)==standalonePreference)
             System.getProperties().remove(PREFER_STANDALONE);
+        if(defaultPack!=null)defaultPack.close();
         views.clear();packReady.clear();packOffered.clear();
     }
 
@@ -145,6 +157,7 @@ public final class PatPatVelocity {
     }
 
     private void offerPack(Player player) {
+        if(player.getProtocolVersion().getProtocol()<769)return; // Java 1.21.4+, with Via
         String url=text("resource-pack-url","");
         if(url.isBlank() || isBedrock(player.getUniqueId()) ||
                 !packOffered.add(player.getUniqueId()))return;
@@ -159,11 +172,13 @@ public final class PatPatVelocity {
                 .setShouldForce(false)
                 .setPrompt(Component.text("PatPatの手アニメーション用リソースパック"));
             String hex=text("resource-pack-sha1","");
+            if(defaultPack!=null && hex.isBlank())hex=defaultPack.sha1();
             if(!hex.isBlank()) {
                 byte[] hash=HexFormat.of().parseHex(hex);
                 if(hash.length!=20)throw new IllegalArgumentException("SHA-1 must contain 40 hex chars");
                 builder.setHash(hash);
             }
+            // A dedicated UUID keeps PatPat independent of the world resource pack.
             player.sendResourcePackOffer(builder.build());
         } catch(Exception ex) {
             packOffered.remove(player.getUniqueId());
@@ -533,6 +548,9 @@ public final class PatPatVelocity {
             !player.isActive() || isBedrock(player.getUniqueId()) ||
             disabled.contains(player.getUniqueId()) || view.realMod ||
             !enabled("hand-enabled",true))return;
+        // Display entities were introduced in Java 1.19.4. ViaVersion cannot
+        // translate these displays into something meaningful for older clients.
+        if(view.user.getClientVersion().isOlderThan(ClientVersion.V_1_19_4))return;
         Tracked target=view.find(targetId);
         Vector3d pos=target==null && targetId.equals(player.getUniqueId()) ? view.self
             : target==null?null:target.pos;
@@ -554,13 +572,15 @@ public final class PatPatVelocity {
         }
     }
     private boolean usesItemHand(UUID viewer) {
-        String mode=text("hand-renderer","resourcepack");
+        Player player=proxy.getPlayer(viewer).orElse(null);
+        // Query the real client protocol version, not the backend version.
+        // This works for ViaVersion/Backwards connections through Velocity.
+        if(player==null || player.getProtocolVersion().getProtocol()<769)return false;
+        String mode=text("hand-renderer","auto");
         if(mode.equalsIgnoreCase("voxel"))return false;
-        if(mode.equalsIgnoreCase("resourcepack"))return true;
-        // Auto: require confirmed download if offering a pack; otherwise assume
-        // the client has the pack installed manually, as an optional setting.
-        return packReady.contains(viewer) || (text("resource-pack-url","").isBlank()
-            && enabled("resource-pack-assume-installed",false));
+        if(packReady.contains(viewer))return true;
+        return text("resource-pack-url","").isBlank()
+            && enabled("resource-pack-assume-installed",false);
     }
     private ItemStack handItem(User user,SkinCatalog.Skin style,int frame) {
         int index=Math.max(0,Math.min(style.frames()-1,frame));
@@ -598,7 +618,8 @@ public final class PatPatVelocity {
         final Tracked trackedTarget=view.find(targetId);
         final int targetEntityId=trackedTarget!=null?trackedTarget.id:targetId.equals(view.player)?view.selfEntityId:0;
         final boolean squash=enabled("squish-enabled",true) && trackedTarget!=null &&
-            targetEntityId>0 && view.squishing.add(targetEntityId);
+            targetEntityId>0 && !view.user.getClientVersion().isOlderThan(ClientVersion.V_1_20_5)
+            && view.squishing.add(targetEntityId);
         final double minScale=number("squish-min-scale",0.86,0.5,1.0);
         try {
             Vector3d pos=targetPosition(view,targetId,offset,0);
@@ -720,7 +741,7 @@ public final class PatPatVelocity {
             if(args.length==0 || args[0].equalsIgnoreCase("status")) {
                 View view=sender instanceof Player player?views.get(player.getUniqueId()):null;
                 String state=view==null?"unknown":modeFor(view).status();
-                sender.sendMessage(Component.text("PatPatVelocity v0.3.0 | mode="+state
+                sender.sendMessage(Component.text("PatPatVelocity v0.4.0 | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
                     +" | active="+active.get()
                     +" | Geyser bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
