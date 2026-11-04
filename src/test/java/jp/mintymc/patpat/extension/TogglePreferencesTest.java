@@ -29,6 +29,23 @@ class TogglePreferencesTest {
         assertTrue(new PatPreferences(file).enabled(player),"ON must persist too");
     }
 
+    @Test void proxyBridgeReportsSuccessForOffInsteadOfMistakingFalseForFailure() throws Exception {
+        Path file=folder.resolve("disabled-players.txt");
+        var extension=new PatPatExtension();
+        var storage=PatPatExtension.class.getDeclaredField("preferences");
+        storage.setAccessible(true);
+        storage.set(extension,new PatPreferences(file));
+        var callback=PatPatExtension.class.getDeclaredMethod("toggleFromProxy",Object[].class);
+        callback.setAccessible(true);
+        UUID id=UUID.randomUUID();
+        Object muted=callback.invoke(extension,(Object)new Object[]{id,false});
+        assertEquals(true,muted,"Saving OFF is a successful operation");
+        assertFalse(new PatPreferences(file).enabled(id));
+        Object enabled=callback.invoke(extension,(Object)new Object[]{id,true});
+        assertEquals(true,enabled);
+        assertTrue(new PatPreferences(file).enabled(id));
+    }
+
     @Test void twoUsersStayIndependentAndRepeatedCommandsAreIdempotent() throws Exception {
         var prefs=new PatPreferences(folder.resolve("disabled-players.txt"));
         UUID a=UUID.randomUUID(),b=UUID.randomUUID();
