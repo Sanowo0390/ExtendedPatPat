@@ -7,7 +7,7 @@
 - Original authors and contributors: LopyMine / PatPat contributors.
 - Upstream license: GNU Lesser General Public License, version 3 (LGPL-3.0).
 - License text: [LICENSES/LGPL-3.0.txt](LICENSES/LGPL-3.0.txt)
-- GNU GPL v3 (incorporated by LGPL v3): https://www.gnu.org/licenses/gpl-3.0.html
+- GNU GPL v3 (incorporated by LGPL v3): [LICENSES/GPL-3.0-only.txt](LICENSES/GPL-3.0-only.txt) ([official version](https://www.gnu.org/licenses/gpl-3.0.html))
 
 ### Known upstream-derived binary assets
 
