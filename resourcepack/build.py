@@ -210,7 +210,15 @@ def main():
         for key,value in values.items():index.append(prefix+key+'='+str(value))
         folder=OUT/'maps'/skin.id
         folder.mkdir(parents=True,exist_ok=True)
+        text_folder=OUT/'text-art'/skin.id
+        text_folder.mkdir(parents=True,exist_ok=True)
         for n,frame in enumerate(skin.frames):
+            # Source RGBA art is embedded in Velocity's JAR. Clients download no pack.
+            side=max(frame.size)
+            square=Image.new('RGBA',(side,side),(0,0,0,0))
+            square.alpha_composite(frame,((side-frame.width)//2,(side-frame.height)//2))
+            square.resize((128,128),Image.Resampling.NEAREST).save(
+                text_folder/(str(n)+'.png'))
             # Paper still uses the original single-map art.
             pixels=map_pixels(frame)
             assert len(pixels)==16384
