@@ -222,7 +222,8 @@ def main():
                 (folder/(f'{n}_{pose}.bin')).write_bytes(art)
     (OUT/'patpat-skins.properties').write_text('\n'.join(index)+'\n',encoding='utf-8')
     print('Compiled '+', '.join(s.id+'('+str(len(s.frames))+' map frames)' for s in styles))
-    print('No client resource pack, URL, or HTTP server needed.')\n    print(f'Generated {MOTION_STEPS} vertical map poses per source frame for Velocity.')
+    print('No client resource pack, URL, or HTTP server needed.')
+    print(f'Generated {MOTION_STEPS} vertical map poses per source frame for Velocity.')
 
 if __name__=='__main__':
     main()
