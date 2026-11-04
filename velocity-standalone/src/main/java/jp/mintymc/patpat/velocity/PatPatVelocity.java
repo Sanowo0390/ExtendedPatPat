@@ -824,6 +824,10 @@ public final class PatPatVelocity {
                     (sender instanceof Player p ? (personalEnabled(p.getUniqueId())?"ON":"OFF") : "-")
                     +" | mode="+state
                     +" | skin="+(sender instanceof Player p ? skin(p.getUniqueId()).id() : "-")
+                    +" | image-scale="+number("image-scale",0.5,0.05,1.0)
+                    +" | offset=(" +number("offset-x",0.5,-8,8)+","
+                        +number("offset-y",0,-8,8)+","
+                        +number("offset-z",0,-8,8)+")"
                     +" | active="+active.get()
                     +" | Geyser bridge="+(System.getProperties().get(JAVA_TO_BEDROCK)!=null)));
                 return;
