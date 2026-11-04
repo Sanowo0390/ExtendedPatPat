@@ -550,7 +550,8 @@ public final class PatPatVelocity {
             !enabled("hand-enabled",true))return;
         // Display entities were introduced in Java 1.19.4. ViaVersion cannot
         // translate these displays into something meaningful for older clients.
-        if(view.user.getClientVersion().isOlderThan(ClientVersion.V_1_19_4))return;
+        if(player.getProtocolVersion().getProtocol()<762 ||
+            view.user.getClientVersion().isOlderThan(ClientVersion.V_1_19_4))return;
         Tracked target=view.find(targetId);
         Vector3d pos=target==null && targetId.equals(player.getUniqueId()) ? view.self
             : target==null?null:target.pos;
@@ -618,7 +619,8 @@ public final class PatPatVelocity {
         final Tracked trackedTarget=view.find(targetId);
         final int targetEntityId=trackedTarget!=null?trackedTarget.id:targetId.equals(view.player)?view.selfEntityId:0;
         final boolean squash=enabled("squish-enabled",true) && trackedTarget!=null &&
-            targetEntityId>0 && !view.user.getClientVersion().isOlderThan(ClientVersion.V_1_20_5)
+            targetEntityId>0 && player.getProtocolVersion().getProtocol()>=766 &&
+            !view.user.getClientVersion().isOlderThan(ClientVersion.V_1_20_5)
             && view.squishing.add(targetEntityId);
         final double minScale=number("squish-min-scale",0.86,0.5,1.0);
         try {
@@ -753,6 +755,20 @@ public final class PatPatVelocity {
                 }
                 reload();sender.sendMessage(Component.text("PatPatVelocity configuration reloaded"));return;
             }
+            if(args[0].equalsIgnoreCase("pack")) {
+                if(!(sender instanceof Player p)) {
+                    sender.sendMessage(Component.text("Players only."));return;
+                }
+                if(text("resource-pack-url","").isBlank()) {
+                    sender.sendMessage(Component.text("PatPat pack URL is not configured; "
+                        +"the embedded ZIP is extracted under plugins/patpatvelocity/"));
+                    return;
+                }
+                packOffered.remove(p.getUniqueId());
+                offerPack(p);
+                sender.sendMessage(Component.text("PatPat extra pack offered (if Java 1.21.4+)."));
+                return;
+            }
             if(args[0].equalsIgnoreCase("skin")) {
                 if(!(sender instanceof Player p)) {
                     sender.sendMessage(Component.text("Skin selection is available to players only."));return;
@@ -780,11 +796,11 @@ public final class PatPatVelocity {
                 persistDisabled();
                 sender.sendMessage(Component.text("PatPatVelocity "+(desired?"ON":"OFF")));return;
             }
-            sender.sendMessage(Component.text("/ppv <status|skin [list|id]|toggle [on|off]|reload>"));
+            sender.sendMessage(Component.text("/ppv <status|pack|skin [list|id]|toggle [on|off]|reload>"));
         }
         @Override public List<String> suggest(Invocation invocation) {
             String[] args=invocation.arguments();
-            if(args.length<=1)return List.of("status","skin","toggle","reload");
+            if(args.length<=1)return List.of("status","pack","skin","toggle","reload");
             if(args.length==2 && args[0].equalsIgnoreCase("toggle"))return List.of("on","off");
             if(args.length==2 && args[0].equalsIgnoreCase("skin")) {
                 List<String> options=new ArrayList<>();
