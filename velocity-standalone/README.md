@@ -4,11 +4,19 @@ Java版はURL不要の**地図（Map）画像アニメーション**です。リ
 
 ## 導入
 
-Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.7.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
+Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPat-Velocity-0.6.8.jar`を`plugins/`に配置して再起動してください。統合版への表示はGeyser版も追加します。バックエンドのPaper/PurpurにPatPatの追加は不要です。
 
 - 設定：`plugins/extendedpatpatvelocity/config.properties`
 - コマンド：`/extendedpatpat`（略称`/epp`）
 - 権限：`extendedpatpat.admin`（管理コマンド）
+
+## 描画方式の切り替え（0.6.8）
+
+Velocity版の `plugins/extendedpatpatvelocity/config.properties` で `hand-renderer=item_frame`（従来の高画質な地図方式、**デフォルト**）または `hand-renderer=text_display`（実験的なカメラ追従表示）を選べます。変更後は `/extendedpatpat reload` を実行してください。**どちらもリソースパック不要**で、Geyser拡張やPaper版には影響しません。
+
+`text_display` はJava版1.19.4以降のみ対応し、それ以前のクライアントには従来方式を自動使用します。RGBA画像を24×24程度の色付きブロック文字に変換して1体のText Displayで表示します。`billboard=center` によってプレイヤーの視線に正対し、240msの上下動はDisplayエンティティの位置を更新します。
+
+`text-display-resolution=24`（8〜32）を上げると精細になりますが、1フレームあたりの色コンポーネント数と通信量が増えます。標準の額縁より描画負荷が高くなる可能性があります。バニラフォントの字形・行間・透明セルの制約によって隙間やズレが出る可能性があるため、**実機で試すための実験的レンダラー**です。
 
 ## マップ表示
 
@@ -18,7 +26,7 @@ Velocity 3.5とPacketEvents 2.14.0（Velocity版）を導入し、`ExtendedPatPa
 
 ## よく使う設定
 
-`enabled`、`require-sneaking`、`cooldown-ms`、`image-scale`、`offset-space`、`offset-x/y/z`、`sitting-offset-y`、`hand-motion-depth`、`hand-motion-duration-ms`、`max-active`、`sound-*`、`required-permission`。オプションの公式PatPat Plugin連携は`official-integration-enabled`で切り替えます。
+`hand-renderer`、`text-display-resolution`、`enabled`、`require-sneaking`、`cooldown-ms`、`image-scale`、`offset-space`、`offset-x/y/z`、`sitting-offset-y`、`hand-motion-depth`、`hand-motion-duration-ms`、`max-active`、`sound-*`、`required-permission`。オプションの公式PatPat Plugin連携は`official-integration-enabled`で切り替えます。
 
 `/extendedpatpat skin list`と`/extendedpatpat skin <ID>`で自分が見るマップ画像を選択できます。標準配布にBonkなどのサンプル素材は含まれません。カスタム素材の追加：[resourcepack/README.md](../resourcepack/README.md)。
 

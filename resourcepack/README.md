@@ -11,3 +11,7 @@ Java版の各プレイヤーは`/extendedpatpat skin list`と`/extendedpatpat sk
 ## Velocityの手の上下アニメーション
 
 `resourcepack/build.py` は各スプライトに対して `0_0.bin` ～ `0_4.bin` のように5段階の上下位置を生成します（元の `0.bin` はPaper版用として残します）。Velocityは1つの透明額縁に表示するマップを切り替えて、手を下げて戻す動きを実現します。地図データは同じ接続先に対して一度だけ送信されます。
+
+## Velocity: Text Display表示（リソースパック不要）
+
+`resourcepack/build.py` は元のRGBA画像を `resourcepack/dist/text-art/<ID>/<FRAME>.png` にも変換し、Velocity JARに含めます。画像ファイル自体をクライアントへ配信せず、起動時に色付き文字コンポーネントへ変換します。`hand-renderer=text_display` を選ぶと、`billboard=center` の疑似画像と仮想エンティティの上下移動を使用します。デフォルトの額縁＋地図方式は維持されます。

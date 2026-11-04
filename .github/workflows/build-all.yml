@@ -49,6 +49,10 @@ jobs:
                       assert len(pixels)==16384
                       assert pixels[0]==0, 'Motion map must retain transparent corners'
               assert z.read('maps/default/0_0.bin') != z.read('maps/default/0_4.bin')
+              # Verify optional text-display source frames are bundled in JAR.
+              for frame in range(5):
+                  pixels=z.read(f'text-art/default/{frame}.png')
+                  assert pixels.startswith(bytes([137,80,78,71,13,10,26,10]))
               assert 'PatPatJava-26.3.zip' not in z.namelist()
               assert b'skins=default' in z.read('patpat-skins.properties')
           PY
