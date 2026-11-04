@@ -12,18 +12,18 @@ class HandMotionTest {
         Settings cfg=Settings.from(new Properties());
         assertTrue(cfg.handMotionEnabled());
         assertEquals(240,cfg.handMotionDuration());
-        assertEquals(0.28,cfg.handMotionDepth(),1e-6);
-        assertEquals(0,HandMotion.displacement(0,240,.28),1e-6);
-        float first=HandMotion.displacement(20,240,.28);
-        float deepest=HandMotion.displacement(70,240,.28);
-        float returning=HandMotion.displacement(160,240,.28);
+        assertEquals(0.425,cfg.handMotionDepth(),1e-6);
+        assertEquals(0,HandMotion.displacement(0,240,.425),1e-6);
+        float first=HandMotion.displacement(20,240,.425);
+        float deepest=HandMotion.displacement(70,240,.425);
+        float returning=HandMotion.displacement(160,240,.425);
         assertTrue(first<0,"Hand must start by lowering");
         assertTrue(deepest<first,"Hand must continue lowering before reversing");
-        assertEquals(-.28,deepest,.002,"PatPat's ease-then-sine peaks near 70 ms");
+        assertEquals(-.425,deepest,.002,"PatPat's ease-then-sine peaks near 70 ms");
         assertTrue(returning>deepest,"Hand must rise after pressing");
         assertTrue(returning<0);
-        assertEquals(0,HandMotion.displacement(240,240,.28),1e-6);
-        assertEquals(0,HandMotion.displacement(1000,240,.28),1e-6);
+        assertEquals(0,HandMotion.displacement(240,240,.425),1e-6);
+        assertEquals(0,HandMotion.displacement(1000,240,.425),1e-6);
     }
 
     @Test void movementOnlyChangesYAndPreservesAbsoluteOffsets() {
@@ -36,7 +36,7 @@ class HandMotionTest {
         Vector3f down=start.add(0f,HandMotion.displacement(70,cfg.handMotionDuration(),cfg.handMotionDepth()),0f);
         assertEquals(start.getX(),down.getX(),1e-6);
         assertEquals(start.getZ(),down.getZ(),1e-6);
-        assertEquals(start.getY()-.28,down.getY(),.003);
+        assertEquals(start.getY()-.425,down.getY(),.003);
         assertEquals(start,start.add(0f,HandMotion.displacement(240,cfg.handMotionDuration(),cfg.handMotionDepth()),0f));
     }
 
@@ -60,10 +60,10 @@ class HandMotionTest {
         p.setProperty("hand-motion-depth","NaN");
         p.setProperty("hand-motion-duration-ms","-5");
         Settings cfg=Settings.from(p);
-        assertEquals(.28,cfg.handMotionDepth(),1e-6);
+        assertEquals(.425,cfg.handMotionDepth(),1e-6);
         assertEquals(50,cfg.handMotionDuration());
-        assertEquals(0,HandMotion.displacement(-5,240,.28));
-        assertEquals(0,HandMotion.displacement(40,0,.28));
+        assertEquals(0,HandMotion.displacement(-5,240,.425));
+        assertEquals(0,HandMotion.displacement(40,0,.425));
         assertEquals(0,HandMotion.displacement(40,240,0));
     }
 }

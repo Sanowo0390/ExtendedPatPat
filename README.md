@@ -12,7 +12,7 @@
 | JAR | 動作環境 |
 |---|---|
 | **ExtendedPatPat-Velocity** (0.6.7) | Velocity 3.5 + PacketEvents 2.14.0 |
-| **ExtendedPatPat-Geyser** (0.13.2) | Geyser-Velocity 2.12.1系 |
+| **ExtendedPatPat-Geyser** (0.13.1) | Geyser-Velocity 2.12.1系 |
 | **ExtendedPatPat-Paper** (0.6.1) | Paper/Purpur 26.3（Java 25） |
 
 - **Java・統合版のクロスプレイ**：Velocity版を`plugins/`に、Geyser版をGeyserの`extensions/`に配置。Paperバックエンド用PatPatは不要です。
@@ -21,7 +21,7 @@
 ## 主な機能
 
 - しゃがみ＋対象への操作でPat。手のアニメーション・効果音・クールダウン
-- Java版：**128×128の地図画像を透明な額縁で表示**。Geyserと共通の画像スケール・視聴者方向のX/Zオフセットを使用し、地図画像内の手が上下に動きます。画像データは各地図につき初回のみ転送
+- Java版：**128×128の地図画像を透明な額縁で表示**。Geyserの表示を参考に、Java版に合わせて調整した画像スケールと視聴者方向のX/Zオフセットを使用し、地図画像内の手が上下に動きます。画像データは各地図につき初回のみ転送
 - 統合版：PNG/GIF、手の上下動、Squish（凹み）、音、任意のカメラ演出
 - Velocity＋Geyser：Java⇔統合版の相互演出
 - 個人ごとのON/OFF、権限設定、Java版スキン切替（地図画像に変換して同梱可能）
@@ -43,7 +43,7 @@
 
 **ON/OFFの仕様：** `toggle off` でPatの送信・受信を両方停止し、自分がPat対象になることも防ぎます。表示中の手も終了します。`toggle on` で再開し、指定なしの `toggle` は反転します。設定は再接続後も保持されます。Geyser-VelocityとVelocity版を併用している統合版プレイヤーは、Velocityの `/extendedpatpat toggle` またはGeyserの `/extendedpatpatgeyser toggle` のどちらでも同じ状態を操作できます。
 
-既定の表示サイズは `image-scale=0.6`、上下移動は `hand-motion-depth=0.28` ブロックです。Java/統合版で同じ値に設定してください。既存の設定ファイルは自動変更されません。
+Java版（Velocity）はGeyser版の見た目を基準に、手のサイズを `image-scale=0.6`、上下移動量を `hand-motion-depth=0.28` ブロックに調整しています。**Geyser版は従来どおり `image-scale=0.5` / `hand-motion-depth=0.425`** です。描画方式が違うため、両方を同じ数値にする必要はありません。既存のVelocity設定ファイルは自動変更されません。
 
 詳細：[Velocityの設定](velocity-standalone/README.md) ／ [Paperの設定](paper-standalone/README.md) ／ [画像の追加方法](resourcepack/README.md)
 

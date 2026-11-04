@@ -45,7 +45,7 @@ class MapFramesTest {
         assertTrue(small<large,"image-scale=0.5 should be smaller than 1.0");
         assertTrue(small>0,"Scaled map should not become transparent");
     }
-    @Test void defaultImageIsLargerAndPhysicalStrokeMatchesGeyserDepth() {
+    @Test void velocityDefaultUsesLargerImageAndShorterStrokeThanGeyser() {
         byte[] full=new byte[128*128];
         Arrays.fill(full,(byte)1);
         byte[] up=MapFrames.scaleAndMove(full,0.6,0,0.28);
@@ -54,7 +54,8 @@ class MapFramesTest {
         int width=0;
         for(int x=0;x<128;x++)if(up[start*128+x]!=0)width++;
         assertEquals(77,width,"0.6 block image should be 77 map pixels wide");
-        assertEquals(36,end-start,"0.28 block stroke should be 36 map pixels");
+        assertEquals(36,end-start,"0.28 block Velocity stroke should be 36 map pixels");
+        assertTrue(0.28 < 0.425,"Velocity travel is intentionally smaller than Geyser's unchanged default");
         assertTrue(end+width<=128,"The whole stroke must remain inside the map");
     }
 

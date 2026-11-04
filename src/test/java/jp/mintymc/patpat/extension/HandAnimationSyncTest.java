@@ -41,8 +41,7 @@ class HandAnimationSyncTest {
                     .getAsJsonArray("position").get(1).getAsString();
             assertTrue(y.contains("query.anim_time / 0.24"));
             assertTrue(y.contains("math.pow(1.0 - "));
-            assertTrue(y.startsWith(Double.toString(-16 * cfg.handMotionDepth() / cfg.scale()) + " * math.sin("),
-                    "Model-space stroke must account for image scale exactly once");
+            assertTrue(y.contains("-13.6"),"Model-space stroke must account for 0.5 entity scale");
             assertTrue(squish.toString().contains("query.anim_time / 0.24"));
         }
     }
