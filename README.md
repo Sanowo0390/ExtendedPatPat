@@ -1,6 +1,6 @@
 # PatPat — Velocity / Geyser / Paper 🐾
 
-このリポジトリでは、**Java版・統合版をサポートするVelocity構成**と、**Paper/Purpur単体向け構成**を、それぞれ別のJARとして開発・配布しています。開発・ビルドの基準ブランチは **`master`** です。
+このリポジトリでは、**Java版・統合版をサポートするVelocity構成**と、**Paper/Purpur単体向け構成**を、それぞれ別のJARとして開発・配布しています。開発・ビルドの基準ブランチは **`main`** です。
 
 ## 配布する3つのJAR
 
@@ -18,7 +18,7 @@
 
 **同一サーバーにPaper版とVelocity版を同時導入しないでください。** 演出の重複を招きます。また、Java版のブロック製の手は元のPatPatクライアントModの2D画像とは異なります。
 
-ビルドはリポジトリの `master` で実行し、ActionsのArtifactsから対応するJARを取得してください。Geyser版はGeyser 2.12.1系のb1280および最新ビルドに対して検証されます。なお、GitHub Actionsの成功はゲーム内動作の保証ではありません。
+ビルドはリポジトリの `main` で実行し、ActionsのArtifactsから対応するJARを取得してください。Geyser版はGeyser 2.12.1系のb1280および最新ビルドに対して検証されます。なお、GitHub Actionsの成功はゲーム内動作の保証ではありません。
 
 ---
 
