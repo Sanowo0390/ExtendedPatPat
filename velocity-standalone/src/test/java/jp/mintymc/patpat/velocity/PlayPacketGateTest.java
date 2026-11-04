@@ -30,6 +30,12 @@ class PlayPacketGateTest {
             "Client-bound writes must use encoder, not decoder protocol state");
         assertTrue(source.contains("ServerPreConnectEvent"),
             "Stop effects at start of a backend switch, not only when it completes");
+        assertTrue(source.contains("replacement.backend=event.getServer().getServerInfo().getName()"),
+            "ServerConnectedEvent must use event destination; getCurrentServer may be null");
+        assertFalse(source.contains("replacement.backend=serverOf(player)"),
+            "This bug made canSendPlay reject all Pat effects after joining a backend");
+        assertTrue(source.contains("previous.switching=false;"),
+            "Recover Pat rendering when an NPC's backend switch fails");
         assertTrue(source.contains("delay(75L,TimeUnit.MILLISECONDS)"),
             "Give NPC server transfer handlers an opportunity to begin before spawning maps");
         assertTrue(source.contains("if(event.getConnectionState()!=ConnectionState.PLAY)return;"),
