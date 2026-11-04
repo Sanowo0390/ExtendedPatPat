@@ -150,6 +150,37 @@ def map_pixels(frame):
         data[i]=choice
     return bytes(data)
 
+# Pre-render five vertical hand positions; ItemFrame is block-attached in
+# Java 26.3, so sub-block teleport packets cannot move its visible map.
+# Shift the map ART instead and keep the same frame entity.
+MOTION_STEPS=5
+MOTION_TRAVEL_PX=28
+
+def motion_pixels(frame):
+    side=max(frame.size)
+    source=Image.new('RGBA',(side,side),(0,0,0,0))
+    source.alpha_composite(frame,((side-frame.width)//2,(side-frame.height)//2))
+    source=source.resize((128,128),resample=Image.Resampling.NEAREST)
+    bbox=source.getbbox()
+    if bbox is None:
+        return [bytes(128*128) for _ in range(MOTION_STEPS)]
+    hand=source.crop(bbox)
+    max_h=128-MOTION_TRAVEL_PX-8
+    ratio=min(1.0,122/hand.width,max_h/hand.height)
+    if ratio<1.0:
+        hand=hand.resize((max(1,round(hand.width*ratio)),
+                          max(1,round(hand.height*ratio))),
+                         resample=Image.Resampling.NEAREST)
+    left=(128-hand.width)//2
+    top=(128-MOTION_TRAVEL_PX-hand.height)//2
+    results=[]
+    for motion in range(MOTION_STEPS):
+        shift=round(MOTION_TRAVEL_PX*motion/(MOTION_STEPS-1))
+        image=Image.new('RGBA',(128,128),(0,0,0,0))
+        image.alpha_composite(hand,(left,top+shift))
+        results.append(map_pixels(image))
+    return results
+
 def main():
     with Image.open(SOURCE) as im:
         rgba=im.convert('RGBA')
@@ -180,12 +211,18 @@ def main():
         folder=OUT/'maps'/skin.id
         folder.mkdir(parents=True,exist_ok=True)
         for n,frame in enumerate(skin.frames):
+            # Paper still uses the original single-map art.
             pixels=map_pixels(frame)
             assert len(pixels)==16384
             (folder/(str(n)+'.bin')).write_bytes(pixels)
+            # Velocity uses a different map ID for each vertical motion phase.
+            # The image is transmitted once per phase, not on each pat/tick.
+            for pose,art in enumerate(motion_pixels(frame)):
+                assert len(art)==16384
+                (folder/(f'{n}_{pose}.bin')).write_bytes(art)
     (OUT/'patpat-skins.properties').write_text('\n'.join(index)+'\n',encoding='utf-8')
     print('Compiled '+', '.join(s.id+'('+str(len(s.frames))+' map frames)' for s in styles))
-    print('No client resource pack, URL, or HTTP server needed.')
+    print('No client resource pack, URL, or HTTP server needed.')\n    print(f'Generated {MOTION_STEPS} vertical map poses per source frame for Velocity.')
 
 if __name__=='__main__':
     main()
