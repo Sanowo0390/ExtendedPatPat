@@ -1,8 +1,32 @@
-# PatPatGeyserExtension 🐾
+# PatPat — Velocity / Geyser / Paper 🐾
+
+このリポジトリでは、**Java版・統合版をサポートするVelocity構成**と、**Paper/Purpur単体向け構成**を、それぞれ別のJARとして開発・配布しています。開発・ビルドの基準ブランチは **`master`** です。
+
+## 配布する3つのJAR
+
+| コンポーネント | 最新版 | 導入先 | 役割 | GitHub Actions |
+|---|---|---|---|---|
+| **PatPatVelocity** | 0.1.2 | `Velocity/plugins/` | Java版の操作検出、仮想手、Java↔統合版中継 | [Velocity版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-velocity.yml) |
+| **PatPatGeyserExtension** | 0.12.0 | `Velocity/plugins/Geyser-Velocity/extensions/` | 統合版の手画像・効果音・モーション | [Geyser版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) |
+| **PatPatVanilla** | 0.1.0 | `Paper/plugins/` | Paper/Purpur単体向けJava版の手アニメーション | [Paper版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-paper.yml) |
+
+### どちらの構成を使う？
+
+**VelocityでJava版＋統合版を連携**させたい場合は、PatPatVelocity＋PacketEvents＋Geyser-Velocity＋PatPatGeyserExtensionを導入してください。バックエンドのPaper/Purpur側にはPatPatプラグインを入れる必要はありません。設定は `official-integration-enabled=false` と `standalone-mode=true` が基本です。詳細は [Velocity版README](velocity-standalone/README.md)。
+
+**Paper/Purpur単体**でJava版クライアントにPat演出を追加したい場合は、PatPatVanillaだけを導入してください。詳細は [Paper版README](paper-standalone/README.md)。Paper版は独立実装で、**Velocity版のJava↔統合版ブリッジ機能は含まれていません**。
+
+**同一サーバーにPaper版とVelocity版を同時導入しないでください。** 演出の重複を招きます。また、Java版のブロック製の手は元のPatPatクライアントModの2D画像とは異なります。
+
+ビルドはリポジトリの `master` で実行し、ActionsのArtifactsから対応するJARを取得してください。Geyser版はGeyser 2.12.1系のb1280および最新ビルドに対して検証されます。なお、GitHub Actionsの成功はゲーム内動作の保証ではありません。
+
+---
+
+## Geyser拡張の詳細
 
 Geyserを利用する**Minecraft統合版（Bedrock Edition）プレイヤー**向けのPatPat拡張機能です。しゃがみながら空のメインハンドでモブやプレイヤーを操作すると、対象の頭上に手のPNGスプライトシート／GIFアニメーションを表示し、**手が下がって戻るモーション**と効果音を再生します。さらに統合版側では対象のモデルが一瞬むにゅっと縮む「Squish」演出にも対応します。
 
-サーバー側のPatPatプラグインがなくても動作します。PatPat本体がある場合は本体との通信を優先し、Java版クライアントModとの演出共有にも対応します。
+サーバー側のPatPatプラグインがなくても動作します。Velocity版を併用するとJava版との演出共有に対応します。公式PatPat Pluginとの通信は任意で有効化できます。
 
 ## 必要環境
 
@@ -188,7 +212,7 @@ PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240ms
 ## 動作モードと制限
 
 - **バックエンドPatPatあり**：本体とのV2通信を利用。PatPat本体の権限・制限に従い、Java版Modからの演出も統合版に届きます。
-- **バックエンドPatPatなし**：Geyserが演出を直接表示。同じGeyserインスタンスで同じ接続先・ワールドの対象を認識している統合版プレイヤーに共有します。Java版や別Geyserインスタンスには送信しません。
+- **バックエンドPatPatなし**：Geyserが統合版への演出を直接表示します。PatPatVelocityを併用すると、同じVelocityインスタンスのJava版へも演出を中継できます。PatPatVelocityを導入していない場合は、Java版への中継はありません。
 - `/patpatbedrock test` は照準先の対象が見つからないと表示しません。自分の頭上に自動表示する仕様ではありません。
 - 本機能はGeyserのパケット・エンティティ情報に依存します。端末ごとの操作や他プラグインとの組合せは実際のサーバーで確認してください。
 
@@ -201,7 +225,7 @@ PatPat Java版（1.3.2）の描画処理に合わせ、手の画像は**約240ms
 
 Geyserのビルド番号やコミットSHAの固定判定を撤廃しました。起動時には利用中のGeyserに必要なクラス・メソッドが存在するかを確認します。互換性があれば新しいビルドでも有効化します。互換性がなければ不足したAPI名をログに表示して停止します。カメラの内部APIのみ非対応の場合は、カメラ演出を無効化し、他のPat演出を維持します。
 
-GitHub Actionsは **Geyser 2.12.1-b1280と2.12.1系の最新ビルド** を別々にコンパイル・単体テストします。公式ダウンロードAPIが返すSHA-256でJARを検証しており、mainへマージ後は週1回の互換性チェックが動きます。
+GitHub Actionsは **Geyser 2.12.1-b1280と2.12.1系の最新ビルド** を別々にコンパイル・単体テストします。公式ダウンロードAPIが返すSHA-256でJARを検証しており、GitHubのデフォルトブランチ上では週1回の互換性チェックが実行されます。
 
 ローカルでビルドを固定する場合は `GEYSER_BUILD=1284 python scripts/prepare_build.py`、最新を使う場合は `python scripts/prepare_build.py` とします。
 
