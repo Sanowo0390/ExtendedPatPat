@@ -88,6 +88,7 @@ public final class PatPatVelocity {
     private static final String BEDROCK_USERS="jp.mintymc.patpat.bridge.v1.bedrock-users";
     private static final String BEDROCK_TOGGLE_READ="jp.mintymc.patpat.bridge.v1.toggle-read";
     private static final String BEDROCK_TOGGLE_WRITE="jp.mintymc.patpat.bridge.v1.toggle-write";
+    private static final String JAVA_TOGGLE_READ="jp.mintymc.patpat.bridge.v1.java-toggle-read";
     private static final String PREFER_STANDALONE="jp.mintymc.patpat.bridge.v1.prefer-standalone";
     // These names and packet formats are defined by the upstream LopyMine/PatPat-Plugin.
     private static final String REGISTER_CHANNEL="minecraft:register";
@@ -104,6 +105,8 @@ public final class PatPatVelocity {
     private final AtomicInteger entitySequence=new AtomicInteger(1_900_000_000);
     private final AtomicInteger active=new AtomicInteger();
     private final Consumer<Object[]> bedrockConsumer=this::receiveBedrockPat;
+    private final java.util.function.Function<UUID,Boolean> javaToggleRead=
+        uuid->!disabled.contains(uuid);
     private final java.util.function.BooleanSupplier standalonePreference=
         ()->!enabled("official-integration-enabled",false);
 
@@ -121,6 +124,7 @@ public final class PatPatVelocity {
         proxy.getCommandManager().register(meta,new Commands());
         System.getProperties().put(BEDROCK_TO_JAVA,bedrockConsumer);
         System.getProperties().put(PREFER_STANDALONE,standalonePreference);
+        System.getProperties().put(JAVA_TOGGLE_READ,javaToggleRead);
         log.info("ExtendedPatPat Velocity ready; mode={}, bridge via Geyser",
             enabled("official-integration-enabled",false)?"optional-official":"proxy-standalone");
     }
@@ -131,6 +135,8 @@ public final class PatPatVelocity {
             System.getProperties().remove(BEDROCK_TO_JAVA);
         if(System.getProperties().get(PREFER_STANDALONE)==standalonePreference)
             System.getProperties().remove(PREFER_STANDALONE);
+        if(System.getProperties().get(JAVA_TOGGLE_READ)==javaToggleRead)
+            System.getProperties().remove(JAVA_TOGGLE_READ);
         views.clear();
     }
 
@@ -409,6 +415,7 @@ public final class PatPatVelocity {
                     view.lastPat=now;
                     if(enabled("cancel-interaction",false))event.setCancelled(true);
                     UUID targetUuid=target.uuid;
+                    if(!personalEnabled(targetUuid))return;
                     if(official) {
                         // Upstream validates: permission, rate limit, whitelist/blacklist,
                         // living target/range, and cancellable PatPacketReceiveEvent.
@@ -421,9 +428,10 @@ public final class PatPatVelocity {
                         return;
                     }
                     proxy.getScheduler().buildTask(PatPatVelocity.this,()->{
-                        if(!personalEnabled(uuid))return;
+                        if(!personalEnabled(uuid) || !personalEnabled(targetUuid))return;
                         renderToJava(uuid,targetUuid);
-                        if(enabled("bridge-enabled",true) && personalEnabled(uuid))
+                        if(enabled("bridge-enabled",true) &&
+                                personalEnabled(uuid) && personalEnabled(targetUuid))
                             sendToBedrock(uuid,targetUuid);
                     }).schedule();
                 }
@@ -506,14 +514,14 @@ public final class PatPatVelocity {
         if(payload==null || payload.length!=2 || !(payload[0] instanceof UUID actor)
                 || !(payload[1] instanceof UUID target))return;
         if(!enabled("enabled",true) || !enabled("bridge-enabled",true)
-                || !personalEnabled(actor))return;
+                || !personalEnabled(actor) || !personalEnabled(target))return;
         proxy.getScheduler().buildTask(this,()->{
-            if(personalEnabled(actor))renderToJava(actor,target);
+            if(personalEnabled(actor) && personalEnabled(target))renderToJava(actor,target);
         }).schedule();
     }
 
     private void renderToJava(UUID actorId,UUID targetId) {
-        if(!personalEnabled(actorId))return;
+        if(!personalEnabled(actorId) || !personalEnabled(targetId))return;
         Player actor=proxy.getPlayer(actorId).orElse(null);
         if(actor==null)return;
         String server=serverOf(actor);
@@ -528,7 +536,7 @@ public final class PatPatVelocity {
     private void renderToJavaViewer(Player player,View view,UUID targetId,UUID actorId) {
         if(view==null || views.get(player.getUniqueId())!=view || view.user==null ||
             !player.isActive() || isBedrock(player.getUniqueId()) ||
-            !personalEnabled(player.getUniqueId()) ||
+            !personalEnabled(player.getUniqueId()) || !personalEnabled(targetId) ||
             (actorId!=null && !personalEnabled(actorId)) || view.realMod ||
             !enabled("hand-enabled",true))return;
         // Item frames and maps are supported by old Java clients and ViaVersion.
@@ -639,6 +647,7 @@ public final class PatPatVelocity {
                 try {
                     if(tick++>=duration || views.get(player.getUniqueId())!=view ||
                             !player.isActive() || !personalEnabled(player.getUniqueId()) ||
+                            !personalEnabled(targetId) ||
                             (actorId!=null && !personalEnabled(actorId))){
                         finish();return;
                     }
