@@ -69,3 +69,12 @@ individual artifacts. Old individual workflows are now manual-only.
 The repository does not automatically commit uploaded third-party skin ZIPs.
 Custom skins must be committed into \`resourcepack/skins/\` for GitHub Actions
 to include them. ZIP extraction is never performed on the build runner.
+
+
+## 標準配布（0.4.0以降）
+
+GitHub Actionsからダウンロードできるのは `PatPatVelocity`・`PatPatGeyserExtension`・`PatpatPaper` の**3つのJARのみ**です。Java版の標準画像ZIPはVelocity版とPaper版のJARに内包され、起動時にプラグインのデータフォルダーへ書き出されます。サンプルBonkは同梱しません。
+
+ユーザー側への適用は、通常のサーバーリソースパックとは独立したパックの追加リクエスト（UUID指定）で行います。ただしMinecraftはクライアントがダウンロードできるHTTP(S) URLを要求します。`resource-pack-url` にZIPの公開URLを設定するか、JARに付属する読み取り専用HTTP配信機能を有効化し、そのURLを公開してください。既存の `server.properties` のリソースパック設定は変更不要です。
+
+ViaVersion経由のJava 1.21.4以降は画像方式、1.19.4～1.21.3はVoxel方式、それより古いクライアントはDisplayパケットの送信を抑制します。実際の表示互換性はクライアント／Viaの組み合わせごとに確認が必要です。

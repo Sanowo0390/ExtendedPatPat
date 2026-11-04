@@ -6,15 +6,15 @@
 
 | コンポーネント | 最新版 | 導入先 | 役割 | GitHub Actions |
 |---|---|---|---|---|
-| **PatPatVelocity** | 0.3.0 | `Velocity/plugins/` | Java版の操作検出、仮想手、Java↔統合版中継 | [Velocity版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-velocity.yml) |
+| **PatPatVelocity** | 0.4.0 | `Velocity/plugins/` | Java版の操作検出、仮想手、Java↔統合版中継 | [Velocity版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-velocity.yml) |
 | **PatPatGeyserExtension** | 0.12.0 | `Velocity/plugins/Geyser-Velocity/extensions/` | 統合版の手画像・効果音・モーション | [Geyser版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build.yml) |
-| **PatPatVanilla** | 0.3.0 | `Paper/plugins/` | Paper/Purpur単体向けJava版の手アニメーション | [Paper版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-paper.yml) |
+| **PatpatPaper** | 0.4.0 | `Paper/plugins/` | Paper/Purpur単体向けJava版の手アニメーション | [Paper版をビルド](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-paper.yml) |
 
 ### どちらの構成を使う？
 
 **VelocityでJava版＋統合版を連携**させたい場合は、PatPatVelocity＋PacketEvents＋Geyser-Velocity＋PatPatGeyserExtensionを導入してください。バックエンドのPaper/Purpur側にはPatPatプラグインを入れる必要はありません。設定は `official-integration-enabled=false` と `standalone-mode=true` が基本です。詳細は [Velocity版README](velocity-standalone/README.md)。
 
-**Paper/Purpur単体**でJava版クライアントにPat演出を追加したい場合は、PatPatVanillaだけを導入してください。詳細は [Paper版README](paper-standalone/README.md)。Paper版は独立実装で、**Velocity版のJava↔統合版ブリッジ機能は含まれていません**。
+**Paper/Purpur単体**でJava版クライアントにPat演出を追加したい場合は、PatpatPaperだけを導入してください。詳細は [Paper版README](paper-standalone/README.md)。Paper版は独立実装で、**Velocity版のJava↔統合版ブリッジ機能は含まれていません**。
 
 **同一サーバーにPaper版とVelocity版を同時導入しないでください。** 演出の重複を招きます。Java版は共通のリソースパックによって5コマの画像手を表示します。リソースパックを使用しない場合はブロック製の手へ切り替え可能です。
 
@@ -24,9 +24,9 @@
 
 ## 一括ビルド・スキン選択
 
-[**Build All PatPat（統合GitHub Actions）**](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-all.yml) を使うと、**Geyser拡張・Velocity版・Paper版の3つのJARと、対応するJava版リソースパック**を1回の実行でビルドし、最終的に `PatPat-Complete` からまとめてダウンロードできます。
+[**Build All PatPat（統合GitHub Actions）**](https://github.com/Sanowo0390/PatPatGeyserExtension/actions/workflows/build-all.yml) を使うと、**Geyser拡張・Velocity版・Paper版の3つのJARを**並列ビルド**し、同じGitHub Actions実行から個別にダウンロードできます。Java版の標準リソースパックは各JARに内包され、`Complete` やパック単体の配布物は作りません。
 
-Mod向けのPatPat画像パック（ZIP）、横並びPNG、GIFを `resourcepack/skins/` に入れてビルドすると、すべてがJava版リソースパックに統合されます。Java版プレイヤーごとに `/ppv skin list` と `/ppv skin <ID>` で手を選択でき、選択を保存します。詳しくは [カスタムスキンの導入方法](resourcepack/README.md) を確認してください。
+公開Actionsでは標準の手画像だけをビルドします。Bonkなどのサンプル画像は含みません。カスタムビルド時のみ `resourcepack/skins/` に素材を置けます。Java版プレイヤーごとに `/ppv skin list` と `/ppv skin <ID>` で手を選択でき、選択を保存します。詳しくは [カスタムスキンの導入方法](resourcepack/README.md) を確認してください。
 
 ## Java版リソースパック（26.3）
 

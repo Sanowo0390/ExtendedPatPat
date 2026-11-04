@@ -6,7 +6,7 @@ Place any *.zip (PatPat resource pack), *.png (horizontal sprite strip), or
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
-import hashlib, json, re, zipfile
+import hashlib, json, re, zipfile, os
 from PIL import Image, ImageSequence
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -127,7 +127,7 @@ def main():
         first=Skin('default','Default',decode_frames(b.getvalue(),5))
     styles=[first]
     seen={'default'}
-    if SKINS.exists():
+    if SKINS.exists() and os.environ.get("PATPAT_DEFAULT_ONLY","0")!="1":
         for path in sorted(SKINS.iterdir()):
             if path.name.startswith('.') or not path.is_file(): continue
             if path.suffix.lower()=='.zip':
@@ -140,7 +140,9 @@ def main():
     if len(styles)>32: raise ValueError('Too many skin packs')
     pack={'pack.mcmeta':j({'pack':{
         'description':'PatPat animated hands | Minecraft Java 26.3',
-        'min_format':[97,1], 'max_format':97}})}
+        'pack_format':46,
+        'supported_formats':{'min_inclusive':46,'max_inclusive':97},
+        'min_format':46,'max_format':97}})}
     index=['# Generated: both plugins embed this exact manifest.',
         'skins='+','.join(s.id for s in styles)]
     sounds={}
